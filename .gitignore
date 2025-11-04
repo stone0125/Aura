@@ -1,0 +1,56 @@
+# --------------------------
+# Miscellaneous
+# --------------------------
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+Thumbs.db
+nul
+
+# --------------------------
+# Flutter/Dart
+# --------------------------
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.metadata
+build/
+**/doc/api/
+
+# --------------------------
+# Android / Gradle
+# --------------------------
+.gradle/
+android/.gradle/
+android/build/
+android/app/debug/
+android/app/profile/
+android/app/release/
+
+# --------------------------
+# iOS / Xcode
+# --------------------------
+**/ios/Flutter/.last_build_id
+
+# --------------------------
+# IDEs
+# --------------------------
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+
+# --------------------------
+# Personal / Local files
+# --------------------------
+local.properties
+
+# --------------------------
+# Symbolication / Obfuscation
+# -
+app.*.symbols
+app.*.map.json
