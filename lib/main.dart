@@ -6,6 +6,8 @@ import 'providers/theme_provider.dart';
 import 'providers/habit_provider.dart';
 import 'providers/habit_detail_provider.dart';
 import 'providers/ai_coach_provider.dart';
+import 'providers/progress_provider.dart';
+import 'providers/settings_provider.dart';
 import 'screens/home_screen.dart';
 
 void main() {
@@ -40,6 +42,12 @@ class MyApp extends StatelessWidget {
 
         // AI Coach Provider
         ChangeNotifierProvider(create: (_) => AICoachProvider()),
+
+        // Progress Provider
+        ChangeNotifierProvider(create: (_) => ProgressProvider()),
+
+        // Settings Provider
+        ChangeNotifierProvider(create: (_) => SettingsProvider()),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, child) {

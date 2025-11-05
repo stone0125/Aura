@@ -7,6 +7,8 @@ import '../widgets/home/habit_list.dart';
 import '../config/theme/app_colors.dart';
 import 'habit_creation_screen.dart';
 import 'ai_coach_screen.dart';
+import 'progress_screen.dart';
+import 'settings_screen.dart';
 
 /// Home Screen - Primary Dashboard
 class HomeScreen extends StatefulWidget {
@@ -22,9 +24,9 @@ class _HomeScreenState extends State<HomeScreen> {
   // Define screens for each tab
   final List<Widget> _screens = [
     const _HomeTab(),
-    const _ProgressTab(),
+    const ProgressScreen(),
     const AICoachScreen(),
-    const _SettingsTab(),
+    const SettingsScreen(),
   ];
 
   @override
@@ -70,17 +72,6 @@ class _HomeScreenState extends State<HomeScreen> {
             setState(() {
               _currentIndex = index;
             });
-
-            // Show placeholder messages for non-implemented tabs
-            if (index == 1 || index == 3) {
-              final tabNames = ['Home', 'Progress', 'AI Coach', 'Settings'];
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('${tabNames[index]} screen coming soon!'),
-                  duration: const Duration(seconds: 2),
-                ),
-              );
-            }
           },
           items: const [
             BottomNavigationBarItem(
@@ -144,106 +135,6 @@ class _HomeTab extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// Progress Tab Placeholder
-class _ProgressTab extends StatelessWidget {
-  const _ProgressTab();
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return SafeArea(
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(40),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.bar_chart_rounded,
-                size: 80,
-                color: isDark ? AppColors.darkCoral : AppColors.lightCoral,
-              ),
-              const SizedBox(height: 20),
-              Text(
-                'Progress Screen',
-                style: TextStyle(
-                  color: isDark
-                      ? AppColors.darkPrimaryText
-                      : AppColors.lightPrimaryText,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Coming soon!',
-                style: TextStyle(
-                  color: isDark
-                      ? AppColors.darkSecondaryText
-                      : AppColors.lightSecondaryText,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w400,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Settings Tab Placeholder
-class _SettingsTab extends StatelessWidget {
-  const _SettingsTab();
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return SafeArea(
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(40),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.settings_rounded,
-                size: 80,
-                color: isDark ? AppColors.darkCoral : AppColors.lightCoral,
-              ),
-              const SizedBox(height: 20),
-              Text(
-                'Settings Screen',
-                style: TextStyle(
-                  color: isDark
-                      ? AppColors.darkPrimaryText
-                      : AppColors.lightPrimaryText,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Coming soon!',
-                style: TextStyle(
-                  color: isDark
-                      ? AppColors.darkSecondaryText
-                      : AppColors.lightSecondaryText,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w400,
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

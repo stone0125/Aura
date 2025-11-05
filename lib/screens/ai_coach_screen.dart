@@ -5,6 +5,7 @@ import '../models/ai_coach_models.dart';
 import '../models/ai_habit_suggestion.dart';
 import '../providers/ai_coach_provider.dart';
 import '../config/theme/app_colors.dart';
+import '../models/habit_category.dart';
 import 'habit_creation_screen.dart';
 
 /// AI Coach Screen with personalized suggestions and insights
