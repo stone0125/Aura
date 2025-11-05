@@ -1,0 +1,4 @@
+# This file stores settings for Dart & Flutter DevTools.
+# Documentation: https://docs.flutter.dev/tools/devtools/extensions#configure-extension-enablement-states
+
+extensions: {}

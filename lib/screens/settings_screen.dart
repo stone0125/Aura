@@ -1029,7 +1029,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 value: value,
                 onChanged: onChanged,
                 activeTrackColor: isDark ? AppColors.darkCoral.withValues(alpha: 0.5) : AppColors.lightCoral.withValues(alpha: 0.5),
-                activeColor: isDark ? AppColors.darkCoral : AppColors.lightCoral,
                 thumbColor: WidgetStateProperty.resolveWith((states) {
                   if (states.contains(WidgetState.selected)) {
                     return isDark ? AppColors.darkCoral : AppColors.lightCoral;

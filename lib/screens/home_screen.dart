@@ -112,7 +112,7 @@ class _HomeTab extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Header Section
-                const HomeHeader(userName: 'Lucas'),
+                const HomeHeader(userName: 'Stone'),
 
                 // AI Suggestion Card
                 const AISuggestionCard(),
