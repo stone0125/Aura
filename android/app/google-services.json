@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "314464093764",
+    "project_id": "aura-habit-tra",
+    "storage_bucket": "aura-habit-tra.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:314464093764:android:d6d5b60666091732781e11",
+        "android_client_info": {
+          "package_name": "com.aura.habittracker"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "314464093764-3l6fq00kol5slkqqu10oi4cem646uebj.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.aura.habittracker",
+            "certificate_hash": "aea7a5b1b496293d0bde68749d3ab21adabbdb60"
+          }
+        },
+        {
+          "client_id": "314464093764-squts7kosrc0s0kn9nsp1nshk1strk3i.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCzYx5_KSv_VEyTgd9no-Jj0rrL9bCPfEA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "314464093764-squts7kosrc0s0kn9nsp1nshk1strk3i.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "314464093764-cien0ubrsfkrmd4j5jlqmvoerishrsiq.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.aura.habittracke"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

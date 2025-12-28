@@ -1,30 +1,138 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../services/auth_service.dart';
+import '../services/firestore_service.dart';
+import '../services/badge_service.dart';
 import '../models/settings_models.dart';
 
 /// Provider for managing app settings and user profile
 class SettingsProvider with ChangeNotifier {
+  final FirestoreService _firestoreService = FirestoreService();
   UserProfile _userProfile = UserProfile(
-    id: 'user_001',
-    firstName: 'Sarah',
-    lastName: 'Mitchell',
-    email: 'sarah.mitchell@email.com',
-    displayName: 'Sarah M.',
-    bio: 'Building better habits, one day at a time. Computer Science student passionate about self-improvement.',
-    avatarUrl: null, // Can be set to actual URL
-    memberSince: DateTime.now().subtract(const Duration(days: 90)),
+    id: '',
+    firstName: '',
+    lastName: '',
+    email: '',
+    displayName: '',
+    bio: '',
+    avatarUrl: null,
+    memberSince: DateTime.now(),
     isPro: false,
   );
 
   AppSettings _settings = const AppSettings();
 
+  SettingsProvider() {
+    _initAuthListener();
+  }
+
+  void _initAuthListener() {
+    FirebaseAuth.instance.authStateChanges().listen((user) {
+      if (user != null) {
+        initialize();
+      } else {
+        // Clear user profile on logout
+        _userProfile = UserProfile(
+          id: '',
+          firstName: '',
+          lastName: '',
+          email: '',
+          displayName: '',
+          bio: '',
+          avatarUrl: null,
+          memberSince: DateTime.now(),
+          isPro: false,
+        );
+        notifyListeners();
+      }
+    });
+  }
+
   // Getters
   UserProfile get userProfile => _userProfile;
   AppSettings get settings => _settings;
 
-  /// Initialize settings (load from SharedPreferences in real app)
+  /// Initialize settings and load user profile
   Future<void> initialize() async {
-    // Simulate loading delay
-    await Future.delayed(const Duration(milliseconds: 300));
+    // Load saved settings locally (if needed in future)
+
+    // Load real user data if logged in
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      try {
+        await user.reload(); // Ensure we have latest data
+        final freshUser = FirebaseAuth.instance.currentUser!;
+        debugPrint(
+          "DEBUG: SettingsProvider init - Auth User: uid=${freshUser.uid}, name=${freshUser.displayName}, email=${freshUser.email}",
+        );
+
+        final userDoc = await _firestoreService.getUserProfile(freshUser.uid);
+
+        if (userDoc != null) {
+          debugPrint(
+            "DEBUG: Firestore Profile found: ${userDoc.firstName} ${userDoc.lastName}",
+          );
+          _userProfile = userDoc;
+
+          // Self-heal: If firestore name OR email is missing but auth has it, update it
+          bool needsUpdate = false;
+          UserProfile updatedProfile = _userProfile;
+
+          if ((updatedProfile.firstName.isEmpty ||
+                  updatedProfile.firstName == 'User') &&
+              freshUser.displayName != null &&
+              freshUser.displayName!.isNotEmpty) {
+            debugPrint("DEBUG: Fixing empty DB name with Auth data");
+            final names = freshUser.displayName!.split(' ');
+            updatedProfile = updatedProfile.copyWith(
+              firstName: names.first,
+              lastName: names.length > 1 ? names.sublist(1).join(' ') : '',
+              displayName: freshUser.displayName,
+            );
+            needsUpdate = true;
+          }
+
+          if (updatedProfile.email.isEmpty &&
+              freshUser.email != null &&
+              freshUser.email!.isNotEmpty) {
+            debugPrint("DEBUG: Fixing empty DB email with Auth data");
+            updatedProfile = updatedProfile.copyWith(email: freshUser.email);
+            needsUpdate = true;
+          }
+
+          if (needsUpdate) {
+            _userProfile = updatedProfile;
+            await _firestoreService.updateUserProfile(updatedProfile);
+          }
+        } else {
+          debugPrint("DEBUG: No Firestore doc found, creating new.");
+          // Fallback if doc doesn't exist yet, create from Auth
+          final names = freshUser.displayName?.split(' ') ?? ['User'];
+          String firstName = names.first;
+          String lastName = names.length > 1 ? names.sublist(1).join(' ') : '';
+
+          if (firstName.isEmpty) firstName = 'User';
+
+          _userProfile = UserProfile(
+            id: freshUser.uid,
+            firstName: firstName,
+            lastName: lastName,
+            displayName: freshUser.displayName ?? 'User',
+            email: freshUser.email ?? '',
+            bio: 'Ready to build better habits!',
+            avatarUrl: freshUser.photoURL,
+            memberSince: freshUser.metadata.creationTime ?? DateTime.now(),
+            isPro: false,
+          );
+          // Create in DB
+          await _firestoreService.updateUserProfile(_userProfile);
+        }
+      } catch (e) {
+        debugPrint('Error loading user profile: $e');
+      }
+    } else {
+      debugPrint("DEBUG: SettingsProvider init - No user logged in");
+    }
     notifyListeners();
   }
 
@@ -46,7 +154,13 @@ class SettingsProvider with ChangeNotifier {
       avatarUrl: avatarUrl,
     );
     notifyListeners();
-    _saveToStorage();
+    // Persist changes to Firestore
+    if (_userProfile.id.isNotEmpty) {
+      _firestoreService.updateUserProfile(_userProfile);
+    }
+    if (_userProfile.id.isNotEmpty) {
+      _firestoreService.updateUserProfile(_userProfile);
+    }
   }
 
   /// Upgrade to Pro
@@ -93,6 +207,7 @@ class SettingsProvider with ChangeNotifier {
   /// Toggle badge
   void setBadgeEnabled(bool enabled) {
     _settings = _settings.copyWith(badgeEnabled: enabled);
+    BadgeService().setBadgeEnabled(enabled);
     notifyListeners();
     _saveToStorage();
   }
@@ -220,7 +335,10 @@ class SettingsProvider with ChangeNotifier {
   }
 
   /// Change password
-  Future<bool> changePassword(String currentPassword, String newPassword) async {
+  Future<bool> changePassword(
+    String currentPassword,
+    String newPassword,
+  ) async {
     // Simulate API call
     await Future.delayed(const Duration(seconds: 1));
     // In real app, would verify current password and update
@@ -229,9 +347,8 @@ class SettingsProvider with ChangeNotifier {
 
   /// Sign out
   Future<void> signOut() async {
-    // Simulate sign out
-    await Future.delayed(const Duration(milliseconds: 500));
-    // In real app, would clear auth tokens and navigate to login
+    await AuthService().signOut();
+    notifyListeners();
   }
 
   /// Delete account

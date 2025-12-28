@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import '../models/habit.dart';
 import '../models/habit_stats.dart';
+import '../services/firestore_service.dart';
 
 /// Provider for managing habit detail data
 class HabitDetailProvider with ChangeNotifier {
@@ -24,11 +26,14 @@ class HabitDetailProvider with ChangeNotifier {
     return _completions.any((c) => c.isToday);
   }
 
-  /// Load habit details
+  final FirestoreService _firestoreService = FirestoreService();
+
+  /// Load habit details with real history
   Future<void> loadHabitDetails(Habit habit) async {
     _habit = habit;
-    _loadMockData();
     notifyListeners();
+
+    await _loadData();
 
     // Load AI insight if needed
     if (_aiInsight == null || _aiInsight!.isStale) {
@@ -36,88 +41,191 @@ class HabitDetailProvider with ChangeNotifier {
     }
   }
 
-  /// Load mock data for demonstration
-  void _loadMockData() {
+  /// Load real data from Firestore
+  Future<void> _loadData() async {
     if (_habit == null) return;
 
-    // Mock statistics
-    _stats = HabitStats(
-      currentStreak: _habit!.streak,
-      longestStreak: 21,
-      totalCompletions: 87,
-      completionRate: 85.2,
-      bestDay: 'Tuesday',
-      bestTime: '9:15 AM',
-    );
+    try {
+      final history = await _firestoreService.getHabitHistory(_habit!.id);
 
-    // Mock completions
-    final now = DateTime.now();
-    _completions = [
-      HabitCompletion(
-        id: '1',
-        date: now,
-        time: '9:15 AM',
-        method: CompletionMethod.manual,
-        notes: '',
-      ),
-      HabitCompletion(
-        id: '2',
-        date: now.subtract(const Duration(days: 1)),
-        time: '9:30 AM',
-        method: CompletionMethod.reminder,
-        notes: '',
-      ),
-      HabitCompletion(
-        id: '3',
-        date: now.subtract(const Duration(days: 2)),
-        time: '10:00 AM',
-        method: CompletionMethod.manual,
-        notes: '',
-      ),
-      HabitCompletion(
-        id: '4',
-        date: now.subtract(const Duration(days: 3)),
-        time: '9:00 AM',
-        method: CompletionMethod.quickTap,
-        notes: '',
-      ),
-      HabitCompletion(
-        id: '5',
-        date: now.subtract(const Duration(days: 4)),
-        time: '9:45 AM',
-        method: CompletionMethod.manual,
-        notes: '',
-      ),
-    ];
+      // Convert to completions list
+      _completions = history
+          .map(
+            (date) => HabitCompletion(
+              id: date.millisecondsSinceEpoch.toString(),
+              date: date,
+              time: '${date.hour}:${date.minute.toString().padLeft(2, '0')}',
+              method: CompletionMethod.manual, // Default
+              notes: '',
+            ),
+          )
+          .toList();
 
-    // Mock calendar data (last 30 days)
-    _calendarData = {};
-    for (int i = 0; i < 30; i++) {
-      final date = now.subtract(Duration(days: i));
-      // 85% completion rate simulation
-      final isCompleted = (i % 7) != 0 && (i % 5) != 4;
-      _calendarData[DateTime(date.year, date.month, date.day)] = isCompleted;
+      // Sort completions (newest first)
+      _completions.sort((a, b) => b.date.compareTo(a.date));
+
+      // Build Calendar Data
+      _calendarData = {};
+      for (var date in history) {
+        _calendarData[DateTime(date.year, date.month, date.day)] = true;
+      }
+
+      // Calculate Stats
+      _calculateStats(history);
+    } catch (e) {
+      debugPrint("Error loading habit details: $e");
     }
+    notifyListeners();
   }
 
-  /// Load AI insight
+  void _calculateStats(List<DateTime> history) {
+    if (_habit == null) return;
+
+    // Calculate streaks
+    int currentStreak = 0;
+    int longestStreak = 0;
+
+    // Sort dates ascending for streak calc
+    var sortedDates = List<DateTime>.from(history);
+    sortedDates.sort((a, b) => a.compareTo(b));
+
+    // Normalize to YMD to avoid time issues
+    var uniqueDates = sortedDates
+        .map((d) => DateTime(d.year, d.month, d.day))
+        .toSet()
+        .toList();
+    uniqueDates.sort((a, b) => a.compareTo(b));
+
+    if (uniqueDates.isNotEmpty) {
+      // Current Streak
+      // Check if today or yesterday is in list (if no, streak is 0)
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final yesterday = today.subtract(const Duration(days: 1));
+
+      if (uniqueDates.contains(today)) {
+        // Count backwards
+        currentStreak = 1;
+        var checkDate = yesterday;
+        while (uniqueDates.contains(checkDate)) {
+          currentStreak++;
+          checkDate = checkDate.subtract(const Duration(days: 1));
+        }
+      } else if (uniqueDates.contains(yesterday)) {
+        currentStreak =
+            0; // Or does streak persist? Usually if you miss today, streak is technically valid until day ends?
+        // Let's assume if it contains yesterday, streak is valid.
+        var checkDate = yesterday;
+        while (uniqueDates.contains(checkDate)) {
+          currentStreak++;
+          checkDate = checkDate.subtract(const Duration(days: 1));
+        }
+      } else {
+        currentStreak = 0;
+      }
+
+      // Longest Streak
+      int tempStreak = 0;
+      DateTime? lastDate;
+      for (var date in uniqueDates) {
+        if (lastDate == null) {
+          tempStreak = 1;
+        } else {
+          if (date.difference(lastDate).inDays == 1) {
+            tempStreak++;
+          } else {
+            if (tempStreak > longestStreak) longestStreak = tempStreak;
+            tempStreak = 1;
+          }
+        }
+        lastDate = date;
+      }
+      if (tempStreak > longestStreak) longestStreak = tempStreak;
+    }
+
+    // Calculate days tracked (from first completion to now)
+    int daysTracked = 1;
+    if (uniqueDates.isNotEmpty) {
+      final firstDate = uniqueDates.first;
+      final now = DateTime.now();
+      daysTracked = now.difference(firstDate).inDays + 1;
+    }
+
+    // Calculate actual completion rate
+    final double completionRate = daysTracked > 0
+        ? (history.length / daysTracked * 100).clamp(0.0, 100.0)
+        : 0.0;
+
+    // Calculate best day of week
+    final dayCount = <int, int>{};
+    for (var date in uniqueDates) {
+      dayCount[date.weekday] = (dayCount[date.weekday] ?? 0) + 1;
+    }
+    String bestDay = 'No data';
+    if (dayCount.isNotEmpty) {
+      final bestDayNum = dayCount.entries
+          .reduce((a, b) => a.value > b.value ? a : b)
+          .key;
+      const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      bestDay = dayNames[bestDayNum - 1];
+    }
+
+    _stats = HabitStats(
+      currentStreak: currentStreak,
+      longestStreak: longestStreak,
+      totalCompletions: history.length,
+      completionRate: completionRate,
+      bestDay: bestDay,
+      bestTime: 'Morning', // Would need time data to calculate
+    );
+  }
+
+  /// Load AI insight from Cloud Function
   Future<void> _loadAIInsight() async {
+    if (_habit == null) return;
+
     _isLoadingInsight = true;
     notifyListeners();
 
-    // Simulate API delay
-    await Future.delayed(const Duration(seconds: 2));
+    try {
+      final functions = FirebaseFunctions.instance;
+      final callable = functions.httpsCallable('generateHabitInsight');
 
-    // Mock AI insight
-    _aiInsight = AIInsight(
-      text: 'You complete this habit 90% of the time after breakfast 🍳',
-      confidence: 'high',
-      generatedAt: DateTime.now(),
-      supportingIcon: 'coffee',
-    );
+      // Calculate recent completions (last 7 days)
+      final now = DateTime.now();
+      final weekAgo = now.subtract(const Duration(days: 7));
+      final recentCompletions = _completions
+          .where((c) => c.date.isAfter(weekAgo))
+          .length;
 
-    _isLoadingInsight = false;
-    notifyListeners();
+      final result = await callable.call({
+        'habitName': _habit!.name,
+        'category': _habit!.category.name,
+        'currentStreak': _stats?.currentStreak ?? _habit!.streak,
+        'totalCompletions': _stats?.totalCompletions ?? _completions.length,
+        'recentDays': recentCompletions,
+      });
+
+      final data = result.data;
+      _aiInsight = AIInsight(
+        text: data['text'] ?? 'Keep going!',
+        confidence: data['confidence'] ?? 'medium',
+        generatedAt: DateTime.now(),
+        supportingIcon: data['icon'] ?? 'trending_up',
+      );
+    } catch (e) {
+      debugPrint('Error loading AI insight: $e');
+      // Fallback to simple message
+      _aiInsight = AIInsight(
+        text: 'Keep building your habit!',
+        confidence: 'low',
+        generatedAt: DateTime.now(),
+        supportingIcon: 'psychology',
+      );
+    } finally {
+      _isLoadingInsight = false;
+      notifyListeners();
+    }
   }
 
   /// Refresh AI insight
@@ -127,63 +235,17 @@ class HabitDetailProvider with ChangeNotifier {
 
   /// Mark habit as complete for today
   Future<void> completeHabit() async {
-    if (_habit == null || isCompletedToday) return;
+    if (_habit == null) return;
 
-    // Create new completion
-    final now = DateTime.now();
-    final timeStr =
-        '${now.hour}:${now.minute.toString().padLeft(2, '0')} ${now.hour >= 12 ? 'PM' : 'AM'}';
-
-    final completion = HabitCompletion(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      date: now,
-      time: timeStr,
-      method: CompletionMethod.manual,
-      notes: '',
-    );
-
-    _completions.insert(0, completion);
-
-    // Update stats
-    _stats = HabitStats(
-      currentStreak: _stats!.currentStreak + 1,
-      longestStreak: _stats!.currentStreak + 1 > _stats!.longestStreak
-          ? _stats!.currentStreak + 1
-          : _stats!.longestStreak,
-      totalCompletions: _stats!.totalCompletions + 1,
-      completionRate: _stats!.completionRate, // Recalculate in real app
-      bestDay: _stats!.bestDay,
-      bestTime: _stats!.bestTime,
-    );
-
-    // Update calendar
-    _calendarData[DateTime(now.year, now.month, now.day)] = true;
-
-    notifyListeners();
+    await _firestoreService.toggleHabitCompletion(
+      _habit!,
+    ); // This handles history logging we added
+    await _loadData(); // Reload to update UI
   }
 
-  /// Undo today's completion
+  /// Undo today's completion (handled by toggle logic mostly, but explicit undo might be needed)
   Future<void> undoCompletion() async {
-    if (_habit == null || !isCompletedToday) return;
-
-    // Remove today's completion
-    _completions.removeWhere((c) => c.isToday);
-
-    // Update stats
-    _stats = HabitStats(
-      currentStreak: _stats!.currentStreak - 1,
-      longestStreak: _stats!.longestStreak,
-      totalCompletions: _stats!.totalCompletions - 1,
-      completionRate: _stats!.completionRate,
-      bestDay: _stats!.bestDay,
-      bestTime: _stats!.bestTime,
-    );
-
-    // Update calendar
-    final now = DateTime.now();
-    _calendarData[DateTime(now.year, now.month, now.day)] = false;
-
-    notifyListeners();
+    await completeHabit(); // Toggle acts as undo if already completed
   }
 
   /// Get chart data for time range
@@ -197,11 +259,13 @@ class HabitDetailProvider with ChangeNotifier {
       final dateKey = DateTime(date.year, date.month, date.day);
       final isCompleted = _calendarData[dateKey] ?? false;
 
-      points.add(ChartDataPoint(
-        date: dateKey,
-        value: isCompleted ? 1.0 : 0.0,
-        isCompleted: isCompleted,
-      ));
+      points.add(
+        ChartDataPoint(
+          date: dateKey,
+          value: isCompleted ? 1.0 : 0.0,
+          isCompleted: isCompleted,
+        ),
+      );
     }
 
     return points;

@@ -1,21 +1,80 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../models/ai_habit_suggestion.dart';
+import '../../models/ai_coach_models.dart';
 import '../../models/habit_category.dart';
 import '../../providers/habit_provider.dart';
+import '../../providers/ai_coach_provider.dart';
 import '../../config/theme/app_colors.dart';
 import '../../screens/habit_creation_screen.dart';
+import '../../screens/home_screen.dart';
 
-/// AI Suggestion Card widget
-class AISuggestionCard extends StatelessWidget {
+/// AI Suggestion Card widget (Live Version)
+class AISuggestionCard extends StatefulWidget {
   const AISuggestionCard({super.key});
 
   @override
+  State<AISuggestionCard> createState() => _AISuggestionCardState();
+}
+
+class _AISuggestionCardState extends State<AISuggestionCard> {
+  @override
+  void initState() {
+    super.initState();
+    // Defer loading to next frame to access context/providers safely
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadSuggestionsIfNeeded();
+    });
+  }
+
+  void _loadSuggestionsIfNeeded() {
+    if (!mounted) return;
+
+    final aiCoachProvider = Provider.of<AICoachProvider>(
+      context,
+      listen: false,
+    );
+    final habitProvider = Provider.of<HabitProvider>(context, listen: false);
+
+    // If no suggestions yet, load them
+    if (aiCoachProvider.suggestions.isEmpty &&
+        !aiCoachProvider.isLoadingSuggestions) {
+      // Get current context for AI
+      final currentHabitNames = habitProvider.habits
+          .map((h) => h.name)
+          .toList();
+      // Simple categories list, or could be smarter
+      final categories = HabitCategory.values.map((c) => c.name).toList();
+
+      aiCoachProvider.loadSuggestions(
+        categories: categories,
+        currentHabits: currentHabitNames,
+      );
+    }
+  }
+
+  void _refreshSuggestions() {
+    final aiCoachProvider = Provider.of<AICoachProvider>(
+      context,
+      listen: false,
+    );
+    final habitProvider = Provider.of<HabitProvider>(context, listen: false);
+
+    final currentHabitNames = habitProvider.habits.map((h) => h.name).toList();
+    final categories = HabitCategory.values.map((c) => c.name).toList();
+
+    aiCoachProvider.loadSuggestions(
+      categories: categories,
+      currentHabits: currentHabitNames,
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final habitProvider = Provider.of<HabitProvider>(context);
+    // Listen to AICoachProvider for data
+    final aiCoachProvider = Provider.of<AICoachProvider>(context);
+    final suggestions = aiCoachProvider.suggestions;
+    final isLoading = aiCoachProvider.isLoadingSuggestions;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final suggestions = habitProvider.aiSuggestions;
-    final isLoading = habitProvider.isLoadingSuggestions;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
@@ -83,9 +142,7 @@ class AISuggestionCard extends StatelessWidget {
               Material(
                 color: Colors.transparent,
                 child: InkWell(
-                  onTap: isLoading
-                      ? null
-                      : () => habitProvider.refreshAISuggestions(),
+                  onTap: isLoading ? null : _refreshSuggestions,
                   borderRadius: BorderRadius.circular(16),
                   child: Container(
                     width: 32,
@@ -127,7 +184,7 @@ class AISuggestionCard extends StatelessWidget {
 
           // Subtitle
           Text(
-            'Based on your habits and goals',
+            'Personalized using advanced AI',
             style: TextStyle(
               color: isDark
                   ? AppColors.darkSecondaryText
@@ -139,12 +196,12 @@ class AISuggestionCard extends StatelessWidget {
           const SizedBox(height: 16),
 
           // Suggestions Preview
-          if (isLoading)
+          if (isLoading && suggestions.isEmpty)
             _buildLoadingState(isDark)
           else if (suggestions.isEmpty)
             _buildEmptyState(isDark)
           else
-            _buildSuggestionsList(suggestions, isDark, habitProvider),
+            _buildSuggestionsList(suggestions, isDark),
         ],
       ),
     );
@@ -235,18 +292,6 @@ class AISuggestionCard extends StatelessWidget {
                 fontWeight: FontWeight.w500,
               ),
             ),
-            const SizedBox(height: 4),
-            Text(
-              'We need at least 5 days of data',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: isDark
-                    ? AppColors.darkSecondaryText
-                    : AppColors.lightSecondaryText,
-                fontSize: 12,
-                fontWeight: FontWeight.w400,
-              ),
-            ),
           ],
         ),
       ),
@@ -254,30 +299,13 @@ class AISuggestionCard extends StatelessWidget {
   }
 
   Widget _buildSuggestionsList(
-    List<AIHabitSuggestion> suggestions,
+    List<AICoachSuggestion> suggestions,
     bool isDark,
-    HabitProvider habitProvider,
-  ) {
-    return Builder(
-      builder: (context) => _buildSuggestionsContent(
-        context,
-        suggestions,
-        isDark,
-        habitProvider,
-      ),
-    );
-  }
-
-  Widget _buildSuggestionsContent(
-    BuildContext context,
-    List<AIHabitSuggestion> suggestions,
-    bool isDark,
-    HabitProvider habitProvider,
   ) {
     return Column(
       children: [
         SizedBox(
-          height: 120,
+          height: 130, // Slightly taller for better layout
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             itemCount: suggestions.length,
@@ -298,34 +326,82 @@ class AISuggestionCard extends StatelessWidget {
                       ? AppColors.darkSurfaceVariant
                       : AppColors.lightBorder.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isDark
+                        ? AppColors.darkBorder
+                        : AppColors.lightBorder.withValues(alpha: 0.3),
+                    width: 1,
+                  ),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Category Icon
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                          colors: gradientColors,
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
+                    // Category Icon & Impact Badge
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              colors: gradientColors,
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                          ),
+                          child: Icon(
+                            suggestion.category.icon,
+                            color: Colors.white,
+                            size: 16,
+                          ),
                         ),
-                      ),
-                      child: Icon(
-                        suggestion.category.icon,
-                        color: Colors.white,
-                        size: 16,
-                      ),
+                        // Mini Add Button
+                        SizedBox(
+                          height: 28,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              // Navigate to habit creation screen with Live AI Suggestion
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) => HabitCreationScreen(
+                                    aiCoachSuggestion: suggestion,
+                                  ),
+                                ),
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: isDark
+                                  ? AppColors.darkCoral
+                                  : AppColors.lightCoral,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                              ),
+                              minimumSize: const Size(0, 28),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              elevation: 0,
+                            ),
+                            child: const Text(
+                              '+ Add',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 8),
 
                     // Habit Name
                     Text(
-                      suggestion.habitName,
-                      maxLines: 2,
+                      suggestion.title,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: isDark
@@ -340,8 +416,8 @@ class AISuggestionCard extends StatelessWidget {
                     // Explanation
                     Expanded(
                       child: Text(
-                        suggestion.explanation,
-                        maxLines: 1,
+                        suggestion.description,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: isDark
@@ -349,43 +425,7 @@ class AISuggestionCard extends StatelessWidget {
                               : AppColors.lightSecondaryText,
                           fontSize: 12,
                           fontWeight: FontWeight.w400,
-                        ),
-                      ),
-                    ),
-
-                    // Add Button
-                    SizedBox(
-                      height: 28,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          // Navigate to habit creation screen with AI pre-fill
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => HabitCreationScreen(
-                                aiSuggestion: suggestion,
-                              ),
-                            ),
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: isDark
-                              ? AppColors.darkCoral
-                              : AppColors.lightCoral,
-                          foregroundColor:
-                              isDark ? AppColors.darkBackground : Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          minimumSize: const Size(0, 28),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          elevation: 0,
-                        ),
-                        child: const Text(
-                          '+ Add',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
+                          height: 1.2,
                         ),
                       ),
                     ),
@@ -402,13 +442,19 @@ class AISuggestionCard extends StatelessWidget {
           alignment: Alignment.centerRight,
           child: TextButton(
             onPressed: () {
-              // Navigate to AI Coach screen
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('AI Coach screen coming soon!'),
-                  duration: Duration(seconds: 2),
-                ),
-              );
+              // 1. Set the initial tab on the provider
+              Provider.of<AICoachProvider>(
+                context,
+                listen: false,
+              ).setTab(AICoachTab.suggestions);
+
+              // 2. Switch to AI Coach tab (index 2)
+              // We find the ancestor HomeScreenState and call switchToTab
+              final homeState = context
+                  .findAncestorStateOfType<HomeScreenState>();
+              if (homeState != null) {
+                homeState.switchToTab(2);
+              }
             },
             style: TextButton.styleFrom(
               padding: EdgeInsets.zero,

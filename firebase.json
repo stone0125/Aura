@@ -1,0 +1,32 @@
+{
+    "firestore": {
+        "rules": "firestore.rules",
+        "indexes": "firestore.indexes.json"
+    },
+    "functions": {
+        "source": "functions"
+    },
+    "flutter": {
+        "platforms": {
+            "android": {
+                "default": {
+                    "projectId": "aura-habit-tra",
+                    "appId": "1:314464093764:android:6ad655cd4e65ca98781e11",
+                    "fileOutput": "android/app/google-services.json"
+                }
+            },
+            "dart": {
+                "lib/firebase_options.dart": {
+                    "projectId": "aura-habit-tra",
+                    "configurations": {
+                        "android": "1:314464093764:android:6ad655cd4e65ca98781e11",
+                        "ios": "1:314464093764:ios:4bb91343dadca47e781e11",
+                        "macos": "1:314464093764:ios:4bb91343dadca47e781e11",
+                        "web": "1:314464093764:web:c2ebce98e0559ed2781e11",
+                        "windows": "1:314464093764:web:c28e4805063fc004781e11"
+                    }
+                }
+            }
+        }
+    }
+}

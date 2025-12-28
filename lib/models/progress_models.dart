@@ -3,21 +3,17 @@ import 'habit.dart';
 import 'habit_category.dart';
 
 /// Date range for progress filtering
-enum DateRange {
-  thisWeek,
-  thisMonth,
-  allTime,
-}
+enum DateRange { thisWeek, thisMonth, allTime }
 
 extension DateRangeExtension on DateRange {
   String get displayName {
     switch (this) {
       case DateRange.thisWeek:
-        return 'This Week';
+        return 'Week';
       case DateRange.thisMonth:
-        return 'This Month';
+        return 'Month';
       case DateRange.allTime:
-        return 'All Time';
+        return 'All';
     }
   }
 
@@ -98,10 +94,7 @@ class TrendDataPoint {
   final DateTime date;
   final double completionRate; // 0.0 to 1.0
 
-  const TrendDataPoint({
-    required this.date,
-    required this.completionRate,
-  });
+  const TrendDataPoint({required this.date, required this.completionRate});
 }
 
 /// Habit performance ranking
@@ -198,7 +191,7 @@ class Achievement {
         'Sep',
         'Oct',
         'Nov',
-        'Dec'
+        'Dec',
       ];
       return '${months[unlockedAt!.month - 1]} ${unlockedAt!.day}, ${unlockedAt!.year}';
     }

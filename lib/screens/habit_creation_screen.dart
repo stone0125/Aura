@@ -4,19 +4,18 @@ import 'package:provider/provider.dart';
 import '../models/habit.dart';
 import '../models/habit_category.dart';
 import '../models/habit_form_data.dart';
-import '../models/ai_habit_suggestion.dart';
+import '../models/ai_coach_models.dart';
 import '../providers/habit_provider.dart';
 import '../config/theme/app_colors.dart';
 import '../config/habit_icons.dart';
+import '../services/notification_service.dart';
 
 /// Habit Creation Screen
 class HabitCreationScreen extends StatefulWidget {
-  final AIHabitSuggestion? aiSuggestion;
+  /// Live AI Coach suggestion from Cloud Functions
+  final AICoachSuggestion? aiCoachSuggestion;
 
-  const HabitCreationScreen({
-    super.key,
-    this.aiSuggestion,
-  });
+  const HabitCreationScreen({super.key, this.aiCoachSuggestion});
 
   @override
   State<HabitCreationScreen> createState() => _HabitCreationScreenState();
@@ -43,18 +42,19 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
     _formData = HabitFormData();
 
     // Pre-fill from AI suggestion if provided
-    if (widget.aiSuggestion != null) {
-      final suggestion = widget.aiSuggestion!;
-      _formData.name = suggestion.habitName;
-      _formData.description = suggestion.explanation;
+    if (widget.aiCoachSuggestion != null) {
+      final suggestion = widget.aiCoachSuggestion!;
+      _formData.name = suggestion.title;
+      _formData.description = suggestion.description;
       _formData.category = suggestion.category;
-      _formData.selectedIcon =
-          HabitIcons.getDefaultIconForCategory(suggestion.category.name);
+      _formData.selectedIcon = HabitIcons.getDefaultIconForCategory(
+        suggestion.category.name,
+      );
       _formData.aiOptimizedTiming = true;
       _formData.isAISuggested = true;
 
-      _nameController.text = suggestion.habitName;
-      _descriptionController.text = suggestion.explanation;
+      _nameController.text = suggestion.title;
+      _descriptionController.text = suggestion.description;
     } else {
       // Default icon
       _formData.selectedIcon = HabitIcons.icons.first.icon;
@@ -128,18 +128,32 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
     // Simulate save delay
     await Future.delayed(const Duration(milliseconds: 500));
 
-    // Create habit
+    // Create habit with reminder settings
     final habit = Habit(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       name: _formData.name,
       category: _formData.category!,
       streak: 0,
       isCompleted: false,
+      reminderEnabled: _formData.reminderEnabled,
+      reminderTime: _formData.reminderEnabled ? _formData.reminderTime : null,
     );
 
     if (mounted) {
       final habitProvider = Provider.of<HabitProvider>(context, listen: false);
       habitProvider.addHabit(habit);
+
+      // Schedule notification if reminder is enabled
+      if (_formData.reminderEnabled) {
+        await NotificationService().scheduleHabitReminder(
+          habitId: habit.id,
+          habitName: habit.name,
+          hour: _formData.reminderTime.hour,
+          minute: _formData.reminderTime.minute,
+        );
+      }
+
+      if (!mounted) return;
 
       // Success feedback
       HapticFeedback.mediumImpact();
@@ -149,9 +163,13 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
 
       // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Habit created!'),
-          duration: Duration(seconds: 2),
+        SnackBar(
+          content: Text(
+            _formData.reminderEnabled
+                ? 'Habit created with reminder!'
+                : 'Habit created!',
+          ),
+          duration: const Duration(seconds: 2),
         ),
       );
     }
@@ -172,9 +190,7 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
             ),
             TextButton(
               onPressed: () => Navigator.of(context).pop(true),
-              style: TextButton.styleFrom(
-                foregroundColor: AppColors.red,
-              ),
+              style: TextButton.styleFrom(foregroundColor: AppColors.red),
               child: const Text('Discard'),
             ),
           ],
@@ -208,8 +224,9 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
         }
       },
       child: Scaffold(
-        backgroundColor:
-            isDark ? AppColors.darkBackground : AppColors.lightBackground,
+        backgroundColor: isDark
+            ? AppColors.darkBackground
+            : AppColors.lightBackground,
         appBar: _buildAppBar(isDark),
         body: Stack(
           children: [
@@ -269,7 +286,9 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
       leading: IconButton(
         icon: Icon(
           Icons.close_rounded,
-          color: isDark ? AppColors.darkPrimaryText : AppColors.lightPrimaryText,
+          color: isDark
+              ? AppColors.darkPrimaryText
+              : AppColors.lightPrimaryText,
         ),
         onPressed: () async {
           final shouldPop = await _onWillPop();
@@ -281,7 +300,9 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
       title: Text(
         _formData.isAISuggested ? 'Add AI Suggestion' : 'Create Habit',
         style: TextStyle(
-          color: isDark ? AppColors.darkPrimaryText : AppColors.lightPrimaryText,
+          color: isDark
+              ? AppColors.darkPrimaryText
+              : AppColors.lightPrimaryText,
           fontSize: 18,
           fontWeight: FontWeight.w600,
         ),
@@ -293,8 +314,8 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
             color: _formData.isValid
                 ? (isDark ? AppColors.darkCoral : AppColors.lightCoral)
                 : (isDark
-                    ? AppColors.darkSecondaryText
-                    : AppColors.lightSecondaryText),
+                      ? AppColors.darkSecondaryText
+                      : AppColors.lightSecondaryText),
           ),
           onPressed: _formData.isValid ? _saveHabit : null,
         ),
@@ -409,8 +430,9 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
             controller: _nameController,
             maxLength: 50,
             style: TextStyle(
-              color:
-                  isDark ? AppColors.darkPrimaryText : AppColors.lightPrimaryText,
+              color: isDark
+                  ? AppColors.darkPrimaryText
+                  : AppColors.lightPrimaryText,
               fontSize: 16,
             ),
             decoration: InputDecoration(
@@ -463,10 +485,10 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
                   color: _formData.nameExceedsLimit
                       ? AppColors.red
                       : _formData.nameNearLimit
-                          ? AppColors.orange
-                          : (isDark
-                              ? AppColors.darkSecondaryText
-                              : AppColors.lightSecondaryText),
+                      ? AppColors.orange
+                      : (isDark
+                            ? AppColors.darkSecondaryText
+                            : AppColors.lightSecondaryText),
                   fontSize: 11,
                 ),
               ),
@@ -502,8 +524,9 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
             maxLength: 200,
             maxLines: 3,
             style: TextStyle(
-              color:
-                  isDark ? AppColors.darkPrimaryText : AppColors.lightPrimaryText,
+              color: isDark
+                  ? AppColors.darkPrimaryText
+                  : AppColors.lightPrimaryText,
               fontSize: 15,
             ),
             decoration: InputDecoration(
@@ -597,8 +620,9 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
             child: Row(
               children: HabitCategory.values.map((category) {
                 final isSelected = _formData.category == category;
-                final gradientColors =
-                    category.getGradient(isDark ? Brightness.dark : Brightness.light);
+                final gradientColors = category.getGradient(
+                  isDark ? Brightness.dark : Brightness.light,
+                );
 
                 return Padding(
                   padding: const EdgeInsets.only(right: 12),
@@ -611,7 +635,8 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
                           _formData.category = category;
                           _formData.selectedIcon =
                               HabitIcons.getDefaultIconForCategory(
-                                  category.name);
+                                category.name,
+                              );
                           _categoryError = null;
                         });
                       },
@@ -629,8 +654,8 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
                             color: isSelected
                                 ? Colors.transparent
                                 : (isDark
-                                    ? AppColors.darkBorder
-                                    : AppColors.lightBorder),
+                                      ? AppColors.darkBorder
+                                      : AppColors.lightBorder),
                             width: 1.5,
                           ),
                         ),
@@ -642,11 +667,11 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
                               size: 18,
                               color: isSelected
                                   ? (isDark
-                                      ? AppColors.darkBackground
-                                      : Colors.white)
+                                        ? AppColors.darkBackground
+                                        : Colors.white)
                                   : (isDark
-                                      ? AppColors.darkSecondaryText
-                                      : AppColors.lightSecondaryText),
+                                        ? AppColors.darkSecondaryText
+                                        : AppColors.lightSecondaryText),
                             ),
                             const SizedBox(width: 8),
                             Text(
@@ -654,11 +679,11 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
                               style: TextStyle(
                                 color: isSelected
                                     ? (isDark
-                                        ? AppColors.darkBackground
-                                        : Colors.white)
+                                          ? AppColors.darkBackground
+                                          : Colors.white)
                                     : (isDark
-                                        ? AppColors.darkSecondaryText
-                                        : AppColors.lightPrimaryText),
+                                          ? AppColors.darkSecondaryText
+                                          : AppColors.lightPrimaryText),
                                 fontSize: 14,
                                 fontWeight: isSelected
                                     ? FontWeight.w600
@@ -715,8 +740,10 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
             runSpacing: 8,
             children: HabitIcons.icons.map((iconData) {
               final isSelected = _formData.selectedIcon == iconData.icon;
-              final categoryColor = _formData.category?.getGradient(
-                      isDark ? Brightness.dark : Brightness.light)[0] ??
+              final categoryColor =
+                  _formData.category?.getGradient(
+                    isDark ? Brightness.dark : Brightness.light,
+                  )[0] ??
                   (isDark ? AppColors.darkCoral : AppColors.lightCoral);
 
               return Material(
@@ -736,25 +763,20 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
                       color: isSelected
                           ? categoryColor
                           : (isDark
-                              ? AppColors.darkSurfaceVariant
-                              : AppColors.lightBorder.withValues(alpha: 0.3)),
+                                ? AppColors.darkSurfaceVariant
+                                : AppColors.lightBorder.withValues(alpha: 0.3)),
                       border: isSelected
-                          ? Border.all(
-                              color: categoryColor,
-                              width: 2,
-                            )
+                          ? Border.all(color: categoryColor, width: 2)
                           : null,
                     ),
                     child: Icon(
                       iconData.icon,
                       size: 24,
                       color: isSelected
-                          ? (isDark
-                              ? AppColors.darkBackground
-                              : Colors.white)
+                          ? (isDark ? AppColors.darkBackground : Colors.white)
                           : (isDark
-                              ? AppColors.darkSecondaryText
-                              : AppColors.lightSecondaryText),
+                                ? AppColors.darkSecondaryText
+                                : AppColors.lightSecondaryText),
                     ),
                   ),
                 ),
@@ -816,8 +838,8 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
                       decoration: BoxDecoration(
                         color: isSelected
                             ? (isDark
-                                ? AppColors.darkBorder
-                                : AppColors.lightSurface)
+                                  ? AppColors.darkBorder
+                                  : AppColors.lightSurface)
                             : Colors.transparent,
                         borderRadius: BorderRadius.circular(10),
                         boxShadow: isSelected
@@ -838,11 +860,11 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
                           style: TextStyle(
                             color: isSelected
                                 ? (isDark
-                                    ? AppColors.darkCoral
-                                    : AppColors.lightCoral)
+                                      ? AppColors.darkCoral
+                                      : AppColors.lightCoral)
                                 : (isDark
-                                    ? AppColors.darkSecondaryText
-                                    : AppColors.lightPrimaryText),
+                                      ? AppColors.darkSecondaryText
+                                      : AppColors.lightPrimaryText),
                             fontSize: 14,
                             fontWeight: isSelected
                                 ? FontWeight.w600
@@ -909,11 +931,11 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
                       shape: BoxShape.circle,
                       color: isSelected
                           ? (isDark
-                              ? AppColors.darkCoral
-                              : AppColors.lightCoral)
+                                ? AppColors.darkCoral
+                                : AppColors.lightCoral)
                           : (isDark
-                              ? AppColors.darkSurfaceVariant
-                              : AppColors.lightBorder.withValues(alpha: 0.3)),
+                                ? AppColors.darkSurfaceVariant
+                                : AppColors.lightBorder.withValues(alpha: 0.3)),
                       border: !isSelected
                           ? Border.all(
                               color: isDark
@@ -929,11 +951,11 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
                         style: TextStyle(
                           color: isSelected
                               ? (isDark
-                                  ? AppColors.darkBackground
-                                  : Colors.white)
+                                    ? AppColors.darkBackground
+                                    : Colors.white)
                               : (isDark
-                                  ? AppColors.darkSecondaryText
-                                  : AppColors.lightPrimaryText),
+                                    ? AppColors.darkSecondaryText
+                                    : AppColors.lightPrimaryText),
                           fontSize: 14,
                           fontWeight: isSelected
                               ? FontWeight.w600
@@ -1044,9 +1066,103 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
               ),
             ],
           ),
+          // Time picker (shown when enabled)
+          if (_formData.reminderEnabled) ...[
+            const SizedBox(height: 16),
+            InkWell(
+              onTap: () => _showReminderTimePicker(isDark),
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? AppColors.darkBackground
+                      : AppColors.lightBackground,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isDark
+                        ? AppColors.darkBorder
+                        : AppColors.lightBorder,
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.access_time_rounded,
+                          color: isDark
+                              ? AppColors.darkCoral
+                              : AppColors.lightCoral,
+                          size: 22,
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Reminder Time',
+                          style: TextStyle(
+                            color: isDark
+                                ? AppColors.darkPrimaryText
+                                : AppColors.lightPrimaryText,
+                            fontSize: 15,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      _formatTimeOfDay(_formData.reminderTime),
+                      style: TextStyle(
+                        color: isDark
+                            ? AppColors.darkCoral
+                            : AppColors.lightCoral,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  String _formatTimeOfDay(TimeOfDay time) {
+    final hour = time.hourOfPeriod == 0 ? 12 : time.hourOfPeriod;
+    final minute = time.minute.toString().padLeft(2, '0');
+    final period = time.period == DayPeriod.am ? 'AM' : 'PM';
+    return '$hour:$minute $period';
+  }
+
+  Future<void> _showReminderTimePicker(bool isDark) async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _formData.reminderTime,
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: isDark ? AppColors.darkCoral : AppColors.lightCoral,
+              onPrimary: Colors.white,
+              surface: isDark ? AppColors.darkSurface : Colors.white,
+              onSurface: isDark
+                  ? AppColors.darkPrimaryText
+                  : AppColors.lightPrimaryText,
+            ),
+            timePickerTheme: TimePickerThemeData(
+              backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) {
+      HapticFeedback.selectionClick();
+      setState(() => _formData.reminderTime = picked);
+    }
   }
 
   Widget _buildBottomActionButton(bool isDark) {
@@ -1086,14 +1202,15 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
             foregroundColor: _formData.isValid
                 ? (isDark ? AppColors.darkBackground : Colors.white)
                 : (isDark
-                    ? AppColors.darkSecondaryText
-                    : AppColors.lightSecondaryText),
+                      ? AppColors.darkSecondaryText
+                      : AppColors.lightSecondaryText),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
             elevation: _formData.isValid ? 4 : 0,
-            disabledBackgroundColor:
-                isDark ? AppColors.darkBorder : AppColors.lightBorder,
+            disabledBackgroundColor: isDark
+                ? AppColors.darkBorder
+                : AppColors.lightBorder,
             disabledForegroundColor: isDark
                 ? AppColors.darkSecondaryText
                 : AppColors.lightSecondaryText,

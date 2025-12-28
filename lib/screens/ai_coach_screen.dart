@@ -2,15 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../models/ai_coach_models.dart';
-import '../models/ai_habit_suggestion.dart';
 import '../providers/ai_coach_provider.dart';
+import '../providers/habit_provider.dart';
+
 import '../config/theme/app_colors.dart';
 import '../models/habit_category.dart';
 import 'habit_creation_screen.dart';
 
 /// AI Coach Screen with personalized suggestions and insights
 class AICoachScreen extends StatefulWidget {
-  const AICoachScreen({super.key});
+  final AICoachTab? initialTab;
+
+  const AICoachScreen({super.key, this.initialTab});
 
   @override
   State<AICoachScreen> createState() => _AICoachScreenState();
@@ -38,7 +41,16 @@ class _AICoachScreenState extends State<AICoachScreen>
 
     // Load data
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<AICoachProvider>(context, listen: false).initialize();
+      final provider = Provider.of<AICoachProvider>(context, listen: false);
+
+      // Set initial tab if provided
+      if (widget.initialTab != null) {
+        provider.setTab(widget.initialTab!);
+      }
+
+      provider.initialize();
+      // Load initial tab data
+      _loadTabData(provider.currentTab, context);
     });
   }
 
@@ -64,9 +76,7 @@ class _AICoachScreenState extends State<AICoachScreen>
             _buildTabNavigation(isDark, coachProvider),
 
             // Tab Content
-            Expanded(
-              child: _buildTabContent(isDark, coachProvider),
-            ),
+            Expanded(child: _buildTabContent(isDark, coachProvider)),
           ],
         ),
       ),
@@ -146,10 +156,11 @@ class _AICoachScreenState extends State<AICoachScreen>
                               : AppColors.lightCoral,
                           boxShadow: [
                             BoxShadow(
-                              color: (isDark
-                                      ? AppColors.darkCoral
-                                      : AppColors.lightCoral)
-                                  .withValues(alpha: 0.3),
+                              color:
+                                  (isDark
+                                          ? AppColors.darkCoral
+                                          : AppColors.lightCoral)
+                                      .withValues(alpha: 0.3),
                               blurRadius: 20,
                               offset: const Offset(0, 4),
                             ),
@@ -157,8 +168,9 @@ class _AICoachScreenState extends State<AICoachScreen>
                         ),
                         child: Icon(
                           Icons.psychology_rounded,
-                          color:
-                              isDark ? AppColors.darkBackground : Colors.white,
+                          color: isDark
+                              ? AppColors.darkBackground
+                              : Colors.white,
                           size: 32,
                         ),
                       ),
@@ -224,6 +236,7 @@ class _AICoachScreenState extends State<AICoachScreen>
               onTap: () {
                 HapticFeedback.lightImpact();
                 coachProvider.setTab(tab);
+                _loadTabData(tab, context);
               },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
@@ -231,8 +244,8 @@ class _AICoachScreenState extends State<AICoachScreen>
                 decoration: BoxDecoration(
                   color: isSelected
                       ? (isDark
-                          ? AppColors.darkSurface
-                          : AppColors.lightSurface)
+                            ? AppColors.darkSurface
+                            : AppColors.lightSurface)
                       : Colors.transparent,
                   borderRadius: BorderRadius.circular(8),
                   boxShadow: isSelected
@@ -251,11 +264,11 @@ class _AICoachScreenState extends State<AICoachScreen>
                   style: TextStyle(
                     color: isSelected
                         ? (isDark
-                            ? AppColors.darkPrimaryText
-                            : AppColors.lightPrimaryText)
+                              ? AppColors.darkPrimaryText
+                              : AppColors.lightPrimaryText)
                         : (isDark
-                            ? AppColors.darkSecondaryText
-                            : AppColors.lightSecondaryText),
+                              ? AppColors.darkSecondaryText
+                              : AppColors.lightSecondaryText),
                     fontSize: 14,
                     fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
                   ),
@@ -283,7 +296,7 @@ class _AICoachScreenState extends State<AICoachScreen>
   /// Suggestions Tab
   Widget _buildSuggestionsTab(bool isDark, AICoachProvider coachProvider) {
     if (coachProvider.isLoadingSuggestions) {
-      return _buildLoadingState(isDark);
+      return _buildLoadingState(isDark, 'Loading suggestions...');
     }
 
     if (coachProvider.suggestions.isEmpty) {
@@ -291,7 +304,8 @@ class _AICoachScreenState extends State<AICoachScreen>
         isDark,
         icon: Icons.lightbulb_outline_rounded,
         title: 'No suggestions yet',
-        subtitle: 'Keep tracking your habits and we\'ll find patterns to suggest new ones',
+        subtitle:
+            'Keep tracking your habits and we\'ll find patterns to suggest new ones',
       );
     }
 
@@ -357,11 +371,7 @@ class _AICoachScreenState extends State<AICoachScreen>
                       end: Alignment.bottomRight,
                     ),
                   ),
-                  child: Icon(
-                    suggestion.icon,
-                    color: Colors.white,
-                    size: 24,
-                  ),
+                  child: Icon(suggestion.icon, color: Colors.white, size: 24),
                 ),
                 const SizedBox(width: 12),
 
@@ -561,27 +571,21 @@ class _AICoachScreenState extends State<AICoachScreen>
                   child: ElevatedButton(
                     onPressed: () {
                       HapticFeedback.lightImpact();
-                      // Convert to AIHabitSuggestion for creation screen
-                      final habitSuggestion = AIHabitSuggestion(
-                        id: suggestion.id,
-                        habitName: suggestion.title,
-                        explanation: suggestion.description,
-                        category: suggestion.category,
-                        reason: suggestion.whyThisHelps,
-                      );
                       Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (context) => HabitCreationScreen(
-                            aiSuggestion: habitSuggestion,
+                            aiCoachSuggestion: suggestion,
                           ),
                         ),
                       );
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor:
-                          isDark ? AppColors.darkCoral : AppColors.lightCoral,
-                      foregroundColor:
-                          isDark ? AppColors.darkBackground : Colors.white,
+                      backgroundColor: isDark
+                          ? AppColors.darkCoral
+                          : AppColors.lightCoral,
+                      foregroundColor: isDark
+                          ? AppColors.darkBackground
+                          : Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
@@ -608,7 +612,7 @@ class _AICoachScreenState extends State<AICoachScreen>
   /// Insights Tab
   Widget _buildInsightsTab(bool isDark, AICoachProvider coachProvider) {
     if (coachProvider.isLoadingInsights) {
-      return _buildLoadingState(isDark);
+      return _buildLoadingState(isDark, 'Loading insights...');
     }
 
     return SingleChildScrollView(
@@ -626,8 +630,9 @@ class _AICoachScreenState extends State<AICoachScreen>
           Text(
             'Pattern Discovery',
             style: TextStyle(
-              color:
-                  isDark ? AppColors.darkPrimaryText : AppColors.lightPrimaryText,
+              color: isDark
+                  ? AppColors.darkPrimaryText
+                  : AppColors.lightPrimaryText,
               fontSize: 18,
               fontWeight: FontWeight.w600,
             ),
@@ -820,8 +825,9 @@ class _AICoachScreenState extends State<AICoachScreen>
         Text(
           label,
           style: TextStyle(
-            color:
-                isDark ? AppColors.darkSecondaryText : AppColors.lightSecondaryText,
+            color: isDark
+                ? AppColors.darkSecondaryText
+                : AppColors.lightSecondaryText,
             fontSize: 11,
             fontWeight: FontWeight.w500,
           ),
@@ -964,7 +970,7 @@ class _AICoachScreenState extends State<AICoachScreen>
   /// Tips Tab
   Widget _buildTipsTab(bool isDark, AICoachProvider coachProvider) {
     if (coachProvider.isLoadingTips) {
-      return _buildLoadingState(isDark);
+      return _buildLoadingState(isDark, 'Loading tips...');
     }
 
     return ListView.builder(
@@ -975,7 +981,13 @@ class _AICoachScreenState extends State<AICoachScreen>
         final tips = coachProvider.tipsByCategory[category] ?? [];
         final isExpanded = coachProvider.expandedTipCategory == category;
 
-        return _buildTipCategoryCard(isDark, category, tips, isExpanded, coachProvider);
+        return _buildTipCategoryCard(
+          isDark,
+          category,
+          tips,
+          isExpanded,
+          coachProvider,
+        );
       },
     );
   }
@@ -1077,7 +1089,9 @@ class _AICoachScreenState extends State<AICoachScreen>
           // Expanded Tips
           if (isExpanded)
             Column(
-              children: tips.map((tip) => _buildTipCard(isDark, tip, coachProvider)).toList(),
+              children: tips
+                  .map((tip) => _buildTipCard(isDark, tip, coachProvider))
+                  .toList(),
             ),
         ],
       ),
@@ -1127,8 +1141,8 @@ class _AICoachScreenState extends State<AICoachScreen>
                   color: tip.isBookmarked
                       ? (isDark ? AppColors.darkCoral : AppColors.lightCoral)
                       : (isDark
-                          ? AppColors.darkSecondaryText
-                          : AppColors.lightSecondaryText),
+                            ? AppColors.darkSecondaryText
+                            : AppColors.lightSecondaryText),
                 ),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
@@ -1141,8 +1155,9 @@ class _AICoachScreenState extends State<AICoachScreen>
           Text(
             tip.content,
             style: TextStyle(
-              color:
-                  isDark ? AppColors.darkSecondaryText : AppColors.lightSecondaryText,
+              color: isDark
+                  ? AppColors.darkSecondaryText
+                  : AppColors.lightSecondaryText,
               fontSize: 13,
               fontWeight: FontWeight.w400,
               height: 1.4,
@@ -1163,7 +1178,9 @@ class _AICoachScreenState extends State<AICoachScreen>
                     height: 4,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: isDark ? AppColors.darkCoral : AppColors.lightCoral,
+                      color: isDark
+                          ? AppColors.darkCoral
+                          : AppColors.lightCoral,
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -1227,7 +1244,8 @@ class _AICoachScreenState extends State<AICoachScreen>
   }
 
   /// Loading state
-  Widget _buildLoadingState(bool isDark) {
+  /// Loading state
+  Widget _buildLoadingState(bool isDark, String message) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -1237,10 +1255,11 @@ class _AICoachScreenState extends State<AICoachScreen>
           ),
           const SizedBox(height: 16),
           Text(
-            'Loading insights...',
+            message,
             style: TextStyle(
-              color:
-                  isDark ? AppColors.darkSecondaryText : AppColors.lightSecondaryText,
+              color: isDark
+                  ? AppColors.darkSecondaryText
+                  : AppColors.lightSecondaryText,
               fontSize: 14,
               fontWeight: FontWeight.w500,
             ),
@@ -1283,8 +1302,9 @@ class _AICoachScreenState extends State<AICoachScreen>
               title,
               textAlign: TextAlign.center,
               style: TextStyle(
-                color:
-                    isDark ? AppColors.darkPrimaryText : AppColors.lightPrimaryText,
+                color: isDark
+                    ? AppColors.darkPrimaryText
+                    : AppColors.lightPrimaryText,
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
               ),
@@ -1305,5 +1325,27 @@ class _AICoachScreenState extends State<AICoachScreen>
         ),
       ),
     );
+  }
+
+  void _loadTabData(AICoachTab tab, BuildContext context) {
+    final coachProvider = Provider.of<AICoachProvider>(context, listen: false);
+    final habitProvider = Provider.of<HabitProvider>(context, listen: false);
+
+    if (tab == AICoachTab.suggestions && coachProvider.suggestions.isEmpty) {
+      coachProvider.loadSuggestions(
+        categories: habitProvider.habits
+            .map((h) => h.category.name)
+            .toSet()
+            .toList(),
+        currentHabits: habitProvider.habits.map((h) => h.name).toList(),
+      );
+    } else if (tab == AICoachTab.insights &&
+        coachProvider.weeklySummary == null) {
+      final weekData = {
+        'totalCompletions': habitProvider.totalCount, // Simplified
+        'currentStreak': habitProvider.bestStreak,
+      };
+      coachProvider.loadInsights(weekData: weekData);
+    }
   }
 }

@@ -10,15 +10,25 @@ import 'providers/progress_provider.dart';
 import 'providers/settings_provider.dart';
 import 'screens/home_screen.dart';
 
-void main() {
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'firebase_options.dart';
+import 'screens/login_screen.dart';
+import 'services/notification_service.dart';
+import 'services/subscription_service.dart';
+
+void main() async {
   // Ensure Flutter binding is initialized
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Initialize Firebase
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await NotificationService().initialize();
+  await SubscriptionService().initialize();
+
   // Set system UI overlay style
   SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-    ),
+    const SystemUiOverlayStyle(statusBarColor: Colors.transparent),
   );
 
   runApp(const MyApp());
@@ -43,8 +53,12 @@ class MyApp extends StatelessWidget {
         // AI Coach Provider
         ChangeNotifierProvider(create: (_) => AICoachProvider()),
 
-        // Progress Provider
-        ChangeNotifierProvider(create: (_) => ProgressProvider()),
+        // Progress Provider (depends on HabitProvider)
+        ChangeNotifierProxyProvider<HabitProvider, ProgressProvider>(
+          create: (_) => ProgressProvider(),
+          update: (_, habitProvider, progressProvider) =>
+              progressProvider!..updateHabits(habitProvider.habits),
+        ),
 
         // Settings Provider
         ChangeNotifierProvider(create: (_) => SettingsProvider()),
@@ -52,7 +66,7 @@ class MyApp extends StatelessWidget {
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, child) {
           return MaterialApp(
-            title: 'Habit Tracker',
+            title: 'Aura',
             debugShowCheckedModeBanner: false,
 
             // Theme configuration
@@ -60,11 +74,35 @@ class MyApp extends StatelessWidget {
             darkTheme: AppTheme.darkTheme,
             themeMode: themeProvider.themeMode,
 
-            // Home screen
-            home: const HomeScreen(),
+            // Home screen wrapper for Auth
+            home: const AuthWrapper(),
           );
         },
       ),
+    );
+  }
+}
+
+class AuthWrapper extends StatelessWidget {
+  const AuthWrapper({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        if (snapshot.hasData) {
+          return const HomeScreen();
+        }
+
+        return const LoginScreen();
+      },
     );
   }
 }

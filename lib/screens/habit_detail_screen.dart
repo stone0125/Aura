@@ -5,7 +5,7 @@ import '../models/habit.dart';
 import '../models/habit_category.dart';
 import '../models/habit_stats.dart';
 import '../providers/habit_detail_provider.dart';
-import '../providers/habit_provider.dart';
+
 import '../providers/theme_provider.dart';
 import '../config/theme/app_colors.dart';
 
@@ -13,10 +13,7 @@ import '../config/theme/app_colors.dart';
 class HabitDetailScreen extends StatefulWidget {
   final Habit habit;
 
-  const HabitDetailScreen({
-    super.key,
-    required this.habit,
-  });
+  const HabitDetailScreen({super.key, required this.habit});
 
   @override
   State<HabitDetailScreen> createState() => _HabitDetailScreenState();
@@ -61,7 +58,9 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
     final titleOpacity = ((_scrollOffset - 80) / 20).clamp(0.0, 1.0);
 
     return Scaffold(
-      backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground,
+      backgroundColor: isDark
+          ? AppColors.darkBackground
+          : AppColors.lightBackground,
       extendBodyBehindAppBar: true,
       appBar: _buildAppBar(isDark, appBarOpacity, titleOpacity),
       body: Stack(
@@ -118,7 +117,11 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
     );
   }
 
-  PreferredSizeWidget _buildAppBar(bool isDark, double opacity, double titleOpacity) {
+  PreferredSizeWidget _buildAppBar(
+    bool isDark,
+    double opacity,
+    double titleOpacity,
+  ) {
     return AppBar(
       backgroundColor: (isDark ? AppColors.darkSurface : AppColors.lightSurface)
           .withValues(alpha: opacity * 0.95),
@@ -126,7 +129,9 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
       leading: IconButton(
         icon: Icon(
           Icons.arrow_back_rounded,
-          color: isDark ? AppColors.darkPrimaryText : AppColors.lightPrimaryText,
+          color: isDark
+              ? AppColors.darkPrimaryText
+              : AppColors.lightPrimaryText,
         ),
         onPressed: () => Navigator.of(context).pop(),
       ),
@@ -135,7 +140,9 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
         child: Text(
           widget.habit.name,
           style: TextStyle(
-            color: isDark ? AppColors.darkPrimaryText : AppColors.lightPrimaryText,
+            color: isDark
+                ? AppColors.darkPrimaryText
+                : AppColors.lightPrimaryText,
             fontSize: 18,
             fontWeight: FontWeight.w600,
           ),
@@ -145,7 +152,9 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
         IconButton(
           icon: Icon(
             Icons.edit_rounded,
-            color: isDark ? AppColors.darkPrimaryText : AppColors.lightPrimaryText,
+            color: isDark
+                ? AppColors.darkPrimaryText
+                : AppColors.lightPrimaryText,
           ),
           onPressed: () {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -266,7 +275,10 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
 
               // Category Badge
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: isDark ? 0.15 : 0.2),
                   border: Border.all(
@@ -402,7 +414,9 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
         Text(
           insight.text,
           style: TextStyle(
-            color: isDark ? AppColors.darkPrimaryText : AppColors.lightPrimaryText,
+            color: isDark
+                ? AppColors.darkPrimaryText
+                : AppColors.lightPrimaryText,
             fontSize: 15,
             height: 1.5,
           ),
@@ -563,22 +577,17 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
             height: 48,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: LinearGradient(
-                colors: gradientColors,
-              ),
+              gradient: LinearGradient(colors: gradientColors),
             ),
-            child: Icon(
-              icon,
-              color: Colors.white,
-              size: 24,
-            ),
+            child: Icon(icon, color: Colors.white, size: 24),
           ),
           const Spacer(),
           Text(
             number,
             style: TextStyle(
-              color:
-                  isDark ? AppColors.darkPrimaryText : AppColors.lightPrimaryText,
+              color: isDark
+                  ? AppColors.darkPrimaryText
+                  : AppColors.lightPrimaryText,
               fontSize: 32,
               fontWeight: FontWeight.bold,
             ),
@@ -598,7 +607,8 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
             Text(
               sublabel,
               style: TextStyle(
-                color: sublabelColor ??
+                color:
+                    sublabelColor ??
                     (isDark
                         ? AppColors.darkSecondaryText
                         : AppColors.lightSecondaryText),
@@ -623,8 +633,9 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
           Text(
             'Calendar',
             style: TextStyle(
-              color:
-                  isDark ? AppColors.darkPrimaryText : AppColors.lightPrimaryText,
+              color: isDark
+                  ? AppColors.darkPrimaryText
+                  : AppColors.lightPrimaryText,
               fontSize: 18,
               fontWeight: FontWeight.w600,
             ),
@@ -715,8 +726,8 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
                         decoration: BoxDecoration(
                           color: isSelected
                               ? (isDark
-                                  ? AppColors.darkBorder
-                                  : AppColors.lightSurface)
+                                    ? AppColors.darkBorder
+                                    : AppColors.lightSurface)
                               : Colors.transparent,
                           borderRadius: BorderRadius.circular(6),
                         ),
@@ -726,14 +737,15 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
                             style: TextStyle(
                               color: isSelected
                                   ? (isDark
-                                      ? AppColors.darkCoral
-                                      : AppColors.lightCoral)
+                                        ? AppColors.darkCoral
+                                        : AppColors.lightCoral)
                                   : (isDark
-                                      ? AppColors.darkSecondaryText
-                                      : AppColors.lightSecondaryText),
+                                        ? AppColors.darkSecondaryText
+                                        : AppColors.lightSecondaryText),
                               fontSize: 12,
-                              fontWeight:
-                                  isSelected ? FontWeight.w600 : FontWeight.w500,
+                              fontWeight: isSelected
+                                  ? FontWeight.w600
+                                  : FontWeight.w500,
                             ),
                           ),
                         ),
@@ -787,8 +799,9 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
           Text(
             'History',
             style: TextStyle(
-              color:
-                  isDark ? AppColors.darkPrimaryText : AppColors.lightPrimaryText,
+              color: isDark
+                  ? AppColors.darkPrimaryText
+                  : AppColors.lightPrimaryText,
               fontSize: 18,
               fontWeight: FontWeight.w600,
             ),
@@ -842,7 +855,9 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
                         ? 5
                         : provider.completions.length,
                     separatorBuilder: (context, index) => Divider(
-                      color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+                      color: isDark
+                          ? AppColors.darkBorder
+                          : AppColors.lightBorder,
                       height: 24,
                     ),
                     itemBuilder: (context, index) {
@@ -880,8 +895,9 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
           child: Text(
             completion.formattedDate,
             style: TextStyle(
-              color:
-                  isDark ? AppColors.darkPrimaryText : AppColors.lightPrimaryText,
+              color: isDark
+                  ? AppColors.darkPrimaryText
+                  : AppColors.lightPrimaryText,
               fontSize: 15,
               fontWeight: FontWeight.w500,
             ),
@@ -892,17 +908,15 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
-            color: const Color(0xFFE8F5E9).withValues(
-              alpha: isDark ? 0.2 : 1.0,
-            ),
+            color: const Color(
+              0xFFE8F5E9,
+            ).withValues(alpha: isDark ? 0.2 : 1.0),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Text(
             'Completed',
             style: TextStyle(
-              color: isDark
-                  ? const Color(0xFF69F0AE)
-                  : const Color(0xFF27AE60),
+              color: isDark ? const Color(0xFF69F0AE) : const Color(0xFF27AE60),
               fontSize: 12,
               fontWeight: FontWeight.w500,
             ),
@@ -959,9 +973,9 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
                   child: Container(
                     height: 56,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE8F5E9).withValues(
-                        alpha: isDark ? 0.3 : 1.0,
-                      ),
+                      color: const Color(
+                        0xFFE8F5E9,
+                      ).withValues(alpha: isDark ? 0.3 : 1.0),
                       border: Border.all(
                         color: isDark
                             ? const Color(0xFF69F0AE)
@@ -1001,7 +1015,7 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
                 TextButton(
                   onPressed: () async {
                     await provider.undoCompletion();
-                    if (context.mounted) {
+                    if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text('Completion removed'),
@@ -1033,26 +1047,31 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
                   HapticFeedback.mediumImpact();
                   await provider.completeHabit();
 
-                  if (context.mounted) {
-                    // Update main habit provider
-                    final habitProvider =
-                        Provider.of<HabitProvider>(context, listen: false);
-                    habitProvider.toggleHabitCompletion(widget.habit.id);
+                  if (mounted) {
+                    // Update main habit provider (optional, stream handles it)
+                    // final habitProvider = Provider.of<HabitProvider>(
+                    //   context,
+                    //   listen: false,
+                    // );
+                    // habitProvider.toggleHabitCompletion(widget.habit.id);
 
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(
-                            '+1 day streak! 🔥 Now ${provider.stats?.currentStreak ?? 0} days'),
+                          '+1 day streak! 🔥 Now ${provider.stats?.currentStreak ?? 0} days',
+                        ),
                         duration: const Duration(seconds: 2),
                       ),
                     );
                   }
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor:
-                      isDark ? AppColors.darkCoral : AppColors.lightCoral,
-                  foregroundColor:
-                      isDark ? AppColors.darkBackground : Colors.white,
+                  backgroundColor: isDark
+                      ? AppColors.darkCoral
+                      : AppColors.lightCoral,
+                  foregroundColor: isDark
+                      ? AppColors.darkBackground
+                      : Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),

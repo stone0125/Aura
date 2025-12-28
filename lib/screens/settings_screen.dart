@@ -5,6 +5,11 @@ import '../config/theme/app_colors.dart';
 import '../models/settings_models.dart';
 import '../providers/settings_provider.dart';
 import '../providers/theme_provider.dart';
+import '../providers/progress_provider.dart';
+import '../providers/habit_provider.dart';
+import '../services/subscription_service.dart';
+import '../services/export_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// Comprehensive settings and profile management screen
 class SettingsScreen extends StatefulWidget {
@@ -32,14 +37,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final settings = settingsProvider.settings;
 
     return Scaffold(
-      backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground,
+      backgroundColor: isDark
+          ? AppColors.darkBackground
+          : AppColors.lightBackground,
       body: SafeArea(
         child: CustomScrollView(
           slivers: [
             // App Bar
             SliverAppBar(
               floating: true,
-              backgroundColor: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+              backgroundColor: isDark
+                  ? AppColors.darkSurface
+                  : AppColors.lightSurface,
               elevation: 0,
               title: Text(
                 'Settings',
@@ -78,21 +87,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                   const SizedBox(height: 24),
 
-                  // Data & Sync
-                  _buildSectionHeader(context, 'Data & Sync', isDark),
-                  _buildDataSyncSection(context, settings, isDark),
-
-                  const SizedBox(height: 24),
-
                   // Account
                   _buildSectionHeader(context, 'Account', isDark),
                   _buildAccountSection(context, profile, isDark),
 
                   const SizedBox(height: 24),
-
-                  // Accessibility
-                  _buildSectionHeader(context, 'Accessibility', isDark),
-                  _buildAccessibilitySection(context, settings, isDark),
 
                   const SizedBox(height: 24),
 
@@ -118,7 +117,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // ==================== Profile Section ====================
 
-  Widget _buildProfileSection(BuildContext context, UserProfile profile, bool isDark) {
+  Widget _buildProfileSection(
+    BuildContext context,
+    UserProfile profile,
+    bool isDark,
+  ) {
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       decoration: BoxDecoration(
@@ -155,16 +158,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           end: Alignment.bottomRight,
                         ),
                       ),
-                      child: Center(
-                        child: Text(
-                          profile.initials,
-                          style: const TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
+                      child:
+                          profile.avatarUrl != null &&
+                              profile.avatarUrl!.isNotEmpty
+                          ? ClipOval(
+                              child: Image.network(
+                                profile.avatarUrl!,
+                                fit: BoxFit.cover,
+                                width: 72,
+                                height: 72,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Center(
+                                    child: Text(
+                                      profile.initials,
+                                      style: const TextStyle(
+                                        fontSize: 28,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            )
+                          : Center(
+                              child: Text(
+                                profile.initials,
+                                style: const TextStyle(
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
                     ),
                     if (profile.isPro)
                       Positioned(
@@ -173,10 +199,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         child: Container(
                           padding: const EdgeInsets.all(4),
                           decoration: BoxDecoration(
-                            color: isDark ? AppColors.darkGold : AppColors.lightGold,
+                            color: isDark
+                                ? AppColors.darkGold
+                                : AppColors.lightGold,
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+                              color: isDark
+                                  ? AppColors.darkSurface
+                                  : AppColors.lightSurface,
                               width: 2,
                             ),
                           ),
@@ -202,7 +232,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w600,
-                          color: isDark ? Colors.white : AppColors.lightTextPrimary,
+                          color: isDark
+                              ? Colors.white
+                              : AppColors.lightTextPrimary,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -210,7 +242,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         profile.email,
                         style: TextStyle(
                           fontSize: 14,
-                          color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                          color: isDark
+                              ? AppColors.darkTextSecondary
+                              : AppColors.lightTextSecondary,
                         ),
                       ),
                       const SizedBox(height: 6),
@@ -218,7 +252,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         profile.memberSinceText,
                         style: TextStyle(
                           fontSize: 12,
-                          color: isDark ? AppColors.darkTextTertiary : AppColors.lightTextTertiary,
+                          color: isDark
+                              ? AppColors.darkTextTertiary
+                              : AppColors.lightTextTertiary,
                         ),
                       ),
                     ],
@@ -227,10 +263,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                 // Edit button
                 IconButton(
-                  onPressed: () => _showEditProfileModal(context, profile, isDark),
+                  onPressed: () =>
+                      _showEditProfileModal(context, profile, isDark),
                   icon: Icon(
                     Icons.edit_rounded,
-                    color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                    color: isDark
+                        ? AppColors.darkTextSecondary
+                        : AppColors.lightTextSecondary,
                   ),
                 ),
               ],
@@ -250,74 +289,114 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
             ),
-            child: Row(
-              children: [
-                _buildStatItem(context, '42', 'Days Tracked', isDark),
-                _buildStatDivider(isDark),
-                _buildStatItem(context, '8', 'Active Habits', isDark),
-                _buildStatDivider(isDark),
-                _buildStatItem(context, '85%', 'Success Rate', isDark),
-              ],
+            child: Consumer<ProgressProvider>(
+              builder: (context, progressProvider, child) {
+                final stats = progressProvider.stats;
+                return Row(
+                  children: [
+                    _buildStatItem(
+                      context,
+                      '${stats?.daysTracked ?? 0}',
+                      'Days Tracked',
+                      isDark,
+                    ),
+                    _buildStatDivider(isDark),
+                    _buildStatItem(
+                      context,
+                      '${stats?.totalHabits ?? 0}',
+                      'Active Habits',
+                      isDark,
+                    ),
+                    _buildStatDivider(isDark),
+                    _buildStatItem(
+                      context,
+                      '${((stats?.completionRate ?? 0) * 100).toStringAsFixed(0)}%',
+                      'Success Rate',
+                      isDark,
+                    ),
+                  ],
+                );
+              },
             ),
           ),
 
           // Upgrade to Pro (if not pro)
           if (!profile.isPro)
-            Container(
-              margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: isDark
-                      ? [AppColors.darkGold.withValues(alpha: 0.2), AppColors.darkGold.withValues(alpha: 0.1)]
-                      : [AppColors.lightGold.withValues(alpha: 0.2), AppColors.lightGold.withValues(alpha: 0.1)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: isDark ? AppColors.darkGold.withValues(alpha: 0.3) : AppColors.lightGold.withValues(alpha: 0.3),
-                  width: 1,
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.workspace_premium_rounded,
-                    color: isDark ? AppColors.darkGold : AppColors.lightGold,
-                    size: 28,
+            GestureDetector(
+              onTap: () {
+                HapticFeedback.lightImpact();
+                SubscriptionService().presentPaywall();
+              },
+              child: Container(
+                margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: isDark
+                        ? [
+                            AppColors.darkGold.withValues(alpha: 0.2),
+                            AppColors.darkGold.withValues(alpha: 0.1),
+                          ]
+                        : [
+                            AppColors.lightGold.withValues(alpha: 0.2),
+                            AppColors.lightGold.withValues(alpha: 0.1),
+                          ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Upgrade to Pro',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: isDark ? Colors.white : AppColors.lightTextPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Unlock advanced AI features & unlimited habits',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                          ),
-                        ),
-                      ],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isDark
+                        ? AppColors.darkGold.withValues(alpha: 0.3)
+                        : AppColors.lightGold.withValues(alpha: 0.3),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.workspace_premium_rounded,
+                      color: isDark ? AppColors.darkGold : AppColors.lightGold,
+                      size: 28,
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Icon(
-                    Icons.arrow_forward_ios_rounded,
-                    size: 16,
-                    color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                  ),
-                ],
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Upgrade to Pro',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: isDark
+                                  ? Colors.white
+                                  : AppColors.lightTextPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Unlock advanced AI features & unlimited habits',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isDark
+                                  ? AppColors.darkTextSecondary
+                                  : AppColors.lightTextSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      size: 16,
+                      color: isDark
+                          ? AppColors.darkTextSecondary
+                          : AppColors.lightTextSecondary,
+                    ),
+                  ],
+                ),
               ),
             ),
         ],
@@ -325,7 +404,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildStatItem(BuildContext context, String value, String label, bool isDark) {
+  Widget _buildStatItem(
+    BuildContext context,
+    String value,
+    String label,
+    bool isDark,
+  ) {
     return Expanded(
       child: Column(
         children: [
@@ -342,7 +426,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             label,
             style: TextStyle(
               fontSize: 12,
-              color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+              color: isDark
+                  ? AppColors.darkTextSecondary
+                  : AppColors.lightTextSecondary,
             ),
           ),
         ],
@@ -371,7 +457,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           fontSize: 12,
           fontWeight: FontWeight.w600,
           letterSpacing: 0.5,
-          color: isDark ? AppColors.darkTextTertiary : AppColors.lightTextTertiary,
+          color: isDark
+              ? AppColors.darkTextTertiary
+              : AppColors.lightTextTertiary,
         ),
       ),
     );
@@ -379,7 +467,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // ==================== Appearance Section ====================
 
-  Widget _buildAppearanceSection(BuildContext context, AppSettings settings, bool isDark) {
+  Widget _buildAppearanceSection(
+    BuildContext context,
+    AppSettings settings,
+    bool isDark,
+  ) {
     return _buildSettingsCard(
       context,
       isDark,
@@ -390,7 +482,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           title: 'Theme',
           subtitle: settings.themePreference.displayName,
           isDark: isDark,
-          onTap: () => _showThemeSelector(context, settings.themePreference, isDark),
+          onTap: () =>
+              _showThemeSelector(context, settings.themePreference, isDark),
         ),
       ],
     );
@@ -398,7 +491,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // ==================== Notifications Section ====================
 
-  Widget _buildNotificationsSection(BuildContext context, AppSettings settings, bool isDark) {
+  Widget _buildNotificationsSection(
+    BuildContext context,
+    AppSettings settings,
+    bool isDark,
+  ) {
     return _buildSettingsCard(
       context,
       isDark,
@@ -423,20 +520,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             title: 'Default Reminder Time',
             subtitle: settings.reminderTimeText,
             isDark: isDark,
-            onTap: () => _showTimePicker(context, settings.defaultReminderTime, isDark),
+            onTap: () =>
+                _showTimePicker(context, settings.defaultReminderTime, isDark),
           ),
-          _buildDivider(isDark),
-          _buildSettingRow(
-            context,
-            icon: Icons.music_note_rounded,
-            title: 'Notification Sound',
-            subtitle: settings.notificationSound,
-            isDark: isDark,
-            onTap: () {
-              // Show sound picker
-            },
-          ),
-          _buildDivider(isDark),
           _buildSwitchRow(
             context,
             icon: Icons.circle_rounded,
@@ -469,7 +555,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // ==================== AI Preferences Section ====================
 
-  Widget _buildAISection(BuildContext context, AppSettings settings, bool isDark) {
+  Widget _buildAISection(
+    BuildContext context,
+    AppSettings settings,
+    bool isDark,
+  ) {
     return _buildSettingsCard(
       context,
       isDark,
@@ -494,7 +584,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             title: 'Suggestion Frequency',
             subtitle: settings.suggestionFrequency.displayName,
             isDark: isDark,
-            onTap: () => _showFrequencySelector(context, settings.suggestionFrequency, isDark),
+            onTap: () => _showFrequencySelector(
+              context,
+              settings.suggestionFrequency,
+              isDark,
+            ),
           ),
           _buildDivider(isDark),
           _buildSwitchRow(
@@ -527,140 +621,47 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  // ==================== Data & Sync Section ====================
+  // ==================== Account Section ====================
 
-  Widget _buildDataSyncSection(BuildContext context, AppSettings settings, bool isDark) {
+  Widget _buildAccountSection(
+    BuildContext context,
+    UserProfile profile,
+    bool isDark,
+  ) {
     return _buildSettingsCard(
       context,
       isDark,
       children: [
-        _buildSwitchRow(
-          context,
-          icon: Icons.cloud_rounded,
-          title: 'Cloud Sync',
-          subtitle: settings.cloudSyncEnabled
-              ? '${settings.syncStatus.displayName}${settings.lastSyncText != null ? ' • ${settings.lastSyncText}' : ''}'
-              : 'Sync across devices',
-          value: settings.cloudSyncEnabled,
-          isDark: isDark,
-          trailing: settings.syncStatus == SyncStatus.syncing
-              ? SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation(
-                      isDark ? AppColors.darkCoral : AppColors.lightCoral,
-                    ),
-                  ),
-                )
-              : null,
-          onChanged: (value) async {
-            HapticFeedback.lightImpact();
-            await context.read<SettingsProvider>().setCloudSyncEnabled(value);
-          },
-        ),
-        if (settings.cloudSyncEnabled) ...[
-          _buildDivider(isDark),
-          _buildSettingRow(
-            context,
-            icon: Icons.sync_rounded,
-            title: 'Sync Now',
-            subtitle: 'Manually sync your data',
-            isDark: isDark,
-            onTap: () async {
-              HapticFeedback.lightImpact();
-              await context.read<SettingsProvider>().syncNow();
-            },
-          ),
-        ],
-        _buildDivider(isDark),
-        _buildSwitchRow(
-          context,
-          icon: Icons.backup_rounded,
-          title: 'Auto Backup',
-          subtitle: 'Daily automatic backups',
-          value: settings.autoBackupEnabled,
-          isDark: isDark,
-          onChanged: (value) {
-            HapticFeedback.lightImpact();
-            context.read<SettingsProvider>().setAutoBackupEnabled(value);
-          },
-        ),
-        _buildDivider(isDark),
         _buildSettingRow(
           context,
-          icon: Icons.upload_rounded,
-          title: 'Export Data',
-          subtitle: 'Download your habit data',
+          icon: Icons.workspace_premium_rounded,
+          iconColor: profile.isPro
+              ? (isDark ? AppColors.darkGold : AppColors.lightGold)
+              : null,
+          title: profile.isPro ? 'Pro Member' : 'Subscription',
+          subtitle: profile.isPro
+              ? 'Active Pro subscription'
+              : 'Manage subscription',
           isDark: isDark,
-          onTap: () => _showExportFormatSelector(context, isDark),
+          onTap: () {
+            HapticFeedback.lightImpact();
+            SubscriptionService().presentCustomerCenter();
+          },
         ),
         _buildDivider(isDark),
         _buildSettingRow(
           context,
           icon: Icons.download_rounded,
-          title: 'Import Data',
-          subtitle: 'Restore from backup',
+          title: 'Export Data',
+          subtitle: 'Download your habit data',
           isDark: isDark,
-          onTap: () => _showImportConfirmation(context, isDark),
-        ),
-        _buildDivider(isDark),
-        _buildSettingRow(
-          context,
-          icon: Icons.delete_sweep_rounded,
-          iconColor: isDark ? AppColors.darkRed : AppColors.lightRed,
-          title: 'Clear All Data',
-          subtitle: 'Delete all habits and progress',
-          titleColor: isDark ? AppColors.darkRed : AppColors.lightRed,
-          isDark: isDark,
-          onTap: () => _showClearDataConfirmation(context, isDark),
-        ),
-      ],
-    );
-  }
-
-  // ==================== Account Section ====================
-
-  Widget _buildAccountSection(BuildContext context, UserProfile profile, bool isDark) {
-    return _buildSettingsCard(
-      context,
-      isDark,
-      children: [
-        _buildSettingRow(
-          context,
-          icon: Icons.email_rounded,
-          title: 'Email Address',
-          subtitle: profile.email,
-          isDark: isDark,
-          onTap: () => _showChangeEmail(context, isDark),
-        ),
-        _buildDivider(isDark),
-        _buildSettingRow(
-          context,
-          icon: Icons.lock_rounded,
-          title: 'Password',
-          subtitle: 'Change your password',
-          isDark: isDark,
-          onTap: () => _showChangePassword(context, isDark),
-        ),
-        _buildDivider(isDark),
-        _buildSettingRow(
-          context,
-          icon: Icons.workspace_premium_rounded,
-          iconColor: profile.isPro ? (isDark ? AppColors.darkGold : AppColors.lightGold) : null,
-          title: profile.isPro ? 'Pro Member' : 'Subscription',
-          subtitle: profile.isPro ? 'Active Pro subscription' : 'Manage subscription',
-          isDark: isDark,
-          onTap: () {
-            // Show subscription management
-          },
+          onTap: () => _showExportOptions(context, isDark),
         ),
         _buildDivider(isDark),
         _buildSettingRow(
           context,
           icon: Icons.logout_rounded,
-          iconColor: isDark ? AppColors.darkOrange : AppColors.lightOrange,
+          iconColor: isDark ? AppColors.darkRed : AppColors.lightRed,
           title: 'Sign Out',
           subtitle: 'Sign out of your account',
           isDark: isDark,
@@ -681,51 +682,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  // ==================== Accessibility Section ====================
-
-  Widget _buildAccessibilitySection(BuildContext context, AppSettings settings, bool isDark) {
-    return _buildSettingsCard(
-      context,
-      isDark,
-      children: [
-        _buildSettingRow(
-          context,
-          icon: Icons.text_fields_rounded,
-          title: 'Text Size',
-          subtitle: settings.textSize.displayName,
-          isDark: isDark,
-          onTap: () => _showTextSizeSelector(context, settings.textSize, isDark),
-        ),
-        _buildDivider(isDark),
-        _buildSwitchRow(
-          context,
-          icon: Icons.motion_photos_off_rounded,
-          title: 'Reduce Motion',
-          subtitle: 'Minimize animations',
-          value: settings.reduceMotion,
-          isDark: isDark,
-          onChanged: (value) {
-            HapticFeedback.lightImpact();
-            context.read<SettingsProvider>().setReduceMotion(value);
-          },
-        ),
-        _buildDivider(isDark),
-        _buildSwitchRow(
-          context,
-          icon: Icons.visibility_rounded,
-          title: 'Color Blind Mode',
-          subtitle: 'Enhanced color accessibility',
-          value: settings.colorBlindMode,
-          isDark: isDark,
-          onChanged: (value) {
-            HapticFeedback.lightImpact();
-            context.read<SettingsProvider>().setColorBlindMode(value);
-          },
-        ),
-      ],
-    );
-  }
-
   // ==================== Help & Support Section ====================
 
   Widget _buildHelpSection(BuildContext context, bool isDark) {
@@ -739,9 +695,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           title: 'FAQ',
           subtitle: 'Common questions and answers',
           isDark: isDark,
-          onTap: () {
-            context.read<SettingsProvider>().openFAQ();
-          },
+          onTap: () => _launchUrl('https://habittracker.app/faq'),
         ),
         _buildDivider(isDark),
         _buildSettingRow(
@@ -750,9 +704,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           title: 'Tutorials',
           subtitle: 'Learn how to use the app',
           isDark: isDark,
-          onTap: () {
-            context.read<SettingsProvider>().openTutorials();
-          },
+          onTap: () => _launchUrl('https://habittracker.app/tutorials'),
         ),
         _buildDivider(isDark),
         _buildSettingRow(
@@ -788,9 +740,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           title: 'AI Transparency',
           subtitle: 'How AI works in this app',
           isDark: isDark,
-          onTap: () {
-            context.read<SettingsProvider>().openAITransparency();
-          },
+          onTap: () => _launchUrl('https://habittracker.app/ai-transparency'),
         ),
       ],
     );
@@ -818,9 +768,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           title: 'Changelog',
           subtitle: 'See what\'s new',
           isDark: isDark,
-          onTap: () {
-            // Show changelog
-          },
+          onTap: () => _showChangelog(context, isDark),
         ),
         _buildDivider(isDark),
         _buildSettingRow(
@@ -829,9 +777,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           title: 'Privacy Policy',
           subtitle: 'How we handle your data',
           isDark: isDark,
-          onTap: () {
-            // Open privacy policy
-          },
+          onTap: () => _showPrivacyPolicy(context, isDark),
         ),
         _buildDivider(isDark),
         _buildSettingRow(
@@ -840,9 +786,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           title: 'Terms of Service',
           subtitle: 'User agreement',
           isDark: isDark,
-          onTap: () {
-            // Open terms
-          },
+          onTap: () => _showTermsOfService(context, isDark),
         ),
         _buildDivider(isDark),
         _buildSettingRow(
@@ -866,16 +810,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
           title: 'Rate App',
           subtitle: 'Leave a review',
           isDark: isDark,
-          onTap: () {
-            // Open app store
-          },
+          onTap: () => _launchUrl(
+            'https://play.google.com/store/apps/details?id=com.aura.habittracker',
+          ),
         ),
         _buildDivider(isDark),
         _buildSettingRow(
           context,
           icon: Icons.people_rounded,
           title: 'Credits',
-          subtitle: 'Made by Sarah Mitchell',
+          subtitle: 'Made by Stone',
           isDark: isDark,
           showArrow: false,
         ),
@@ -885,7 +829,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // ==================== Helper Widgets ====================
 
-  Widget _buildSettingsCard(BuildContext context, bool isDark, {required List<Widget> children}) {
+  Widget _buildSettingsCard(
+    BuildContext context,
+    bool isDark, {
+    required List<Widget> children,
+  }) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
@@ -899,9 +847,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ],
       ),
-      child: Column(
-        children: children,
-      ),
+      child: Column(children: children),
     );
   }
 
@@ -927,13 +873,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: (iconColor ?? (isDark ? AppColors.darkCoral : AppColors.lightCoral)).withValues(alpha: 0.1),
+                color:
+                    (iconColor ??
+                            (isDark
+                                ? AppColors.darkCoral
+                                : AppColors.lightCoral))
+                        .withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
                 icon,
                 size: 20,
-                color: iconColor ?? (isDark ? AppColors.darkCoral : AppColors.lightCoral),
+                color:
+                    iconColor ??
+                    (isDark ? AppColors.darkCoral : AppColors.lightCoral),
               ),
             ),
             const SizedBox(width: 12),
@@ -946,7 +899,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w500,
-                      color: titleColor ?? (isDark ? Colors.white : AppColors.lightTextPrimary),
+                      color:
+                          titleColor ??
+                          (isDark ? Colors.white : AppColors.lightTextPrimary),
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -954,7 +909,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     subtitle,
                     style: TextStyle(
                       fontSize: 13,
-                      color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                      color: isDark
+                          ? AppColors.darkTextSecondary
+                          : AppColors.lightTextSecondary,
                     ),
                   ),
                 ],
@@ -964,7 +921,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Icon(
                 Icons.arrow_forward_ios_rounded,
                 size: 16,
-                color: isDark ? AppColors.darkTextTertiary : AppColors.lightTextTertiary,
+                color: isDark
+                    ? AppColors.darkTextTertiary
+                    : AppColors.lightTextTertiary,
               ),
           ],
         ),
@@ -990,7 +949,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: (isDark ? AppColors.darkCoral : AppColors.lightCoral).withValues(alpha: 0.1),
+              color: (isDark ? AppColors.darkCoral : AppColors.lightCoral)
+                  .withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(
@@ -1017,7 +977,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   subtitle,
                   style: TextStyle(
                     fontSize: 13,
-                    color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                    color: isDark
+                        ? AppColors.darkTextSecondary
+                        : AppColors.lightTextSecondary,
                   ),
                 ),
               ],
@@ -1028,7 +990,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Switch(
                 value: value,
                 onChanged: onChanged,
-                activeTrackColor: isDark ? AppColors.darkCoral.withValues(alpha: 0.5) : AppColors.lightCoral.withValues(alpha: 0.5),
+                activeTrackColor: isDark
+                    ? AppColors.darkCoral.withValues(alpha: 0.5)
+                    : AppColors.lightCoral.withValues(alpha: 0.5),
                 thumbColor: WidgetStateProperty.resolveWith((states) {
                   if (states.contains(WidgetState.selected)) {
                     return isDark ? AppColors.darkCoral : AppColors.lightCoral;
@@ -1056,10 +1020,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // ==================== Modals and Dialogs ====================
 
-  void _showEditProfileModal(BuildContext context, UserProfile profile, bool isDark) {
+  void _showEditProfileModal(
+    BuildContext context,
+    UserProfile profile,
+    bool isDark,
+  ) {
     final firstNameController = TextEditingController(text: profile.firstName);
     final lastNameController = TextEditingController(text: profile.lastName);
-    final displayNameController = TextEditingController(text: profile.displayName ?? '');
+    final displayNameController = TextEditingController(
+      text: profile.displayName ?? '',
+    );
     final bioController = TextEditingController(text: profile.bio ?? '');
 
     showModalBottomSheet(
@@ -1067,7 +1037,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
         child: Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
@@ -1086,7 +1058,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w600,
-                        color: isDark ? Colors.white : AppColors.lightTextPrimary,
+                        color: isDark
+                            ? Colors.white
+                            : AppColors.lightTextPrimary,
                       ),
                     ),
                   ),
@@ -1094,7 +1068,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onPressed: () => Navigator.pop(context),
                     icon: Icon(
                       Icons.close_rounded,
-                      color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                      color: isDark
+                          ? AppColors.darkTextSecondary
+                          : AppColors.lightTextSecondary,
                     ),
                   ),
                 ],
@@ -1104,7 +1080,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 controller: firstNameController,
                 decoration: InputDecoration(
                   labelText: 'First Name',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -1112,7 +1090,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 controller: lastNameController,
                 decoration: InputDecoration(
                   labelText: 'Last Name',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -1120,7 +1100,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 controller: displayNameController,
                 decoration: InputDecoration(
                   labelText: 'Display Name (Optional)',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -1129,7 +1111,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 maxLines: 3,
                 decoration: InputDecoration(
                   labelText: 'Bio (Optional)',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
               const SizedBox(height: 24),
@@ -1140,19 +1124,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onPressed: () {
                     HapticFeedback.lightImpact();
                     context.read<SettingsProvider>().updateProfile(
-                          firstName: firstNameController.text,
-                          lastName: lastNameController.text,
-                          displayName: displayNameController.text.isEmpty ? null : displayNameController.text,
-                          bio: bioController.text.isEmpty ? null : bioController.text,
-                        );
+                      firstName: firstNameController.text,
+                      lastName: lastNameController.text,
+                      displayName: displayNameController.text.isEmpty
+                          ? null
+                          : displayNameController.text,
+                      bio: bioController.text.isEmpty
+                          ? null
+                          : bioController.text,
+                    );
                     Navigator.pop(context);
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: isDark ? AppColors.darkCoral : AppColors.lightCoral,
+                    backgroundColor: isDark
+                        ? AppColors.darkCoral
+                        : AppColors.lightCoral,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
                   ),
-                  child: const Text('Save Changes', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                  child: const Text(
+                    'Save Changes',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
                 ),
               ),
             ],
@@ -1162,42 +1157,62 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  void _showThemeSelector(BuildContext context, ThemePreference current, bool isDark) {
+  void _showThemeSelector(
+    BuildContext context,
+    ThemePreference current,
+    bool isDark,
+  ) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Choose Theme',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-                color: isDark ? Colors.white : AppColors.lightTextPrimary,
+      builder: (modalContext) {
+        // Use Theme.of to get the CURRENT theme state, not the captured one
+        final currentIsDark =
+            Theme.of(modalContext).brightness == Brightness.dark;
+        return Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: currentIsDark
+                ? AppColors.darkSurface
+                : AppColors.lightSurface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Choose Theme',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  color: currentIsDark
+                      ? Colors.white
+                      : AppColors.lightTextPrimary,
+                ),
               ),
-            ),
-            const SizedBox(height: 24),
-            ...ThemePreference.values.map((theme) => _buildThemeOption(
-                  context,
+              const SizedBox(height: 24),
+              ...ThemePreference.values.map(
+                (theme) => _buildThemeOption(
+                  modalContext,
                   theme,
                   current == theme,
-                  isDark,
-                )),
-          ],
-        ),
-      ),
+                  currentIsDark,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildThemeOption(BuildContext context, ThemePreference theme, bool isSelected, bool isDark) {
+  Widget _buildThemeOption(
+    BuildContext context,
+    ThemePreference theme,
+    bool isSelected,
+    bool isDark,
+  ) {
     IconData icon;
     switch (theme) {
       case ThemePreference.light:
@@ -1238,7 +1253,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         margin: const EdgeInsets.only(bottom: 8),
         decoration: BoxDecoration(
           color: isSelected
-              ? (isDark ? AppColors.darkCoral : AppColors.lightCoral).withValues(alpha: 0.1)
+              ? (isDark ? AppColors.darkCoral : AppColors.lightCoral)
+                    .withValues(alpha: 0.1)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
@@ -1254,7 +1270,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               icon,
               color: isSelected
                   ? (isDark ? AppColors.darkCoral : AppColors.lightCoral)
-                  : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                  : (isDark
+                        ? AppColors.darkTextSecondary
+                        : AppColors.lightTextSecondary),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -1278,18 +1296,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  void _showTimePicker(BuildContext context, TimeOfDay current, bool isDark) async {
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: current,
-    );
+  void _showTimePicker(
+    BuildContext context,
+    TimeOfDay current,
+    bool isDark,
+  ) async {
+    final picked = await showTimePicker(context: context, initialTime: current);
     if (picked != null && context.mounted) {
       HapticFeedback.lightImpact();
       context.read<SettingsProvider>().setDefaultReminderTime(picked);
     }
   }
 
-  void _showFrequencySelector(BuildContext context, NotificationFrequency current, bool isDark) {
+  void _showFrequencySelector(
+    BuildContext context,
+    NotificationFrequency current,
+    bool isDark,
+  ) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -1312,19 +1335,368 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
             const SizedBox(height: 24),
-            ...NotificationFrequency.values.map((freq) => _buildFrequencyOption(
-                  context,
-                  freq,
-                  current == freq,
-                  isDark,
-                )),
+            ...NotificationFrequency.values.map(
+              (freq) =>
+                  _buildFrequencyOption(context, freq, current == freq, isDark),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildFrequencyOption(BuildContext context, NotificationFrequency freq, bool isSelected, bool isDark) {
+  void _showChangelog(BuildContext context, bool isDark) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.7,
+        ),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'What\'s New',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.white : AppColors.lightTextPrimary,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildChangelogVersion(
+                      isDark,
+                      version: '1.0.0',
+                      date: 'December 2024',
+                      changes: [
+                        '🎉 Initial release',
+                        '✨ AI-powered habit suggestions',
+                        '📊 Progress tracking and analytics',
+                        '🔔 Smart reminders',
+                        '🌙 Dark mode support',
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildChangelogVersion(
+    bool isDark, {
+    required String version,
+    required String date,
+    required List<String> changes,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.darkCoral : AppColors.lightCoral,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                'v$version',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              date,
+              style: TextStyle(
+                color: isDark
+                    ? AppColors.darkTextSecondary
+                    : AppColors.lightTextSecondary,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        ...changes.map(
+          (change) => Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              change,
+              style: TextStyle(
+                fontSize: 14,
+                color: isDark
+                    ? AppColors.darkPrimaryText
+                    : AppColors.lightTextPrimary,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  void _showPrivacyPolicy(BuildContext context, bool isDark) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.85,
+        ),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(
+                  'Privacy Policy',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white : AppColors.lightTextPrimary,
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: Icon(
+                    Icons.close_rounded,
+                    color: isDark
+                        ? AppColors.darkTextSecondary
+                        : AppColors.lightTextSecondary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildPolicySection(
+                      isDark,
+                      title: 'Information We Collect',
+                      content:
+                          'We collect information you provide directly, including:\n• Account information (email, name)\n• Habit data you create and track\n• Usage analytics to improve the app',
+                    ),
+                    _buildPolicySection(
+                      isDark,
+                      title: 'How We Use Your Information',
+                      content:
+                          'Your data is used to:\n• Provide and maintain the habit tracking service\n• Generate AI-powered insights and suggestions\n• Send notifications and reminders you configure\n• Improve the app experience',
+                    ),
+                    _buildPolicySection(
+                      isDark,
+                      title: 'Data Storage & Security',
+                      content:
+                          'Your data is stored securely using Firebase Cloud services with encryption at rest and in transit. We implement industry-standard security measures to protect your information.',
+                    ),
+                    _buildPolicySection(
+                      isDark,
+                      title: 'Your Rights',
+                      content:
+                          'You can:\n• Access and export your data anytime\n• Delete your account and all associated data\n• Opt out of AI features and analytics\n• Contact us with privacy concerns',
+                    ),
+                    _buildPolicySection(
+                      isDark,
+                      title: 'Contact Us',
+                      content:
+                          'For privacy questions, email us at:\nprivacy@habittracker.app',
+                    ),
+                    Text(
+                      'Last updated: December 2024',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark
+                            ? AppColors.darkTextTertiary
+                            : AppColors.lightTextTertiary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showTermsOfService(BuildContext context, bool isDark) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.85,
+        ),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(
+                  'Terms of Service',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white : AppColors.lightTextPrimary,
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: Icon(
+                    Icons.close_rounded,
+                    color: isDark
+                        ? AppColors.darkTextSecondary
+                        : AppColors.lightTextSecondary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildPolicySection(
+                      isDark,
+                      title: '1. Acceptance of Terms',
+                      content:
+                          'By using Habit Tracker, you agree to these terms. If you do not agree, please do not use the app.',
+                    ),
+                    _buildPolicySection(
+                      isDark,
+                      title: '2. Use of Service',
+                      content:
+                          'You may use Habit Tracker for personal, non-commercial habit tracking purposes. You are responsible for maintaining the confidentiality of your account.',
+                    ),
+                    _buildPolicySection(
+                      isDark,
+                      title: '3. User Content',
+                      content:
+                          'You retain ownership of your habit data. By using our service, you grant us permission to store and process this data to provide the service.',
+                    ),
+                    _buildPolicySection(
+                      isDark,
+                      title: '4. AI Features',
+                      content:
+                          'AI suggestions are provided for informational purposes only. We do not guarantee the accuracy or suitability of AI-generated recommendations.',
+                    ),
+                    _buildPolicySection(
+                      isDark,
+                      title: '5. Subscriptions',
+                      content:
+                          'Pro features require a subscription. Subscriptions auto-renew unless cancelled. Refunds are subject to app store policies.',
+                    ),
+                    _buildPolicySection(
+                      isDark,
+                      title: '6. Limitation of Liability',
+                      content:
+                          'Habit Tracker is provided "as is" without warranties. We are not liable for any damages arising from use of the app.',
+                    ),
+                    _buildPolicySection(
+                      isDark,
+                      title: '7. Changes to Terms',
+                      content:
+                          'We may update these terms. Continued use after changes constitutes acceptance of new terms.',
+                    ),
+                    Text(
+                      'Last updated: December 2024',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark
+                            ? AppColors.darkTextTertiary
+                            : AppColors.lightTextTertiary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPolicySection(
+    bool isDark, {
+    required String title,
+    required String content,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: isDark
+                  ? AppColors.darkPrimaryText
+                  : AppColors.lightTextPrimary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            content,
+            style: TextStyle(
+              fontSize: 14,
+              height: 1.5,
+              color: isDark
+                  ? AppColors.darkTextSecondary
+                  : AppColors.lightTextSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFrequencyOption(
+    BuildContext context,
+    NotificationFrequency freq,
+    bool isSelected,
+    bool isDark,
+  ) {
     return InkWell(
       onTap: () {
         HapticFeedback.lightImpact();
@@ -1337,7 +1709,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         margin: const EdgeInsets.only(bottom: 8),
         decoration: BoxDecoration(
           color: isSelected
-              ? (isDark ? AppColors.darkCoral : AppColors.lightCoral).withValues(alpha: 0.1)
+              ? (isDark ? AppColors.darkCoral : AppColors.lightCoral)
+                    .withValues(alpha: 0.1)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
@@ -1357,7 +1730,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     freq.displayName,
                     style: TextStyle(
                       fontSize: 16,
-                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                      fontWeight: isSelected
+                          ? FontWeight.w600
+                          : FontWeight.w500,
                       color: isDark ? Colors.white : AppColors.lightTextPrimary,
                     ),
                   ),
@@ -1366,190 +1741,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     freq.description,
                     style: TextStyle(
                       fontSize: 13,
-                      color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                      color: isDark
+                          ? AppColors.darkTextSecondary
+                          : AppColors.lightTextSecondary,
                     ),
                   ),
                 ],
-              ),
-            ),
-            if (isSelected)
-              Icon(
-                Icons.check_rounded,
-                color: isDark ? AppColors.darkCoral : AppColors.lightCoral,
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showExportFormatSelector(BuildContext context, bool isDark) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Choose Export Format',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-                color: isDark ? Colors.white : AppColors.lightTextPrimary,
-              ),
-            ),
-            const SizedBox(height: 24),
-            ...ExportFormat.values.map((format) => _buildExportFormatOption(
-                  context,
-                  format,
-                  isDark,
-                )),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildExportFormatOption(BuildContext context, ExportFormat format, bool isDark) {
-    return InkWell(
-      onTap: () async {
-        HapticFeedback.lightImpact();
-        Navigator.pop(context);
-        await context.read<SettingsProvider>().exportData(format);
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Exported as ${format.displayName}')),
-          );
-        }
-      },
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        margin: const EdgeInsets.only(bottom: 8),
-        child: Row(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: (isDark ? AppColors.darkCoral : AppColors.lightCoral).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                format.icon,
-                color: isDark ? AppColors.darkCoral : AppColors.lightCoral,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    format.displayName,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: isDark ? Colors.white : AppColors.lightTextPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    format.description,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Icon(
-              Icons.arrow_forward_ios_rounded,
-              size: 16,
-              color: isDark ? AppColors.darkTextTertiary : AppColors.lightTextTertiary,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showTextSizeSelector(BuildContext context, TextSizePreference current, bool isDark) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Text Size',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-                color: isDark ? Colors.white : AppColors.lightTextPrimary,
-              ),
-            ),
-            const SizedBox(height: 24),
-            ...TextSizePreference.values.map((size) => _buildTextSizeOption(
-                  context,
-                  size,
-                  current == size,
-                  isDark,
-                )),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTextSizeOption(BuildContext context, TextSizePreference size, bool isSelected, bool isDark) {
-    return InkWell(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        context.read<SettingsProvider>().setTextSize(size);
-        Navigator.pop(context);
-      },
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        margin: const EdgeInsets.only(bottom: 8),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? (isDark ? AppColors.darkCoral : AppColors.lightCoral).withValues(alpha: 0.1)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected
-                ? (isDark ? AppColors.darkCoral : AppColors.lightCoral)
-                : Colors.transparent,
-            width: 2,
-          ),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                size.displayName,
-                style: TextStyle(
-                  fontSize: 16 * size.scale,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                  color: isDark ? Colors.white : AppColors.lightTextPrimary,
-                ),
               ),
             ),
             if (isSelected)
@@ -1564,153 +1761,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   // ==================== Confirmation Dialogs ====================
-
-  void _showImportConfirmation(BuildContext context, bool isDark) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Import Data'),
-        content: const Text('This will merge imported data with your existing habits. Continue?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              final success = await context.read<SettingsProvider>().importData();
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(success ? 'Data imported successfully' : 'Import failed')),
-                );
-              }
-            },
-            child: const Text('Import'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showClearDataConfirmation(BuildContext context, bool isDark) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Clear All Data'),
-        content: const Text(
-          'This will permanently delete all your habits and progress. This action cannot be undone. Are you sure?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              await context.read<SettingsProvider>().clearAllData();
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('All data cleared')),
-                );
-              }
-            },
-            style: TextButton.styleFrom(foregroundColor: isDark ? AppColors.darkRed : AppColors.lightRed),
-            child: const Text('Clear All'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showChangeEmail(BuildContext context, bool isDark) {
-    final emailController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Change Email'),
-        content: TextField(
-          controller: emailController,
-          decoration: const InputDecoration(
-            labelText: 'New Email Address',
-            hintText: 'email@example.com',
-          ),
-          keyboardType: TextInputType.emailAddress,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              if (emailController.text.isEmpty) return;
-              Navigator.pop(context);
-              final success = await context.read<SettingsProvider>().changeEmail(emailController.text);
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(success ? 'Email updated' : 'Failed to update email')),
-                );
-              }
-            },
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showChangePassword(BuildContext context, bool isDark) {
-    final currentPasswordController = TextEditingController();
-    final newPasswordController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Change Password'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: currentPasswordController,
-              decoration: const InputDecoration(labelText: 'Current Password'),
-              obscureText: true,
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: newPasswordController,
-              decoration: const InputDecoration(labelText: 'New Password'),
-              obscureText: true,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              if (currentPasswordController.text.isEmpty || newPasswordController.text.isEmpty) return;
-              Navigator.pop(context);
-              final success = await context.read<SettingsProvider>().changePassword(
-                    currentPasswordController.text,
-                    newPasswordController.text,
-                  );
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(success ? 'Password updated' : 'Failed to update password')),
-                );
-              }
-            },
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-  }
 
   void _showSignOutConfirmation(BuildContext context, bool isDark) {
     showDialog(
@@ -1755,7 +1805,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               await context.read<SettingsProvider>().deleteAccount();
               // In real app, would navigate to login/welcome screen
             },
-            style: TextButton.styleFrom(foregroundColor: isDark ? AppColors.darkRed : AppColors.lightRed),
+            style: TextButton.styleFrom(
+              foregroundColor: isDark ? AppColors.darkRed : AppColors.lightRed,
+            ),
             child: const Text('Delete Account'),
           ),
         ],
@@ -1764,115 +1816,208 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showContactSupport(BuildContext context, bool isDark) {
-    final messageController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Contact Support'),
-        content: TextField(
-          controller: messageController,
-          decoration: const InputDecoration(
-            labelText: 'Message',
-            hintText: 'How can we help you?',
-          ),
-          maxLines: 4,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              if (messageController.text.isEmpty) return;
-              Navigator.pop(context);
-              await context.read<SettingsProvider>().contactSupport(messageController.text);
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Message sent to support')),
-                );
-              }
-            },
-            child: const Text('Send'),
-          ),
-        ],
-      ),
+    _launchEmail(
+      'support@habittracker.app',
+      subject: 'Habit Tracker Support Request',
+      body: 'Hi, I need help with...',
     );
   }
 
   void _showReportBug(BuildContext context, bool isDark) {
-    final bugController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Report Bug'),
-        content: TextField(
-          controller: bugController,
-          decoration: const InputDecoration(
-            labelText: 'Bug Description',
-            hintText: 'What went wrong?',
-          ),
-          maxLines: 4,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              if (bugController.text.isEmpty) return;
-              Navigator.pop(context);
-              await context.read<SettingsProvider>().reportBug(bugController.text);
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Bug report submitted')),
-                );
-              }
-            },
-            child: const Text('Submit'),
-          ),
-        ],
-      ),
+    _launchEmail(
+      'bugs@habittracker.app',
+      subject: 'Habit Tracker Bug Report',
+      body:
+          'Bug Description:\n\nSteps to Reproduce:\n1.\n2.\n3.\n\nExpected Behavior:\n\nActual Behavior:\n',
     );
   }
 
   void _showRequestFeature(BuildContext context, bool isDark) {
-    final featureController = TextEditingController();
+    _launchEmail(
+      'features@habittracker.app',
+      subject: 'Habit Tracker Feature Request',
+      body: 'Feature Description:\n\nWhy it would be useful:\n',
+    );
+  }
 
-    showDialog(
+  // ==================== URL Launcher Helper ====================
+
+  Future<void> _launchUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Could not open $url')));
+      }
+    }
+  }
+
+  Future<void> _launchEmail(
+    String email, {
+    String? subject,
+    String? body,
+  }) async {
+    final uri = Uri(
+      scheme: 'mailto',
+      path: email,
+      queryParameters: {
+        if (subject != null) 'subject': subject,
+        if (body != null) 'body': body,
+      },
+    );
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open email app')),
+        );
+      }
+    }
+  }
+
+  // ==================== Export Options ====================
+
+  void _showExportOptions(BuildContext context, bool isDark) {
+    HapticFeedback.lightImpact();
+    showModalBottomSheet(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Request Feature'),
-        content: TextField(
-          controller: featureController,
-          decoration: const InputDecoration(
-            labelText: 'Feature Description',
-            hintText: 'What would you like to see?',
-          ),
-          maxLines: 4,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.darkSurface : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Export Your Data',
+              style: TextStyle(
+                color: isDark
+                    ? AppColors.darkPrimaryText
+                    : AppColors.lightPrimaryText,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Choose an export format:',
+              style: TextStyle(
+                color: isDark
+                    ? AppColors.darkSecondaryText
+                    : AppColors.lightSecondaryText,
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 20),
+            _buildExportOption(
+              context,
+              isDark: isDark,
+              icon: Icons.table_chart_rounded,
+              title: 'CSV Spreadsheet',
+              subtitle: 'Open in Excel or Google Sheets',
+              onTap: () async {
+                Navigator.pop(context);
+                final habits = context.read<HabitProvider>().habits;
+                await ExportService().exportAndShareCSV(habits);
+              },
+            ),
+            const SizedBox(height: 12),
+            _buildExportOption(
+              context,
+              isDark: isDark,
+              icon: Icons.data_object_rounded,
+              title: 'JSON Backup',
+              subtitle: 'Full data backup with history',
+              onTap: () async {
+                Navigator.pop(context);
+                final habits = context.read<HabitProvider>().habits;
+                await ExportService().exportAndShareJSON(habits);
+              },
+            ),
+            const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExportOption(
+    BuildContext context, {
+    required bool isDark,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: isDark ? AppColors.darkBackground : AppColors.lightBackground,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? AppColors.darkCoral.withValues(alpha: 0.2)
+                      : AppColors.lightCoral.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  icon,
+                  color: isDark ? AppColors.darkCoral : AppColors.lightCoral,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        color: isDark
+                            ? AppColors.darkPrimaryText
+                            : AppColors.lightPrimaryText,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        color: isDark
+                            ? AppColors.darkSecondaryText
+                            : AppColors.lightSecondaryText,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: isDark
+                    ? AppColors.darkSecondaryText
+                    : AppColors.lightSecondaryText,
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () async {
-              if (featureController.text.isEmpty) return;
-              Navigator.pop(context);
-              await context.read<SettingsProvider>().requestFeature(featureController.text);
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Feature request submitted')),
-                );
-              }
-            },
-            child: const Text('Submit'),
-          ),
-        ],
+        ),
       ),
     );
   }

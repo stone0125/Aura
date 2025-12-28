@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'habit_category.dart';
 
 /// Habit model representing a user's habit
@@ -9,6 +10,10 @@ class Habit {
   final bool isCompleted;
   final DateTime? lastCompletedDate;
 
+  // Reminder settings
+  final bool reminderEnabled;
+  final TimeOfDay? reminderTime;
+
   const Habit({
     required this.id,
     required this.name,
@@ -16,6 +21,8 @@ class Habit {
     this.streak = 0,
     this.isCompleted = false,
     this.lastCompletedDate,
+    this.reminderEnabled = false,
+    this.reminderTime,
   });
 
   /// Create a copy with updated fields
@@ -26,6 +33,8 @@ class Habit {
     int? streak,
     bool? isCompleted,
     DateTime? lastCompletedDate,
+    bool? reminderEnabled,
+    TimeOfDay? reminderTime,
   }) {
     return Habit(
       id: id ?? this.id,
@@ -34,6 +43,8 @@ class Habit {
       streak: streak ?? this.streak,
       isCompleted: isCompleted ?? this.isCompleted,
       lastCompletedDate: lastCompletedDate ?? this.lastCompletedDate,
+      reminderEnabled: reminderEnabled ?? this.reminderEnabled,
+      reminderTime: reminderTime ?? this.reminderTime,
     );
   }
 
@@ -48,6 +59,6 @@ class Habit {
 
   @override
   String toString() {
-    return 'Habit(id: $id, name: $name, category: $category, streak: $streak, isCompleted: $isCompleted)';
+    return 'Habit(id: $id, name: $name, category: $category, streak: $streak, isCompleted: $isCompleted, reminder: $reminderEnabled at $reminderTime)';
   }
 }

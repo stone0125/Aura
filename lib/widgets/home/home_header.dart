@@ -2,58 +2,83 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../providers/theme_provider.dart';
+import '../../providers/settings_provider.dart';
+import '../../models/settings_models.dart';
 import '../../config/theme/app_colors.dart';
 
 /// Home screen header with profile, greeting, and theme toggle
 class HomeHeader extends StatelessWidget {
   final String userName;
 
-  const HomeHeader({
-    super.key,
-    this.userName = 'User',
-  });
+  const HomeHeader({super.key, this.userName = 'User'});
 
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
-    final isDark = themeProvider.isDarkMode;
+    final settingsProvider = Provider.of<SettingsProvider>(context);
+    final profile = settingsProvider.userProfile;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final now = DateTime.now();
     final greeting = _getGreeting(now.hour);
     final dateText = DateFormat('EEEE, MMMM d, yyyy').format(now);
 
+    // Use profile firstName if available, fallback to passed userName
+    final displayName =
+        profile.firstName.isNotEmpty && profile.firstName != 'User'
+        ? profile.firstName
+        : userName;
+
     return Padding(
-      padding: const EdgeInsets.only(
-        left: 20,
-        right: 20,
-        top: 48,
-        bottom: 24,
-      ),
+      padding: const EdgeInsets.only(left: 20, right: 20, top: 48, bottom: 24),
       child: Row(
         children: [
-          // Profile Icon
+          // Profile Avatar - matches Settings screen style
           Container(
-            width: 40,
-            height: 40,
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              border: Border.all(
-                color: isDark ? AppColors.darkCoral : AppColors.lightCoral,
-                width: 2,
-              ),
-              color: isDark
-                  ? AppColors.darkSurface
-                  : AppColors.lightSurface.withValues(alpha: 0.5),
-            ),
-            child: Center(
-              child: Text(
-                _getInitials(userName),
-                style: TextStyle(
-                  color: isDark ? AppColors.darkCoral : AppColors.lightCoral,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
+              gradient: LinearGradient(
+                colors: isDark
+                    ? [AppColors.darkCoral, AppColors.darkOrange]
+                    : [AppColors.lightCoral, AppColors.lightOrange],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
             ),
+            child: profile.avatarUrl != null && profile.avatarUrl!.isNotEmpty
+                ? ClipOval(
+                    child: Image.network(
+                      profile.avatarUrl!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Center(
+                          child: Text(
+                            profile.initials.isNotEmpty
+                                ? profile.initials
+                                : _getInitials(displayName),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  )
+                : Center(
+                    child: Text(
+                      profile.initials.isNotEmpty
+                          ? profile.initials
+                          : _getInitials(displayName),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
           ),
           const SizedBox(width: 16),
 
@@ -63,7 +88,7 @@ class HomeHeader extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '$greeting, $userName',
+                  '$greeting, $displayName',
                   style: TextStyle(
                     color: isDark
                         ? AppColors.darkPrimaryText
@@ -93,12 +118,17 @@ class HomeHeader extends StatelessWidget {
             child: InkWell(
               onTap: () {
                 themeProvider.toggleTheme();
+                // Sync with SettingsProvider
+                final newIsDark = !isDark;
+                context.read<SettingsProvider>().setThemePreference(
+                  newIsDark ? ThemePreference.dark : ThemePreference.light,
+                );
               },
               borderRadius: BorderRadius.circular(20),
               child: Container(
                 width: 40,
                 height: 40,
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   shape: BoxShape.circle,
                   color: Colors.transparent,
                 ),

@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:fl_chart/fl_chart.dart';
 import '../models/progress_models.dart';
 import '../models/habit_category.dart';
 import '../providers/progress_provider.dart';
+import '../providers/habit_provider.dart';
 import '../providers/theme_provider.dart';
+import '../providers/settings_provider.dart';
+import '../models/settings_models.dart';
 import '../config/theme/app_colors.dart';
+import '../config/app_constants.dart';
 import '../widgets/progress/progress_ring_painter.dart';
+import '../services/share_service.dart';
 import 'dart:math' as math;
 
 /// Progress/Analytics Screen with comprehensive data visualization
@@ -125,83 +131,31 @@ class _ProgressScreenState extends State<ProgressScreen>
       pinned: true,
       elevation: 2,
       backgroundColor: isDark ? AppColors.darkBackground : Colors.white,
+      titleSpacing: 16,
       title: Text(
         'Your Progress',
         style: TextStyle(
-          color: isDark ? AppColors.darkPrimaryText : AppColors.lightPrimaryText,
+          color: isDark
+              ? AppColors.darkPrimaryText
+              : AppColors.lightPrimaryText,
           fontSize: 20,
           fontWeight: FontWeight.w700,
         ),
       ),
       actions: [
-        // Date Range Selector
-        Container(
-          margin: const EdgeInsets.symmetric(vertical: 10),
-          padding: const EdgeInsets.all(4),
-          decoration: BoxDecoration(
-            color: isDark
-                ? AppColors.darkBorder.withValues(alpha: 0.3)
-                : const Color(0xFFF5F5F5),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            children: DateRange.values.map((range) {
-              final isSelected = progressProvider.selectedRange == range;
-              return GestureDetector(
-                onTap: () {
-                  HapticFeedback.lightImpact();
-                  progressProvider.setDateRange(range);
-                },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? (isDark
-                            ? AppColors.darkSurface
-                            : Colors.white)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(6),
-                    boxShadow: isSelected
-                        ? [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.1),
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
-                            ),
-                          ]
-                        : null,
-                  ),
-                  child: Text(
-                    range.displayName,
-                    style: TextStyle(
-                      color: isSelected
-                          ? (isDark ? AppColors.darkCoral : AppColors.lightCoral)
-                          : (isDark
-                              ? AppColors.darkSecondaryText
-                              : const Color(0xFF7F8C8D)),
-                      fontSize: 13,
-                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-        ),
-        const SizedBox(width: 8),
-
         // Theme Toggle
         IconButton(
           onPressed: () {
             HapticFeedback.lightImpact();
             themeProvider.toggleTheme();
+            // Sync with SettingsProvider
+            final newIsDark = !isDark;
+            context.read<SettingsProvider>().setThemePreference(
+              newIsDark ? ThemePreference.dark : ThemePreference.light,
+            );
           },
           icon: Icon(
-            isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+            isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
             color: isDark
                 ? AppColors.darkSecondaryText
                 : AppColors.lightSecondaryText,
@@ -213,11 +167,17 @@ class _ProgressScreenState extends State<ProgressScreen>
 
   /// Hero Section with Progress Ring
   Widget _buildHeroSection(bool isDark, ProgressProvider progressProvider) {
-    final stats = progressProvider.stats;
-
-    if (stats == null) {
-      return const SliverToBoxAdapter(child: SizedBox.shrink());
-    }
+    // Use actual stats or default empty stats for new users
+    final stats =
+        progressProvider.stats ??
+        const ProgressStats(
+          completionRate: 0.0,
+          daysTracked: 0,
+          bestStreak: 0,
+          totalHabits: 0,
+          completedToday: 0,
+          totalToday: 0,
+        );
 
     return SliverToBoxAdapter(
       child: Container(
@@ -244,6 +204,59 @@ class _ProgressScreenState extends State<ProgressScreen>
           opacity: _fadeAnimation,
           child: Column(
             children: [
+              // Date Range Selector
+              Container(
+                margin: const EdgeInsets.only(bottom: 20),
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: DateRange.values.map((range) {
+                    final isSelected = progressProvider.selectedRange == range;
+                    return GestureDetector(
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        progressProvider.setDateRange(range);
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isSelected ? Colors.white : Colors.transparent,
+                          borderRadius: BorderRadius.circular(8),
+                          boxShadow: isSelected
+                              ? [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.1),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ]
+                              : null,
+                        ),
+                        child: Text(
+                          range.displayName,
+                          style: TextStyle(
+                            color: isSelected
+                                ? AppColors.lightCoral
+                                : Colors.white,
+                            fontSize: 14,
+                            fontWeight: isSelected
+                                ? FontWeight.w600
+                                : FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
               // Progress Ring
               AnimatedBuilder(
                 animation: _progressAnimation,
@@ -253,7 +266,8 @@ class _ProgressScreenState extends State<ProgressScreen>
                     height: 160,
                     child: CustomPaint(
                       painter: ProgressRingPainter(
-                        progress: stats.completionRate * _progressAnimation.value,
+                        progress:
+                            stats.completionRate * _progressAnimation.value,
                         backgroundColor: Colors.white.withValues(alpha: 0.25),
                         progressColor: Colors.white,
                         strokeWidth: 14,
@@ -334,11 +348,7 @@ class _ProgressScreenState extends State<ProgressScreen>
   }) {
     return Column(
       children: [
-        Icon(
-          icon,
-          color: Colors.white.withValues(alpha: 0.9),
-          size: 32,
-        ),
+        Icon(icon, color: Colors.white.withValues(alpha: 0.9), size: 32),
         const SizedBox(height: 8),
         Text(
           value,
@@ -365,152 +375,168 @@ class _ProgressScreenState extends State<ProgressScreen>
   Widget _buildAIWeeklySummary(bool isDark, ProgressProvider progressProvider) {
     final summary = progressProvider.weeklySummary;
 
-    return Transform.translate(
-      offset: const Offset(0, -24),
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16),
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.darkSurface : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
-            width: 1,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: isDark
-                  ? Colors.black.withValues(alpha: 0.4)
-                  : Colors.black.withValues(alpha: 0.12),
-              blurRadius: isDark ? 24 : 24,
-              offset: const Offset(0, 8),
-            ),
-          ],
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 24, 16, 16),
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkSurface : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+          width: 1,
         ),
-        child: summary == null
-            ? _buildAILoadingState(isDark)
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Header
-                  Row(
-                    children: [
-                      Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: LinearGradient(
-                            colors: isDark
-                                ? [
-                                    const Color(0xFFFF8A80),
-                                    const Color(0xFF69F0AE),
-                                  ]
-                                : [
-                                    const Color(0xFFFF6B6B),
-                                    const Color(0xFFA8E6CF),
-                                  ],
-                          ),
-                        ),
-                        child: Icon(
-                          Icons.psychology_rounded,
-                          color: Colors.white,
-                          size: 18,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        'AI Analysis',
-                        style: TextStyle(
-                          color: isDark
-                              ? AppColors.darkPrimaryText
-                              : AppColors.lightPrimaryText,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
+        boxShadow: [
+          BoxShadow(
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.4)
+                : Colors.black.withValues(alpha: 0.12),
+            blurRadius: isDark ? 24 : 24,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: summary == null
+          ? _buildAILoadingState(isDark)
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header
+                Row(
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          colors: isDark
+                              ? [
+                                  const Color(0xFFFF8A80),
+                                  const Color(0xFF69F0AE),
+                                ]
+                              : [
+                                  const Color(0xFFFF6B6B),
+                                  const Color(0xFFA8E6CF),
+                                ],
                         ),
                       ),
-                      const Spacer(),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isDark
-                              ? const Color(0xFF1A237E)
-                              : const Color(0xFFE3F2FD),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          summary.periodLabel,
-                          style: TextStyle(
-                            color: isDark
-                                ? const Color(0xFF82B1FF)
-                                : const Color(0xFF2196F3),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
+                      child: Icon(
+                        Icons.psychology_rounded,
+                        color: Colors.white,
+                        size: 18,
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Summary Text
-                  Text(
-                    summary.summary,
-                    style: TextStyle(
-                      color: isDark
-                          ? AppColors.darkPrimaryText
-                          : AppColors.lightPrimaryText,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w400,
-                      height: 1.6,
                     ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Divider
-                  Divider(
-                    color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
-                  ),
-                  const SizedBox(height: 12),
-
-                  // View Full Insights Button
-                  InkWell(
-                    onTap: () {
-                      HapticFeedback.lightImpact();
-                      // Navigate to AI Coach screen
-                    },
-                    child: Text(
-                      'View Full Insights →',
+                    const SizedBox(width: 12),
+                    Text(
+                      'AI Analysis',
                       style: TextStyle(
-                        color: isDark ? AppColors.darkCoral : AppColors.lightCoral,
-                        fontSize: 14,
+                        color: isDark
+                            ? AppColors.darkPrimaryText
+                            : AppColors.lightPrimaryText,
+                        fontSize: 16,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? const Color(0xFF1A237E)
+                            : const Color(0xFFE3F2FD),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        summary.periodLabel,
+                        style: TextStyle(
+                          color: isDark
+                              ? const Color(0xFF82B1FF)
+                              : const Color(0xFF2196F3),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Summary Text
+                Text(
+                  summary.summary,
+                  style: TextStyle(
+                    color: isDark
+                        ? AppColors.darkPrimaryText
+                        : AppColors.lightPrimaryText,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w400,
+                    height: 1.6,
                   ),
-                ],
-              ),
-      ),
+                ),
+                const SizedBox(height: 16),
+
+                // Divider
+                Divider(
+                  color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+                ),
+                const SizedBox(height: 12),
+
+                // View Full Insights Button
+                InkWell(
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    // Navigate to AI Coach screen
+                  },
+                  child: Text(
+                    'View Full Insights →',
+                    style: TextStyle(
+                      color: isDark
+                          ? AppColors.darkCoral
+                          : AppColors.lightCoral,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
     );
   }
 
   Widget _buildAILoadingState(bool isDark) {
     return Column(
       children: [
-        CircularProgressIndicator(
-          color: isDark ? AppColors.darkCoral : AppColors.lightCoral,
+        Icon(
+          Icons.psychology_outlined,
+          size: 48,
+          color: isDark
+              ? AppColors.darkSecondaryText.withValues(alpha: 0.5)
+              : AppColors.lightSecondaryText.withValues(alpha: 0.5),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         Text(
-          'AI is analyzing your progress...',
+          'Start tracking habits to unlock AI insights',
+          textAlign: TextAlign.center,
           style: TextStyle(
-            color:
-                isDark ? AppColors.darkSecondaryText : AppColors.lightSecondaryText,
+            color: isDark
+                ? AppColors.darkSecondaryText
+                : AppColors.lightSecondaryText,
             fontSize: 14,
             fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Complete ${AppConstants.minDaysForAIInsights} days of tracking to see personalized analysis',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: isDark
+                ? AppColors.darkTextTertiary
+                : AppColors.lightTextTertiary,
+            fontSize: 12,
           ),
         ),
       ],
@@ -519,7 +545,9 @@ class _ProgressScreenState extends State<ProgressScreen>
 
   /// Category Breakdown Section
   Widget _buildCategoryBreakdown(
-      bool isDark, ProgressProvider progressProvider) {
+    bool isDark,
+    ProgressProvider progressProvider,
+  ) {
     final breakdown = progressProvider.categoryBreakdown;
 
     if (breakdown.isEmpty) return const SizedBox.shrink();
@@ -533,8 +561,9 @@ class _ProgressScreenState extends State<ProgressScreen>
           child: Text(
             'Performance by Category',
             style: TextStyle(
-              color:
-                  isDark ? AppColors.darkPrimaryText : AppColors.lightPrimaryText,
+              color: isDark
+                  ? AppColors.darkPrimaryText
+                  : AppColors.lightPrimaryText,
               fontSize: 18,
               fontWeight: FontWeight.w600,
             ),
@@ -601,7 +630,9 @@ class _ProgressScreenState extends State<ProgressScreen>
               const SizedBox(height: 20),
 
               // Legend
-              ...breakdown.map((item) => _buildCategoryLegendItem(isDark, item)),
+              ...breakdown.map(
+                (item) => _buildCategoryLegendItem(isDark, item),
+              ),
             ],
           ),
         ),
@@ -630,8 +661,9 @@ class _ProgressScreenState extends State<ProgressScreen>
           Text(
             breakdown.category.displayName,
             style: TextStyle(
-              color:
-                  isDark ? AppColors.darkPrimaryText : AppColors.lightPrimaryText,
+              color: isDark
+                  ? AppColors.darkPrimaryText
+                  : AppColors.lightPrimaryText,
               fontSize: 15,
               fontWeight: FontWeight.w500,
             ),
@@ -676,8 +708,9 @@ class _ProgressScreenState extends State<ProgressScreen>
           child: Text(
             'Your Week at a Glance',
             style: TextStyle(
-              color:
-                  isDark ? AppColors.darkPrimaryText : AppColors.lightPrimaryText,
+              color: isDark
+                  ? AppColors.darkPrimaryText
+                  : AppColors.lightPrimaryText,
               fontSize: 18,
               fontWeight: FontWeight.w600,
             ),
@@ -826,7 +859,11 @@ class _ProgressScreenState extends State<ProgressScreen>
     );
   }
 
-  void _showDayDetailSheet(BuildContext context, bool isDark, DayHeatmapData day) {
+  void _showDayDetailSheet(
+    BuildContext context,
+    bool isDark,
+    DayHeatmapData day,
+  ) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -839,7 +876,9 @@ class _ProgressScreenState extends State<ProgressScreen>
           return Container(
             decoration: BoxDecoration(
               color: isDark ? AppColors.darkSurface : Colors.white,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(24),
+              ),
             ),
             padding: const EdgeInsets.all(24),
             child: Column(
@@ -851,7 +890,9 @@ class _ProgressScreenState extends State<ProgressScreen>
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+                      color: isDark
+                          ? AppColors.darkBorder
+                          : AppColors.lightBorder,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -884,16 +925,8 @@ class _ProgressScreenState extends State<ProgressScreen>
                 ),
                 const SizedBox(height: 24),
 
-                // Placeholder for habit list
-                Text(
-                  'Habit details coming soon...',
-                  style: TextStyle(
-                    color: isDark
-                        ? AppColors.darkSecondaryText
-                        : AppColors.lightSecondaryText,
-                    fontSize: 14,
-                  ),
-                ),
+                // Habit completion list for this day
+                _buildDayHabitList(context, day, isDark),
               ],
             ),
           );
@@ -915,7 +948,7 @@ class _ProgressScreenState extends State<ProgressScreen>
       'September',
       'October',
       'November',
-      'December'
+      'December',
     ];
     final weekdays = [
       'Monday',
@@ -924,13 +957,105 @@ class _ProgressScreenState extends State<ProgressScreen>
       'Thursday',
       'Friday',
       'Saturday',
-      'Sunday'
+      'Sunday',
     ];
     return '${weekdays[date.weekday - 1]}, ${months[date.month - 1]} ${date.day}';
   }
 
-  /// Trend Chart Section (Placeholder)
+  /// Build habit list for a specific day
+  Widget _buildDayHabitList(
+    BuildContext context,
+    DayHeatmapData day,
+    bool isDark,
+  ) {
+    final habitProvider = context.read<HabitProvider>();
+    final progressProvider = context.read<ProgressProvider>();
+    final habits = habitProvider.habits;
+
+    if (habits.isEmpty) {
+      return Text(
+        'No habits to track',
+        style: TextStyle(
+          color: isDark
+              ? AppColors.darkSecondaryText
+              : AppColors.lightSecondaryText,
+          fontSize: 14,
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: habits.map((habit) {
+        // Check if this habit was completed on this day
+        final isCompleted = progressProvider.weeklyHeatmap
+            .where(
+              (h) =>
+                  h.date.year == day.date.year &&
+                  h.date.month == day.date.month &&
+                  h.date.day == day.date.day,
+            )
+            .any((h) => h.completed > 0);
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Row(
+            children: [
+              Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isCompleted
+                      ? (isDark ? AppColors.darkCoral : AppColors.lightCoral)
+                      : (isDark
+                            ? AppColors.darkSurface
+                            : AppColors.lightSurface),
+                  border: Border.all(
+                    color: isDark
+                        ? AppColors.darkBorder
+                        : AppColors.lightBorder,
+                  ),
+                ),
+                child: isCompleted
+                    ? Icon(Icons.check, size: 14, color: Colors.white)
+                    : null,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  habit.name,
+                  style: TextStyle(
+                    color: isDark
+                        ? AppColors.darkPrimaryText
+                        : AppColors.lightPrimaryText,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    decoration: isCompleted ? TextDecoration.lineThrough : null,
+                    decorationColor: isDark
+                        ? AppColors.darkSecondaryText
+                        : AppColors.lightSecondaryText,
+                  ),
+                ),
+              ),
+              Icon(
+                habit.category.icon,
+                size: 16,
+                color: isDark
+                    ? habit.category.getDarkGradient().first
+                    : habit.category.getLightGradient().first,
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  /// Trend Chart Section with fl_chart
   Widget _buildTrendChart(bool isDark, ProgressProvider progressProvider) {
+    final trendData = progressProvider.trendData;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -940,8 +1065,9 @@ class _ProgressScreenState extends State<ProgressScreen>
           child: Text(
             'Completion Trend',
             style: TextStyle(
-              color:
-                  isDark ? AppColors.darkPrimaryText : AppColors.lightPrimaryText,
+              color: isDark
+                  ? AppColors.darkPrimaryText
+                  : AppColors.lightPrimaryText,
               fontSize: 18,
               fontWeight: FontWeight.w600,
             ),
@@ -952,7 +1078,7 @@ class _ProgressScreenState extends State<ProgressScreen>
         Container(
           margin: const EdgeInsets.symmetric(horizontal: 16),
           height: 200,
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(8, 20, 20, 12),
           decoration: BoxDecoration(
             color: isDark ? AppColors.darkSurface : Colors.white,
             borderRadius: BorderRadius.circular(16),
@@ -966,17 +1092,153 @@ class _ProgressScreenState extends State<ProgressScreen>
               ),
             ],
           ),
-          child: Center(
-            child: Text(
-              'Chart visualization coming soon...',
-              style: TextStyle(
-                color: isDark
-                    ? AppColors.darkSecondaryText
-                    : AppColors.lightSecondaryText,
-                fontSize: 14,
-              ),
-            ),
-          ),
+          child: trendData.isEmpty
+              ? Center(
+                  child: Text(
+                    'Complete habits to see trends',
+                    style: TextStyle(
+                      color: isDark
+                          ? AppColors.darkSecondaryText
+                          : AppColors.lightSecondaryText,
+                      fontSize: 14,
+                    ),
+                  ),
+                )
+              : LineChart(
+                  LineChartData(
+                    gridData: FlGridData(
+                      show: true,
+                      drawVerticalLine: false,
+                      horizontalInterval: 0.25,
+                      getDrawingHorizontalLine: (value) => FlLine(
+                        color: isDark
+                            ? AppColors.darkBorder.withValues(alpha: 0.3)
+                            : AppColors.lightBorder,
+                        strokeWidth: 1,
+                      ),
+                    ),
+                    titlesData: FlTitlesData(
+                      show: true,
+                      rightTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false),
+                      ),
+                      topTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false),
+                      ),
+                      bottomTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          reservedSize: 30,
+                          interval: (trendData.length / 5).ceilToDouble(),
+                          getTitlesWidget: (value, meta) {
+                            final index = value.toInt();
+                            if (index < 0 || index >= trendData.length) {
+                              return const SizedBox.shrink();
+                            }
+                            final date = trendData[index].date;
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Text(
+                                '${date.day}/${date.month}',
+                                style: TextStyle(
+                                  color: isDark
+                                      ? AppColors.darkTextTertiary
+                                      : AppColors.lightTextTertiary,
+                                  fontSize: 10,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      leftTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          reservedSize: 40,
+                          interval: 0.25,
+                          getTitlesWidget: (value, meta) {
+                            return Text(
+                              '${(value * 100).toInt()}%',
+                              style: TextStyle(
+                                color: isDark
+                                    ? AppColors.darkTextTertiary
+                                    : AppColors.lightTextTertiary,
+                                fontSize: 10,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                    borderData: FlBorderData(show: false),
+                    minX: 0,
+                    maxX: (trendData.length - 1).toDouble(),
+                    minY: 0,
+                    maxY: 1,
+                    lineBarsData: [
+                      LineChartBarData(
+                        spots: trendData.asMap().entries.map((entry) {
+                          return FlSpot(
+                            entry.key.toDouble(),
+                            entry.value.completionRate,
+                          );
+                        }).toList(),
+                        isCurved: true,
+                        curveSmoothness: 0.3,
+                        color: isDark
+                            ? AppColors.darkCoral
+                            : AppColors.lightCoral,
+                        barWidth: 3,
+                        isStrokeCapRound: true,
+                        dotData: FlDotData(
+                          show: true,
+                          getDotPainter: (spot, percent, barData, index) {
+                            return FlDotCirclePainter(
+                              radius: 4,
+                              color: isDark
+                                  ? AppColors.darkCoral
+                                  : AppColors.lightCoral,
+                              strokeWidth: 2,
+                              strokeColor: isDark
+                                  ? AppColors.darkSurface
+                                  : Colors.white,
+                            );
+                          },
+                        ),
+                        belowBarData: BarAreaData(
+                          show: true,
+                          color:
+                              (isDark
+                                      ? AppColors.darkCoral
+                                      : AppColors.lightCoral)
+                                  .withValues(alpha: 0.15),
+                        ),
+                      ),
+                    ],
+                    lineTouchData: LineTouchData(
+                      touchTooltipData: LineTouchTooltipData(
+                        getTooltipColor: (touchedSpot) => isDark
+                            ? AppColors.darkSurfaceVariant
+                            : Colors.white,
+                        getTooltipItems: (touchedSpots) {
+                          return touchedSpots.map((spot) {
+                            final date = trendData[spot.x.toInt()].date;
+                            return LineTooltipItem(
+                              '${date.day}/${date.month}\n${(spot.y * 100).toInt()}%',
+                              TextStyle(
+                                color: isDark
+                                    ? AppColors.darkPrimaryText
+                                    : AppColors.lightPrimaryText,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12,
+                              ),
+                            );
+                          }).toList();
+                        },
+                      ),
+                    ),
+                  ),
+                ),
         ),
       ],
     );
@@ -1000,8 +1262,9 @@ class _ProgressScreenState extends State<ProgressScreen>
           child: Text(
             'Top & Bottom Habits',
             style: TextStyle(
-              color:
-                  isDark ? AppColors.darkPrimaryText : AppColors.lightPrimaryText,
+              color: isDark
+                  ? AppColors.darkPrimaryText
+                  : AppColors.lightPrimaryText,
               fontSize: 18,
               fontWeight: FontWeight.w600,
             ),
@@ -1156,12 +1419,12 @@ class _ProgressScreenState extends State<ProgressScreen>
               color: isTop
                   ? (isDark ? const Color(0xFF69F0AE) : const Color(0xFF27AE60))
                   : (performer.successRate < 0.5
-                      ? (isDark
-                          ? const Color(0xFFFF5252)
-                          : const Color(0xFFE74C3C))
-                      : (isDark
-                          ? const Color(0xFFFFB74D)
-                          : const Color(0xFFF39C12))),
+                        ? (isDark
+                              ? const Color(0xFFFF5252)
+                              : const Color(0xFFE74C3C))
+                        : (isDark
+                              ? const Color(0xFFFFB74D)
+                              : const Color(0xFFF39C12))),
               fontSize: 16,
               fontWeight: FontWeight.w700,
             ),
@@ -1172,7 +1435,10 @@ class _ProgressScreenState extends State<ProgressScreen>
   }
 
   /// Achievement Gallery Section
-  Widget _buildAchievementGallery(bool isDark, ProgressProvider progressProvider) {
+  Widget _buildAchievementGallery(
+    bool isDark,
+    ProgressProvider progressProvider,
+  ) {
     final achievements = progressProvider.achievements.take(6).toList();
 
     if (achievements.isEmpty) return const SizedBox.shrink();
@@ -1280,9 +1546,7 @@ class _ProgressScreenState extends State<ProgressScreen>
         decoration: BoxDecoration(
           color: achievement.isUnlocked
               ? badgeColor.withValues(alpha: 0.15)
-              : (isDark
-                  ? const Color(0xFF2C2C2C)
-                  : const Color(0xFFF5F5F5)),
+              : (isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF5F5F5)),
           border: Border.all(
             color: achievement.isUnlocked
                 ? badgeColor
@@ -1301,8 +1565,8 @@ class _ProgressScreenState extends State<ProgressScreen>
               color: achievement.isUnlocked
                   ? badgeColor
                   : (isDark
-                      ? AppColors.darkSecondaryText
-                      : AppColors.lightSecondaryText),
+                        ? AppColors.darkSecondaryText
+                        : AppColors.lightSecondaryText),
             ),
             const SizedBox(height: 8),
 
@@ -1315,11 +1579,11 @@ class _ProgressScreenState extends State<ProgressScreen>
               style: TextStyle(
                 color: achievement.isUnlocked
                     ? (isDark
-                        ? AppColors.darkPrimaryText
-                        : AppColors.lightPrimaryText)
+                          ? AppColors.darkPrimaryText
+                          : AppColors.lightPrimaryText)
                     : (isDark
-                        ? AppColors.darkSecondaryText
-                        : AppColors.lightSecondaryText),
+                          ? AppColors.darkSecondaryText
+                          : AppColors.lightSecondaryText),
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
               ),
@@ -1341,7 +1605,9 @@ class _ProgressScreenState extends State<ProgressScreen>
                   widthFactor: achievement.progress,
                   child: Container(
                     decoration: BoxDecoration(
-                      color: isDark ? AppColors.darkCoral : AppColors.lightCoral,
+                      color: isDark
+                          ? AppColors.darkCoral
+                          : AppColors.lightCoral,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -1355,7 +1621,10 @@ class _ProgressScreenState extends State<ProgressScreen>
   }
 
   void _showAchievementDetail(
-      BuildContext context, bool isDark, Achievement achievement) {
+    BuildContext context,
+    bool isDark,
+    Achievement achievement,
+  ) {
     showDialog(
       context: context,
       builder: (context) => Dialog(
@@ -1426,11 +1695,11 @@ class _ProgressScreenState extends State<ProgressScreen>
                     size: 16,
                     color: achievement.isUnlocked
                         ? (isDark
-                            ? const Color(0xFF69F0AE)
-                            : const Color(0xFF27AE60))
+                              ? const Color(0xFF69F0AE)
+                              : const Color(0xFF27AE60))
                         : (isDark
-                            ? const Color(0xFFFFB74D)
-                            : const Color(0xFFF39C12)),
+                              ? const Color(0xFFFFB74D)
+                              : const Color(0xFFF39C12)),
                   ),
                   const SizedBox(width: 8),
                   Text(
@@ -1440,11 +1709,11 @@ class _ProgressScreenState extends State<ProgressScreen>
                     style: TextStyle(
                       color: achievement.isUnlocked
                           ? (isDark
-                              ? const Color(0xFF69F0AE)
-                              : const Color(0xFF27AE60))
+                                ? const Color(0xFF69F0AE)
+                                : const Color(0xFF27AE60))
                           : (isDark
-                              ? const Color(0xFFFFB74D)
-                              : const Color(0xFFF39C12)),
+                                ? const Color(0xFFFFB74D)
+                                : const Color(0xFFF39C12)),
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
                     ),
@@ -1494,8 +1763,9 @@ class _ProgressScreenState extends State<ProgressScreen>
                     widthFactor: achievement.progress,
                     child: Container(
                       decoration: BoxDecoration(
-                        color:
-                            isDark ? AppColors.darkCoral : AppColors.lightCoral,
+                        color: isDark
+                            ? AppColors.darkCoral
+                            : AppColors.lightCoral,
                         borderRadius: BorderRadius.circular(6),
                       ),
                     ),
@@ -1513,11 +1783,46 @@ class _ProgressScreenState extends State<ProgressScreen>
                   ),
                 ),
               ],
+
+              // Share button
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    HapticFeedback.lightImpact();
+                    _shareAchievement(achievement);
+                    Navigator.of(context).pop();
+                  },
+                  icon: const Icon(Icons.share_rounded, size: 18),
+                  label: Text(
+                    achievement.isUnlocked
+                        ? 'Share Achievement'
+                        : 'Share Progress',
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isDark
+                        ? AppColors.darkCoral
+                        : AppColors.lightCoral,
+                    foregroundColor: isDark
+                        ? AppColors.darkBackground
+                        : Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Future<void> _shareAchievement(Achievement achievement) async {
+    await ShareService().shareAchievement(achievement);
   }
 
   /// Quick Actions
@@ -1608,10 +1913,7 @@ class _DonutChartPainter extends CustomPainter {
   final List<CategoryBreakdown> breakdown;
   final bool isDark;
 
-  _DonutChartPainter({
-    required this.breakdown,
-    required this.isDark,
-  });
+  _DonutChartPainter({required this.breakdown, required this.isDark});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1637,7 +1939,10 @@ class _DonutChartPainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeCap = StrokeCap.round;
 
-      final rect = Rect.fromCircle(center: center, radius: radius - strokeWidth / 2);
+      final rect = Rect.fromCircle(
+        center: center,
+        radius: radius - strokeWidth / 2,
+      );
       canvas.drawArc(rect, startAngle, sweepAngle, false, paint);
 
       startAngle += sweepAngle;
