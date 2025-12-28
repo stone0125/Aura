@@ -1,16 +1,79 @@
-# habit_tracker
+# Aura - AI-Powered Habit Tracker 💜
 
-A new Flutter project.
+A premium, intelligent habit tracking application built with Flutter and Firebase. Aura helps you build better habits through AI-powered insights, gamification, and detailed analytics.
 
-## Getting Started
+## ✨ Features
 
-This project is a starting point for a Flutter application.
+### 🎯 Core Habit Tracking
+*   **Flexible Schedules**: Daily, weekly, or custom frequency habits.
+*   **Smart Reminders**: Notifications tailored to your schedule.
+*   **Progress Tracking**: Weekly heatmaps and completion stats.
 
-A few resources to get you started if this is your first Flutter project:
+### 🧠 AI Coach
+*   **Personalized Suggestions**: Receive habit suggestions based on your goals.
+*   **Smart Insights**: AI analyzes your patterns to provide actionable feedback.
+*   **Tips & Motivation**: Daily tips to keep you on track.
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+### 📊 Analytics & Insights
+*   **Detailed Charts**: Visualize your progress with beautiful graphs.
+*   **Screen Time Tracking**: Monitor your app usage.
+*   **Firebase Analytics**: Integrated event tracking for deeper user understanding.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+### 🏆 Gamification
+*   **Achievements**: Unlock 15+ unique achievements (e.g., "Week Warrior", "Legend").
+*   **Streaks**: Track your best and current streaks.
+*   **Badges**: Earn visual rewards for consistency.
+
+### 🤝 Social & Export
+*   **Share Progress**: Share achievements and streak milestones with friends.
+*   **Data Export**: Full control over your data with CSV and JSON export options.
+*   **Privacy Focused**: Your data is yours.
+
+## 🛠️ Tech Stack
+
+*   **Frontend**: Flutter (Mobile & Web)
+*   **Backend**: Firebase (Auth, Firestore, Functions, Analytics)
+*   **State Management**: Provider
+*   **Authentication**: Google Sign-In, Apple Sign-In
+*   **Native Features**: Local Notifications, Haptic Feedback, Sharing
+
+## 🚀 Getting Started
+
+### Prerequisites
+*   Flutter SDK (3.30+)
+*   Firebase Project configured
+
+### Installation
+
+1.  **Clone the repository**
+    ```bash
+    git clone https://github.com/stone0125/Aura.git
+    cd habit_tracker
+    ```
+
+2.  **Install Dependencies**
+    ```bash
+    flutter pub get
+    ```
+
+3.  **Run the App**
+    ```bash
+    flutter run
+    ```
+
+## 📂 Project Structure
+
+*   `lib/providers`: State management logic.
+*   `lib/screens`: UI screens (Home, AI Coach, Progress, Settings).
+*   `lib/services`: Backend integrations (Firestore, Auth, Analytics, Notifications).
+*   `functions/`: Firebase Cloud Functions (Node.js).
+
+## 🔒 Privacy & Permissions
+
+*   **Notifications**: Used for habit reminders.
+*   **Storage**: Used for caching AI insights.
+*   **Internet**: Required for syncing and AI features.
+
+---
+
+Built with 💜 by [stone0125](https://github.com/stone0125)
