@@ -20,6 +20,10 @@ class ProgressProvider with ChangeNotifier {
   // Local cache of habits to calculate from
   List<Habit> _habits = [];
 
+  // Cached achievement lists (invalidated when _achievements changes)
+  List<Achievement>? _cachedUnlockedAchievements;
+  List<Achievement>? _cachedLockedAchievements;
+
   // Getters
   DateRange get selectedRange => _selectedRange;
   ProgressStats? get stats => _stats;
@@ -32,10 +36,22 @@ class ProgressProvider with ChangeNotifier {
   WeeklySummary? get weeklySummary => _weeklySummary;
   bool get isLoading => _isLoading;
 
-  List<Achievement> get unlockedAchievements =>
-      _achievements.where((a) => a.isUnlocked).toList();
-  List<Achievement> get lockedAchievements =>
-      _achievements.where((a) => !a.isUnlocked).toList();
+  // Cached achievement getters - computed once per data change
+  List<Achievement> get unlockedAchievements {
+    _cachedUnlockedAchievements ??= _achievements.where((a) => a.isUnlocked).toList();
+    return _cachedUnlockedAchievements!;
+  }
+
+  List<Achievement> get lockedAchievements {
+    _cachedLockedAchievements ??= _achievements.where((a) => !a.isUnlocked).toList();
+    return _cachedLockedAchievements!;
+  }
+
+  /// Invalidate cached achievement lists when achievements change
+  void _invalidateAchievementCache() {
+    _cachedUnlockedAchievements = null;
+    _cachedLockedAchievements = null;
+  }
 
   /// Called by ProxyProvider when habits change
   void updateHabits(List<Habit> habits) {
@@ -46,8 +62,7 @@ class ProgressProvider with ChangeNotifier {
   /// Change selected date range
   void setDateRange(DateRange range) {
     _selectedRange = range;
-    _calculateAllStats();
-    notifyListeners();
+    _calculateAllStats(); // already calls notifyListeners()
   }
 
   void _calculateAllStats() {
@@ -83,7 +98,39 @@ class ProgressProvider with ChangeNotifier {
   void _calculateStats() {
     final totalHabits = _habits.length;
     final completedToday = _habits.where((h) => h.isCompleted).length;
-    final completionRate = totalHabits > 0 ? completedToday / totalHabits : 0.0;
+
+    // Calculate historical completion rate based on selected range
+    double completionRate = 0.0;
+    if (totalHabits > 0 && _habitHistories.isNotEmpty) {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final rangeStart = _getRangeStartDate();
+      final startDay = DateTime(rangeStart.year, rangeStart.month, rangeStart.day);
+
+      int totalPossible = 0;
+      int totalCompleted = 0;
+
+      // Loop forward from range start to today (inclusive)
+      for (var date = startDay; !date.isAfter(today); date = date.add(const Duration(days: 1))) {
+        final dateKey = _dateToKey(date);
+
+        for (var h in _habits) {
+          // Only count this habit if it existed on this date
+          if (!_habitExistedOnDate(h, date)) continue;
+          totalPossible++;
+
+          final normalizedDates = _normalizedHistories[h.id];
+          if (normalizedDates != null && normalizedDates.contains(dateKey)) {
+            totalCompleted++;
+          }
+        }
+      }
+
+      completionRate = totalPossible > 0 ? totalCompleted / totalPossible : 0.0;
+    } else {
+      // Fallback to today's rate if no history
+      completionRate = totalHabits > 0 ? completedToday / totalHabits : 0.0;
+    }
 
     // Best streak across all habits
     int bestStreak = 0;
@@ -134,6 +181,61 @@ class ProgressProvider with ChangeNotifier {
   final FirestoreService _firestoreService = FirestoreService();
   final Map<String, List<DateTime>> _habitHistories = {};
 
+  // Normalized date cache for O(1) lookups - keys are "YYYY-MM-DD" format
+  Map<String, Set<String>> _normalizedHistories = {};
+
+  /// Build normalized date cache from habit histories for O(1) date lookups
+  void _buildNormalizedHistories() {
+    _normalizedHistories = _habitHistories.map((id, dates) => MapEntry(
+      id,
+      dates.map((d) => '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}').toSet(),
+    ));
+  }
+
+  /// Convert DateTime to normalized string key
+  String _dateToKey(DateTime date) {
+    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  }
+
+  /// Find the earliest date across all histories and habit createdAt dates.
+  DateTime _getEarliestDate() {
+    DateTime? earliest;
+    for (var history in _habitHistories.values) {
+      for (var date in history) {
+        if (earliest == null || date.isBefore(earliest)) {
+          earliest = date;
+        }
+      }
+    }
+    for (var h in _habits) {
+      if (h.createdAt != null && (earliest == null || h.createdAt!.isBefore(earliest))) {
+        earliest = h.createdAt;
+      }
+    }
+    // Fallback to 7 days ago if no data at all
+    return earliest ?? DateTime.now().subtract(const Duration(days: 6));
+  }
+
+  /// Get the start date for the currently selected range.
+  /// For week/month returns the calendar boundary; for allTime uses earliest date.
+  DateTime _getRangeStartDate() {
+    return _selectedRange.startDate ?? _getEarliestDate();
+  }
+
+  /// Check if a habit existed on a given date (createdAt is null or <= date).
+  bool _habitExistedOnDate(Habit habit, DateTime date) {
+    if (habit.createdAt == null) return true; // legacy habit, assume always existed
+    final createdDay = DateTime(habit.createdAt!.year, habit.createdAt!.month, habit.createdAt!.day);
+    return !createdDay.isAfter(date);
+  }
+
+  /// Check if a specific habit was completed on a specific date - O(1) lookup
+  bool wasHabitCompletedOnDate(String habitId, DateTime date) {
+    final normalizedDates = _normalizedHistories[habitId];
+    if (normalizedDates == null) return false;
+    return normalizedDates.contains(_dateToKey(date));
+  }
+
   /// Initialize progress data
   Future<void> initialize() async {
     _isLoading = true;
@@ -159,43 +261,63 @@ class ProgressProvider with ChangeNotifier {
   Future<void> _fetchAllHistory() async {
     if (_habits.isEmpty) return;
     try {
-      // In a real production app with many habits, we would optimize this
-      // (e.g. collection group query or storing stats on the habit doc).
-      // For now, parallel fetch is acceptable.
-      await Future.wait(
-        _habits.map((h) async {
+      // Prune old habit histories for habits that no longer exist
+      _pruneOldHistories();
+
+      // Fetch history for current habits (limited to 90 days)
+      // Use individual try-catch to prevent one failure from stopping all fetches
+      final futures = _habits.map((h) async {
+        try {
           final history = await _firestoreService.getHabitHistory(h.id);
           _habitHistories[h.id] = history;
-        }),
-      );
+        } catch (e) {
+          debugPrint("Error fetching history for habit ${h.id}: $e");
+          // Keep existing history or set empty list on failure
+          _habitHistories[h.id] ??= [];
+        }
+      }).toList();
+
+      await Future.wait(futures, eagerError: false);
+
+      // Build normalized cache for O(1) lookups
+      _buildNormalizedHistories();
     } catch (e) {
-      debugPrint("Error fetching history: $e");
+      debugPrint("Error in _fetchAllHistory: $e");
     }
+  }
+
+  /// Remove history entries for habits that no longer exist
+  /// This prevents unbounded memory growth
+  void _pruneOldHistories() {
+    final currentHabitIds = _habits.map((h) => h.id).toSet();
+    _habitHistories.removeWhere((id, _) => !currentHabitIds.contains(id));
+    _normalizedHistories.removeWhere((id, _) => !currentHabitIds.contains(id));
   }
 
   void _recalculateAll() {
     _calculateAllStats();
-    notifyListeners();
+    // notifyListeners() already called in _calculateAllStats
   }
 
-  // Updated Heatmap Calculation using Real History
+  // Updated Heatmap Calculation using Real History - O(1) lookups
   void _calculateWeeklyHeatmap() {
     final now = DateTime.now();
     final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
 
     _weeklyHeatmap = List.generate(7, (index) {
       final date = startOfWeek.add(Duration(days: index));
+      final dateKey = _dateToKey(date);
 
       int completed = 0;
-      int total = _habits.length;
+      int total = 0;
 
       for (var h in _habits) {
-        final history = _habitHistories[h.id] ?? [];
-        // Check if history contains this date
-        if (history.any(
-          (d) =>
-              d.year == date.year && d.month == date.month && d.day == date.day,
-        )) {
+        // Only count habits that existed on this date
+        if (!_habitExistedOnDate(h, date)) continue;
+        total++;
+
+        final normalizedDates = _normalizedHistories[h.id];
+        if (normalizedDates != null && normalizedDates.contains(dateKey)) {
           completed++;
         }
       }
@@ -209,73 +331,94 @@ class ProgressProvider with ChangeNotifier {
     });
   }
 
-  // Updated Trend Data using Real History
+  // Updated Trend Data using Real History - O(1) lookups
   void _calculateTrendData() {
-    int days = 7;
-    if (_selectedRange == DateRange.thisMonth) days = 30;
-
     final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final rangeStart = _getRangeStartDate();
+    final startDay = DateTime(rangeStart.year, rangeStart.month, rangeStart.day);
 
-    _trendData = List.generate(days, (index) {
-      final date = now.subtract(Duration(days: days - 1 - index));
+    _trendData = [];
+    for (var date = startDay; !date.isAfter(today); date = date.add(const Duration(days: 1))) {
+      final dateKey = _dateToKey(date);
 
       int completed = 0;
-      int total = _habits
-          .length; // Assuming total number of habits was constant (Simplification)
+      int total = 0;
 
-      if (total > 0) {
-        for (var h in _habits) {
-          final history = _habitHistories[h.id] ?? [];
-          if (history.any(
-            (d) =>
-                d.year == date.year &&
-                d.month == date.month &&
-                d.day == date.day,
-          )) {
-            completed++;
-          }
+      for (var h in _habits) {
+        if (!_habitExistedOnDate(h, date)) continue;
+        total++;
+
+        final normalizedDates = _normalizedHistories[h.id];
+        if (normalizedDates != null && normalizedDates.contains(dateKey)) {
+          completed++;
         }
       }
 
-      return TrendDataPoint(
+      _trendData.add(TrendDataPoint(
         date: date,
         completionRate: total > 0 ? completed / total : 0.0,
-      );
-    });
+      ));
+    }
   }
 
   void _calculatePerformers() {
-    // Calculate actual performance based on history within selected range
     final now = DateTime.now();
-    final rangeDays = _selectedRange.days ?? 30;
-    final rangeStart = now.subtract(Duration(days: rangeDays));
+    final today = DateTime(now.year, now.month, now.day);
+    final rangeStart = _getRangeStartDate();
+    final startDay = DateTime(rangeStart.year, rangeStart.month, rangeStart.day);
 
     // Build performance data for each habit
     List<_HabitPerfData> perfData = [];
 
     for (var h in _habits) {
+      // Per-habit: effective start is the later of range start or habit creation
+      DateTime effectiveStart = startDay;
+      if (h.createdAt != null) {
+        final createdDay = DateTime(h.createdAt!.year, h.createdAt!.month, h.createdAt!.day);
+        if (createdDay.isAfter(effectiveStart)) {
+          effectiveStart = createdDay;
+        }
+      }
+
+      final habitRangeDays = today.difference(effectiveStart).inDays + 1;
+      if (habitRangeDays <= 0) continue; // habit created after today (shouldn't happen)
+
       final history = _habitHistories[h.id] ?? [];
-      // Count completions within range
+      // Count completions within the effective range
       final completionsInRange = history
-          .where((d) => d.isAfter(rangeStart) || d.isAtSameMomentAs(rangeStart))
+          .where((d) {
+            final day = DateTime(d.year, d.month, d.day);
+            return !day.isBefore(effectiveStart) && !day.isAfter(today);
+          })
           .length;
 
-      final successRate = rangeDays > 0 ? completionsInRange / rangeDays : 0.0;
+      final successRate = habitRangeDays > 0 ? completionsInRange / habitRangeDays : 0.0;
       perfData.add(
         _HabitPerfData(
           habit: h,
           completions: completionsInRange,
-          totalDays: rangeDays,
+          totalDays: habitRangeDays,
           successRate: successRate.clamp(0.0, 1.0),
         ),
       );
     }
 
-    // Sort by success rate descending for top performers
+    // Sort once by success rate descending
     perfData.sort((a, b) => b.successRate.compareTo(a.successRate));
 
+    // Guard against empty perfData
+    if (perfData.isEmpty) {
+      _topPerformers = [];
+      _bottomPerformers = [];
+      return;
+    }
+
+    // Top performers - first 3 (highest success rates)
+    // Use math.min to avoid taking more than available
+    final topCount = perfData.length < 3 ? perfData.length : 3;
     _topPerformers = perfData
-        .take(3)
+        .take(topCount)
         .map(
           (p) => HabitPerformance(
             habit: p.habit,
@@ -286,11 +429,12 @@ class ProgressProvider with ChangeNotifier {
         )
         .toList();
 
-    // Bottom performers - sort ascending
-    perfData.sort((a, b) => a.successRate.compareTo(b.successRate));
-
+    // Bottom performers - last 3 (lowest success rates)
+    // For small lists (3 or fewer habits), bottom performers overlap with top
+    // Take from the end of the sorted list (lowest rates)
+    final bottomCount = perfData.length < 3 ? perfData.length : 3;
     _bottomPerformers = perfData
-        .take(3)
+        .skip(perfData.length - bottomCount)
         .map(
           (p) => HabitPerformance(
             habit: p.habit,
@@ -303,6 +447,8 @@ class ProgressProvider with ChangeNotifier {
   }
 
   void _calculateAchievements() {
+    // Invalidate cached lists since achievements are being recalculated
+    _invalidateAchievementCache();
     final now = DateTime.now();
     final totalStreak = _stats?.bestStreak ?? 0;
     final totalCompletions = _habitHistories.values.fold<int>(
@@ -493,29 +639,46 @@ class ProgressProvider with ChangeNotifier {
     ];
   }
 
+  /// Clear all user-specific data on logout
+  void clearUserData() {
+    _habits = [];
+    _habitHistories.clear();
+    _normalizedHistories = {};
+    _stats = null;
+    _categoryBreakdown = [];
+    _weeklyHeatmap = [];
+    _trendData = [];
+    _topPerformers = [];
+    _bottomPerformers = [];
+    _achievements = [];
+    _weeklySummary = null;
+    _isLoading = false;
+    _cachedUnlockedAchievements = null;
+    _cachedLockedAchievements = null;
+    notifyListeners();
+  }
+
   /// Calculate trend percentage change
   double getTrendChange() {
     if (_trendData.length < 2) return 0.0;
 
-    final days = _selectedRange.days ?? 30;
-    final halfPoint = days ~/ 2;
+    final halfPoint = _trendData.length ~/ 2;
 
-    if (_trendData.length <= halfPoint) return 0.0;
+    // Guard: ensure we have enough data points
+    if (halfPoint <= 0 || _trendData.length <= halfPoint) return 0.0;
 
-    final firstHalfAvg =
-        _trendData
-            .take(halfPoint)
-            .map((d) => d.completionRate)
-            .reduce((a, b) => a + b) /
-        halfPoint;
+    // Calculate first half average with empty list guard
+    final firstHalfData = _trendData.take(halfPoint).map((d) => d.completionRate).toList();
+    if (firstHalfData.isEmpty) return 0.0;
+    final firstHalfAvg = firstHalfData.reduce((a, b) => a + b) / firstHalfData.length;
 
-    final secondHalfAvg =
-        _trendData
-            .skip(halfPoint)
-            .map((d) => d.completionRate)
-            .reduce((a, b) => a + b) /
-        (_trendData.length - halfPoint);
+    // Calculate second half average with empty list guard
+    final secondHalfData = _trendData.skip(halfPoint).map((d) => d.completionRate).toList();
+    if (secondHalfData.isEmpty) return 0.0;
+    final secondHalfAvg = secondHalfData.reduce((a, b) => a + b) / secondHalfData.length;
 
+    // Guard against division by zero
+    if (firstHalfAvg == 0) return secondHalfAvg > 0 ? 100.0 : 0.0;
     return ((secondHalfAvg - firstHalfAvg) / firstHalfAvg) * 100;
   }
 }

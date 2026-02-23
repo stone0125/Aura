@@ -47,7 +47,12 @@ class UserProfile {
       'Nov',
       'Dec'
     ];
-    return 'Member since ${months[memberSince.month - 1]} ${memberSince.year}';
+    // Ensure month is within valid range (1-12)
+    final monthIndex = memberSince.month;
+    if (monthIndex < 1 || monthIndex > 12) {
+      return 'Member since ${memberSince.year}';
+    }
+    return 'Member since ${months[monthIndex - 1]} ${memberSince.year}';
   }
 
   UserProfile copyWith({

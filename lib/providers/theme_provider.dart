@@ -47,6 +47,18 @@ class ThemeProvider with ChangeNotifier {
     }
   }
 
+  /// Clear user data on logout to prevent cross-user data leaks
+  Future<void> clearUserData() async {
+    _themeMode = ThemeMode.light;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_themeModeKey);
+    } catch (e) {
+      debugPrint('Error clearing theme preference: $e');
+    }
+    notifyListeners();
+  }
+
   /// Save theme mode to shared preferences
   Future<void> _saveThemeMode() async {
     try {

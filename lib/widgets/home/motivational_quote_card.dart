@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import '../../config/theme/app_colors.dart';
 
@@ -37,15 +38,17 @@ class _MotivationalQuoteCardState extends State<MotivationalQuoteCard> {
     _quote = _getRandomQuote();
   }
 
+  final _random = Random();
+
   void _shuffleQuote() {
     setState(() {
       final current = _quote;
-      // Simple random shuffle ensuring no immediate repeat if possible
-      var next = _quotes[DateTime.now().microsecond % _quotes.length];
+      // Use dart:math Random for proper randomness
+      var next = _quotes[_random.nextInt(_quotes.length)];
       if (_quotes.length > 1) {
         int attempts = 0;
         while (next == current && attempts < 3) {
-          next = _quotes[DateTime.now().microsecond % _quotes.length];
+          next = _quotes[_random.nextInt(_quotes.length)];
           attempts++;
         }
       }

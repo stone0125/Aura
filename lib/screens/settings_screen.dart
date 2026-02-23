@@ -1,15 +1,24 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
+import '../config/app_constants.dart';
 import '../config/theme/app_colors.dart';
+import '../config/theme/ui_constants.dart';
 import '../models/settings_models.dart';
 import '../providers/settings_provider.dart';
 import '../providers/theme_provider.dart';
 import '../providers/progress_provider.dart';
 import '../providers/habit_provider.dart';
+import '../providers/ai_scoring_provider.dart';
 import '../services/subscription_service.dart';
+import '../models/subscription_models.dart';
 import '../services/export_service.dart';
+import '../services/firestore_service.dart';
+import '../services/notification_service.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../widgets/settings/help_support_sheets.dart';
 
 /// Comprehensive settings and profile management screen
 class SettingsScreen extends StatefulWidget {
@@ -20,15 +29,6 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  @override
-  void initState() {
-    super.initState();
-    // Initialize settings on first load
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<SettingsProvider>().initialize();
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -55,7 +55,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w600,
-                  color: isDark ? Colors.white : AppColors.lightTextPrimary,
+                  color: isDark ? Colors.white : AppColors.lightPrimaryText,
                 ),
               ),
             ),
@@ -81,17 +81,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                   const SizedBox(height: 24),
 
-                  // AI Preferences
-                  _buildSectionHeader(context, 'AI Preferences', isDark),
-                  _buildAISection(context, settings, isDark),
-
-                  const SizedBox(height: 24),
+                  // Health Integration (only show on iOS/Android)
+                  if (Platform.isIOS || Platform.isAndroid) ...[
+                    _buildSectionHeader(context, 'Health Integration', isDark),
+                    _buildHealthIntegrationSection(context, isDark),
+                    const SizedBox(height: 24),
+                  ],
 
                   // Account
                   _buildSectionHeader(context, 'Account', isDark),
                   _buildAccountSection(context, profile, isDark),
-
-                  const SizedBox(height: 24),
 
                   const SizedBox(height: 24),
 
@@ -126,7 +125,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: UIConstants.borderRadiusLarge,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.05),
@@ -234,7 +233,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           fontWeight: FontWeight.w600,
                           color: isDark
                               ? Colors.white
-                              : AppColors.lightTextPrimary,
+                              : AppColors.lightPrimaryText,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -243,8 +242,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         style: TextStyle(
                           fontSize: 14,
                           color: isDark
-                              ? AppColors.darkTextSecondary
-                              : AppColors.lightTextSecondary,
+                              ? AppColors.darkSecondaryText
+                              : AppColors.lightSecondaryText,
                         ),
                       ),
                       const SizedBox(height: 6),
@@ -253,8 +252,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         style: TextStyle(
                           fontSize: 12,
                           color: isDark
-                              ? AppColors.darkTextTertiary
-                              : AppColors.lightTextTertiary,
+                              ? AppColors.darkTertiaryText
+                              : AppColors.lightTertiaryText,
                         ),
                       ),
                     ],
@@ -268,8 +267,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   icon: Icon(
                     Icons.edit_rounded,
                     color: isDark
-                        ? AppColors.darkTextSecondary
-                        : AppColors.lightTextSecondary,
+                        ? AppColors.darkSecondaryText
+                        : AppColors.lightSecondaryText,
                   ),
                 ),
               ],
@@ -283,36 +282,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
               border: Border(
                 top: BorderSide(
                   color: isDark
-                      ? AppColors.darkTextSecondary.withValues(alpha: 0.1)
-                      : AppColors.lightTextSecondary.withValues(alpha: 0.1),
+                      ? AppColors.darkSecondaryText.withValues(alpha: 0.1)
+                      : AppColors.lightSecondaryText.withValues(alpha: 0.1),
                   width: 1,
                 ),
               ),
             ),
-            child: Consumer<ProgressProvider>(
-              builder: (context, progressProvider, child) {
-                final stats = progressProvider.stats;
+            // Uses Selector to only rebuild when stats change
+            child: Selector<ProgressProvider, ({int daysTracked, int totalHabits, double completionRate})>(
+              selector: (context, provider) => (
+                daysTracked: provider.stats?.daysTracked ?? 0,
+                totalHabits: provider.stats?.totalHabits ?? 0,
+                completionRate: provider.stats?.completionRate ?? 0,
+              ),
+              builder: (context, stats, child) {
                 return Row(
                   children: [
                     _buildStatItem(
                       context,
-                      '${stats?.daysTracked ?? 0}',
+                      '${stats.daysTracked}',
                       'Days Tracked',
                       isDark,
                     ),
                     _buildStatDivider(isDark),
                     _buildStatItem(
                       context,
-                      '${stats?.totalHabits ?? 0}',
+                      '${stats.totalHabits}',
                       'Active Habits',
                       isDark,
                     ),
                     _buildStatDivider(isDark),
                     _buildStatItem(
                       context,
-                      '${((stats?.completionRate ?? 0) * 100).toStringAsFixed(0)}%',
+                      '${(stats.completionRate * 100).toStringAsFixed(0)}%',
                       'Success Rate',
                       isDark,
+                      tooltip: 'Based on last 7 days',
                     ),
                   ],
                 );
@@ -325,7 +330,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             GestureDetector(
               onTap: () {
                 HapticFeedback.lightImpact();
-                SubscriptionService().presentPaywall();
+                _showUpgradeBottomSheet(context, isDark);
               },
               child: Container(
                 margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -344,7 +349,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: UIConstants.borderRadiusMedium,
                   border: Border.all(
                     color: isDark
                         ? AppColors.darkGold.withValues(alpha: 0.3)
@@ -371,7 +376,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               fontWeight: FontWeight.w600,
                               color: isDark
                                   ? Colors.white
-                                  : AppColors.lightTextPrimary,
+                                  : AppColors.lightPrimaryText,
                             ),
                           ),
                           const SizedBox(height: 2),
@@ -380,8 +385,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             style: TextStyle(
                               fontSize: 12,
                               color: isDark
-                                  ? AppColors.darkTextSecondary
-                                  : AppColors.lightTextSecondary,
+                                  ? AppColors.darkSecondaryText
+                                  : AppColors.lightSecondaryText,
                             ),
                           ),
                         ],
@@ -392,8 +397,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       Icons.arrow_forward_ios_rounded,
                       size: 16,
                       color: isDark
-                          ? AppColors.darkTextSecondary
-                          : AppColors.lightTextSecondary,
+                          ? AppColors.darkSecondaryText
+                          : AppColors.lightSecondaryText,
                     ),
                   ],
                 ),
@@ -408,32 +413,54 @@ class _SettingsScreenState extends State<SettingsScreen> {
     BuildContext context,
     String value,
     String label,
-    bool isDark,
-  ) {
-    return Expanded(
-      child: Column(
-        children: [
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color: isDark ? Colors.white : AppColors.lightTextPrimary,
-            ),
+    bool isDark, {
+    String? tooltip,
+  }) {
+    Widget content = Column(
+      children: [
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            color: isDark ? Colors.white : AppColors.lightPrimaryText,
           ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: isDark
-                  ? AppColors.darkTextSecondary
-                  : AppColors.lightTextSecondary,
+        ),
+        const SizedBox(height: 4),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark
+                    ? AppColors.darkSecondaryText
+                    : AppColors.lightSecondaryText,
+              ),
             ),
-          ),
-        ],
-      ),
+            if (tooltip != null) ...[
+              const SizedBox(width: 4),
+              Icon(
+                Icons.info_outline_rounded,
+                size: 12,
+                color: isDark
+                    ? AppColors.darkTertiaryText
+                    : AppColors.lightTertiaryText,
+              ),
+            ],
+          ],
+        ),
+      ],
     );
+
+    if (tooltip != null) {
+      return Expanded(
+        child: Tooltip(message: tooltip, child: content),
+      );
+    }
+
+    return Expanded(child: content);
   }
 
   Widget _buildStatDivider(bool isDark) {
@@ -441,8 +468,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       width: 1,
       height: 32,
       color: isDark
-          ? AppColors.darkTextSecondary.withValues(alpha: 0.2)
-          : AppColors.lightTextSecondary.withValues(alpha: 0.2),
+          ? AppColors.darkSecondaryText.withValues(alpha: 0.2)
+          : AppColors.lightSecondaryText.withValues(alpha: 0.2),
     );
   }
 
@@ -458,8 +485,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           fontWeight: FontWeight.w600,
           letterSpacing: 0.5,
           color: isDark
-              ? AppColors.darkTextTertiary
-              : AppColors.lightTextTertiary,
+              ? AppColors.darkTertiaryText
+              : AppColors.lightTertiaryText,
         ),
       ),
     );
@@ -507,45 +534,99 @@ class _SettingsScreenState extends State<SettingsScreen> {
           subtitle: 'Receive habit reminders',
           value: settings.notificationsEnabled,
           isDark: isDark,
-          onChanged: (value) {
+          onChanged: (value) async {
             HapticFeedback.lightImpact();
-            context.read<SettingsProvider>().setNotificationsEnabled(value);
+            final settingsProvider = context.read<SettingsProvider>();
+            settingsProvider.setNotificationsEnabled(value);
+            final reminderTime = settings.defaultReminderTime;
+            if (value) {
+              // Schedule daily summary with current settings
+              await NotificationService().scheduleDailySummary(
+                hour: reminderTime.hour,
+                minute: reminderTime.minute,
+              );
+            } else {
+              await NotificationService().cancelDailySummary();
+            }
+            if (!mounted) return;
+            // Sync to Firestore so Cloud Function respects the toggle
+            try {
+              final rawTimezone = await FlutterTimezone.getLocalTimezone();
+              if (!mounted) return;
+              String timezone = rawTimezone.toString();
+              final match = RegExp(r'TimezoneInfo\(([^,]+)').firstMatch(timezone);
+              if (match != null) {
+                timezone = match.group(1)!.trim();
+              }
+              await FirestoreService().saveNotificationPreferences(
+                enabled: value,
+                hour: reminderTime.hour,
+                minute: reminderTime.minute,
+                timezone: timezone,
+              );
+            } catch (e) {
+              debugPrint('Error saving notification prefs to Firestore: $e');
+            }
           },
         ),
         if (settings.notificationsEnabled) ...[
           _buildDivider(isDark),
           _buildSettingRow(
             context,
-            icon: Icons.access_time_rounded,
-            title: 'Default Reminder Time',
-            subtitle: settings.reminderTimeText,
+            icon: Icons.wb_sunny_rounded,
+            title: 'Daily Summary',
+            subtitle: 'Reminder at ${settings.reminderTimeText}',
             isDark: isDark,
-            onTap: () =>
-                _showTimePicker(context, settings.defaultReminderTime, isDark),
-          ),
-          _buildSwitchRow(
-            context,
-            icon: Icons.circle_rounded,
-            title: 'Badge',
-            subtitle: 'Show app badge count',
-            value: settings.badgeEnabled,
-            isDark: isDark,
-            onChanged: (value) {
-              HapticFeedback.lightImpact();
-              context.read<SettingsProvider>().setBadgeEnabled(value);
-            },
-          ),
-          _buildDivider(isDark),
-          _buildSwitchRow(
-            context,
-            icon: Icons.auto_awesome_rounded,
-            title: 'Motivational Messages',
-            subtitle: 'Daily inspiration',
-            value: settings.motivationalMessages,
-            isDark: isDark,
-            onChanged: (value) {
-              HapticFeedback.lightImpact();
-              context.read<SettingsProvider>().setMotivationalMessages(value);
+            onTap: () async {
+              final settingsProvider = context.read<SettingsProvider>();
+              final scaffoldMessenger = ScaffoldMessenger.of(context);
+              final picked = await _showTimePicker(
+                context,
+                settings.defaultReminderTime,
+                isDark,
+              );
+              if (picked != null && mounted) {
+                // Save to local settings
+                settingsProvider.setDefaultReminderTime(picked);
+
+                // Schedule local notification
+                await NotificationService().scheduleDailySummary(
+                  hour: picked.hour,
+                  minute: picked.minute,
+                );
+                if (!mounted) return;
+
+                // Get timezone and save to Firestore for FCM (backup)
+                try {
+                  final rawTimezone = await FlutterTimezone.getLocalTimezone();
+                  if (!mounted) return;
+                  // Extract IANA timezone name from potential wrapper
+                  String timezone = rawTimezone.toString();
+                  final match = RegExp(r'TimezoneInfo\(([^,]+)').firstMatch(timezone);
+                  if (match != null) {
+                    timezone = match.group(1)!.trim();
+                  }
+                  await FirestoreService().saveNotificationPreferences(
+                    enabled: true,
+                    hour: picked.hour,
+                    minute: picked.minute,
+                    timezone: timezone,
+                  );
+                } catch (e) {
+                  debugPrint('Error saving notification prefs to Firestore: $e');
+                }
+
+                if (mounted) {
+                  scaffoldMessenger.showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Daily summary set for ${_formatTime(picked)}',
+                      ),
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                }
+              }
             },
           ),
         ],
@@ -553,71 +634,493 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  // ==================== AI Preferences Section ====================
+  // ==================== Health Integration Section ====================
 
-  Widget _buildAISection(
-    BuildContext context,
-    AppSettings settings,
-    bool isDark,
-  ) {
+  Widget _buildHealthIntegrationSection(BuildContext context, bool isDark) {
+    final scoringProvider = context.watch<AIScoringProvider>();
+    final isEnabled = scoringProvider.healthIntegrationEnabled;
+
     return _buildSettingsCard(
       context,
       isDark,
       children: [
         _buildSwitchRow(
           context,
-          icon: Icons.psychology_rounded,
-          title: 'AI Suggestions',
-          subtitle: 'Personalized habit recommendations',
-          value: settings.aiSuggestionsEnabled,
+          icon: Icons.favorite_rounded,
+          title: 'Connect Health Data',
+          subtitle: isEnabled
+              ? 'Connected to ${Platform.isIOS ? 'Apple Health' : 'Health Connect'}'
+              : 'Sync steps, sleep & activity',
+          value: isEnabled,
           isDark: isDark,
-          onChanged: (value) {
+          onChanged: (value) async {
             HapticFeedback.lightImpact();
-            context.read<SettingsProvider>().setAISuggestionsEnabled(value);
+            if (value) {
+              // Show confirmation dialog before enabling
+              final confirmed = await _showHealthPermissionDialog(context, isDark);
+              if (confirmed == true) {
+                final success = await scoringProvider.enableHealthIntegration();
+                if (!success && context.mounted) {
+                  final errorMsg = scoringProvider.errorMessage ?? 'Failed to enable health integration';
+                  if (errorMsg == 'INSTALL_HEALTH_CONNECT') {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: const Text(
+                          'Health Connect app needs to be installed',
+                        ),
+                        duration: const Duration(seconds: 5),
+                        action: SnackBarAction(
+                          label: 'Install',
+                          onPressed: () {
+                            launchUrl(
+                              Uri.parse('market://details?id=com.google.android.apps.healthdata'),
+                              mode: LaunchMode.externalApplication,
+                            );
+                          },
+                        ),
+                      ),
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(errorMsg),
+                        duration: const Duration(seconds: 3),
+                      ),
+                    );
+                  }
+                } else if (success && context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Health data connected successfully'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                }
+              }
+            } else {
+              await scoringProvider.disableHealthIntegration();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Health data disconnected'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              }
+            }
           },
         ),
-        if (settings.aiSuggestionsEnabled) ...[
+        if (isEnabled) ...[
           _buildDivider(isDark),
           _buildSettingRow(
             context,
-            icon: Icons.schedule_rounded,
-            title: 'Suggestion Frequency',
-            subtitle: settings.suggestionFrequency.displayName,
+            icon: Icons.analytics_outlined,
+            title: 'Health Correlations',
+            subtitle: 'View health-habit insights',
             isDark: isDark,
-            onTap: () => _showFrequencySelector(
-              context,
-              settings.suggestionFrequency,
-              isDark,
-            ),
-          ),
-          _buildDivider(isDark),
-          _buildSwitchRow(
-            context,
-            icon: Icons.timer_rounded,
-            title: 'AI-Optimized Reminders',
-            subtitle: 'Best times based on your patterns',
-            value: settings.aiOptimizedReminders,
-            isDark: isDark,
-            onChanged: (value) {
+            onTap: () {
               HapticFeedback.lightImpact();
-              context.read<SettingsProvider>().setAIOptimizedReminders(value);
-            },
-          ),
-          _buildDivider(isDark),
-          _buildSwitchRow(
-            context,
-            icon: Icons.analytics_rounded,
-            title: 'Share Data for AI Improvement',
-            subtitle: 'Help improve AI suggestions',
-            value: settings.shareDataForAI,
-            isDark: isDark,
-            onChanged: (value) {
-              HapticFeedback.lightImpact();
-              context.read<SettingsProvider>().setShareDataForAI(value);
+              // Navigate to health correlations or show info
+              _showHealthCorrelationsInfo(context, isDark, scoringProvider);
             },
           ),
         ],
+        _buildDivider(isDark),
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.info_outline_rounded,
+                size: 16,
+                color: isDark
+                    ? AppColors.darkTertiaryText
+                    : AppColors.lightTertiaryText,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Health data helps identify correlations between your physical activity, sleep, and habit completion patterns.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark
+                        ? AppColors.darkTertiaryText
+                        : AppColors.lightTertiaryText,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ],
+    );
+  }
+
+  Future<bool?> _showHealthPermissionDialog(BuildContext context, bool isDark) {
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(
+              Icons.favorite_rounded,
+              color: isDark ? AppColors.darkCoral : AppColors.lightCoral,
+            ),
+            const SizedBox(width: 12),
+            const Text('Connect Health Data'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Aura would like to access your health data to:',
+              style: TextStyle(
+                color: isDark
+                    ? AppColors.darkPrimaryText
+                    : AppColors.lightPrimaryText,
+              ),
+            ),
+            const SizedBox(height: 16),
+            _buildPermissionItem(isDark, 'Steps', 'Daily step count'),
+            _buildPermissionItem(isDark, 'Sleep', 'Sleep duration & quality'),
+            _buildPermissionItem(isDark, 'Activity', 'Active minutes & workouts'),
+            _buildPermissionItem(isDark, 'Heart Rate', 'Average heart rate'),
+            const SizedBox(height: 16),
+            Text(
+              'This data helps identify correlations between your health and habit patterns.',
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark
+                    ? AppColors.darkSecondaryText
+                    : AppColors.lightSecondaryText,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isDark
+                  ? AppColors.darkCoral
+                  : AppColors.lightCoral,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Connect'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPermissionItem(bool isDark, String title, String subtitle) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Icon(
+            Icons.check_circle_outline_rounded,
+            size: 18,
+            color: isDark ? AppColors.darkCoral : AppColors.lightCoral,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w500,
+                    color: isDark
+                        ? AppColors.darkPrimaryText
+                        : AppColors.lightPrimaryText,
+                  ),
+                ),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark
+                        ? AppColors.darkSecondaryText
+                        : AppColors.lightSecondaryText,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showHealthCorrelationsInfo(
+    BuildContext context,
+    bool isDark,
+    AIScoringProvider provider,
+  ) {
+    final correlations = provider.healthCorrelations;
+    final summary = provider.healthSummary;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.7,
+        ),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(UIConstants.radiusXLarge)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.favorite_rounded,
+                    color: isDark ? AppColors.darkCoral : AppColors.lightCoral,
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Health Insights',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.white : AppColors.lightPrimaryText,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: Icon(
+                      Icons.close_rounded,
+                      color: isDark
+                          ? AppColors.darkSecondaryText
+                          : AppColors.lightSecondaryText,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Summary Stats
+                    if (summary != null) ...[
+                      Text(
+                        '7-Day Summary',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: isDark
+                              ? AppColors.darkPrimaryText
+                              : AppColors.lightPrimaryText,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildHealthStat(
+                              isDark,
+                              summary.avgSteps.toStringAsFixed(0),
+                              'Avg Steps',
+                              Icons.directions_walk_rounded,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildHealthStat(
+                              isDark,
+                              '${summary.avgSleepHours.toStringAsFixed(1)}h',
+                              'Avg Sleep',
+                              Icons.bedtime_rounded,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+                    ],
+
+                    // Correlations
+                    if (correlations != null &&
+                        correlations.keyFindings.isNotEmpty) ...[
+                      Text(
+                        'Key Findings',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: isDark
+                              ? AppColors.darkPrimaryText
+                              : AppColors.lightPrimaryText,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      ...correlations.keyFindings.map(
+                        (finding) => Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? AppColors.darkBackground
+                                : AppColors.lightBackground,
+                            borderRadius: UIConstants.borderRadiusSmall,
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(
+                                Icons.insights_rounded,
+                                size: 18,
+                                color: isDark
+                                    ? AppColors.darkCoral
+                                    : AppColors.lightCoral,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  finding,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: isDark
+                                        ? AppColors.darkSecondaryText
+                                        : AppColors.lightSecondaryText,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      if (correlations.actionPlan.isNotEmpty) ...[
+                        Text(
+                          'Recommendation',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: isDark
+                                ? AppColors.darkPrimaryText
+                                : AppColors.lightPrimaryText,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          correlations.actionPlan,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: isDark
+                                ? AppColors.darkSecondaryText
+                                : AppColors.lightSecondaryText,
+                            height: 1.5,
+                          ),
+                        ),
+                      ],
+                    ] else ...[
+                      Container(
+                        padding: const EdgeInsets.all(24),
+                        alignment: Alignment.center,
+                        child: Column(
+                          children: [
+                            Icon(
+                              Icons.analytics_outlined,
+                              size: 48,
+                              color: isDark
+                                  ? AppColors.darkTertiaryText
+                                  : AppColors.lightTertiaryText,
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              'Not enough data yet',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                                color: isDark
+                                    ? AppColors.darkSecondaryText
+                                    : AppColors.lightSecondaryText,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Keep tracking for at least 7 days to see correlations',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: isDark
+                                    ? AppColors.darkTertiaryText
+                                    : AppColors.lightTertiaryText,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHealthStat(
+    bool isDark,
+    String value,
+    String label,
+    IconData icon,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkBackground : AppColors.lightBackground,
+        borderRadius: UIConstants.borderRadiusMedium,
+      ),
+      child: Column(
+        children: [
+          Icon(
+            icon,
+            size: 24,
+            color: isDark ? AppColors.darkCoral : AppColors.lightCoral,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: isDark ? Colors.white : AppColors.lightPrimaryText,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: isDark
+                  ? AppColors.darkSecondaryText
+                  : AppColors.lightSecondaryText,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -645,9 +1148,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
           isDark: isDark,
           onTap: () {
             HapticFeedback.lightImpact();
-            SubscriptionService().presentCustomerCenter();
+            if (profile.isPro) {
+              SubscriptionService().presentCustomerCenter();
+            } else {
+              _showUpgradeBottomSheet(context, isDark);
+            }
           },
         ),
+        _buildDivider(isDark),
+        _buildUsageSection(context, isDark),
         _buildDivider(isDark),
         _buildSettingRow(
           context,
@@ -695,7 +1204,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           title: 'FAQ',
           subtitle: 'Common questions and answers',
           isDark: isDark,
-          onTap: () => _launchUrl('https://habittracker.app/faq'),
+          onTap: () => showFAQSheet(context, isDark),
         ),
         _buildDivider(isDark),
         _buildSettingRow(
@@ -704,7 +1213,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           title: 'Tutorials',
           subtitle: 'Learn how to use the app',
           isDark: isDark,
-          onTap: () => _launchUrl('https://habittracker.app/tutorials'),
+          onTap: () => showTutorialsSheet(context, isDark),
         ),
         _buildDivider(isDark),
         _buildSettingRow(
@@ -713,7 +1222,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           title: 'Contact Support',
           subtitle: 'Get help from our team',
           isDark: isDark,
-          onTap: () => _showContactSupport(context, isDark),
+          onTap: () => showContactSupportSheet(context, isDark),
         ),
         _buildDivider(isDark),
         _buildSettingRow(
@@ -722,7 +1231,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           title: 'Report Bug',
           subtitle: 'Help us improve',
           isDark: isDark,
-          onTap: () => _showReportBug(context, isDark),
+          onTap: () => showReportBugSheet(context, isDark),
         ),
         _buildDivider(isDark),
         _buildSettingRow(
@@ -731,7 +1240,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           title: 'Request Feature',
           subtitle: 'Suggest new features',
           isDark: isDark,
-          onTap: () => _showRequestFeature(context, isDark),
+          onTap: () => showRequestFeatureSheet(context, isDark),
         ),
         _buildDivider(isDark),
         _buildSettingRow(
@@ -740,7 +1249,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           title: 'AI Transparency',
           subtitle: 'How AI works in this app',
           isDark: isDark,
-          onTap: () => _launchUrl('https://habittracker.app/ai-transparency'),
+          onTap: () => showAITransparencySheet(context, isDark),
         ),
       ],
     );
@@ -757,7 +1266,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           context,
           icon: Icons.info_rounded,
           title: 'Version',
-          subtitle: '1.0.0 (Build 1)',
+          subtitle: AppConstants.appVersion,
           isDark: isDark,
           showArrow: false,
         ),
@@ -798,8 +1307,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           onTap: () {
             showLicensePage(
               context: context,
-              applicationName: 'Habit Tracker',
-              applicationVersion: '1.0.0',
+              applicationName: AppConstants.appName,
+              applicationVersion: AppConstants.appVersion,
             );
           },
         ),
@@ -838,7 +1347,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       margin: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: UIConstants.borderRadiusLarge,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.05),
@@ -864,7 +1373,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: UIConstants.borderRadiusLarge,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Row(
@@ -879,7 +1388,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 ? AppColors.darkCoral
                                 : AppColors.lightCoral))
                         .withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: UIConstants.borderRadiusMedium,
               ),
               child: Icon(
                 icon,
@@ -901,7 +1410,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       fontWeight: FontWeight.w500,
                       color:
                           titleColor ??
-                          (isDark ? Colors.white : AppColors.lightTextPrimary),
+                          (isDark ? Colors.white : AppColors.lightPrimaryText),
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -910,8 +1419,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     style: TextStyle(
                       fontSize: 13,
                       color: isDark
-                          ? AppColors.darkTextSecondary
-                          : AppColors.lightTextSecondary,
+                          ? AppColors.darkSecondaryText
+                          : AppColors.lightSecondaryText,
                     ),
                   ),
                 ],
@@ -922,8 +1431,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Icons.arrow_forward_ios_rounded,
                 size: 16,
                 color: isDark
-                    ? AppColors.darkTextTertiary
-                    : AppColors.lightTextTertiary,
+                    ? AppColors.darkTertiaryText
+                    : AppColors.lightTertiaryText,
               ),
           ],
         ),
@@ -951,7 +1460,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             decoration: BoxDecoration(
               color: (isDark ? AppColors.darkCoral : AppColors.lightCoral)
                   .withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: UIConstants.borderRadiusMedium,
             ),
             child: Icon(
               icon,
@@ -969,7 +1478,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
-                    color: isDark ? Colors.white : AppColors.lightTextPrimary,
+                    color: isDark ? Colors.white : AppColors.lightPrimaryText,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -978,8 +1487,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   style: TextStyle(
                     fontSize: 13,
                     color: isDark
-                        ? AppColors.darkTextSecondary
-                        : AppColors.lightTextSecondary,
+                        ? AppColors.darkSecondaryText
+                        : AppColors.lightSecondaryText,
                   ),
                 ),
               ],
@@ -1005,6 +1514,136 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  // ==================== AI Usage Section ====================
+
+  Widget _buildUsageSection(BuildContext context, bool isDark) {
+    final subService = SubscriptionService();
+    final tier = subService.currentTier;
+    final isUnlimited = tier == SubscriptionTier.mastery;
+
+    String subtitle;
+    if (isUnlimited) {
+      subtitle = 'Unlimited — Pro Plan';
+    } else {
+      final habitProvider = context.watch<HabitProvider>();
+      final habitCount = habitProvider.habits.length;
+      final maxHabits = tier.maxHabits;
+
+      final maxSuggestions = tier.maxAISuggestionsPerDay;
+      final remainingSuggestions = subService.getRemainingAISuggestions();
+      final usedSuggestions = maxSuggestions == -1
+          ? 0
+          : maxSuggestions - remainingSuggestions;
+
+      final maxReports = tier.maxAIReportsPerMonth;
+      final remainingReports = subService.getRemainingAIReports();
+      final usedReports = maxReports == -1
+          ? 0
+          : maxReports - remainingReports;
+
+      subtitle =
+          '$habitCount/$maxHabits habits · $usedSuggestions/$maxSuggestions suggestions · $usedReports/$maxReports reports';
+    }
+
+    return _buildSettingRow(
+      context,
+      icon: Icons.data_usage_rounded,
+      title: 'Usage',
+      subtitle: subtitle,
+      isDark: isDark,
+      onTap: () {
+        HapticFeedback.lightImpact();
+        _showUsageDetailsSheet(context, isDark);
+      },
+    );
+  }
+
+  Widget _buildUsageRow({
+    required bool isDark,
+    required IconData icon,
+    required String label,
+    required String subtitle,
+    required int used,
+    required int max,
+    required bool isUnlimited,
+  }) {
+    final coral = isDark ? AppColors.darkCoral : AppColors.lightCoral;
+    final isAtLimit = !isUnlimited && max > 0 && used >= max;
+    final progressColor = isAtLimit ? Colors.orange : coral;
+    final progress = isUnlimited || max <= 0
+        ? 0.0
+        : (used / max).clamp(0.0, 1.0);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: progressColor.withValues(alpha: 0.1),
+              borderRadius: UIConstants.borderRadiusMedium,
+            ),
+            child: Icon(icon, size: 20, color: progressColor),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: isDark ? Colors.white : AppColors.lightPrimaryText,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                if (isUnlimited)
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: isDark
+                          ? AppColors.darkSecondaryText
+                          : AppColors.lightSecondaryText,
+                    ),
+                  )
+                else ...[
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(3),
+                    child: LinearProgressIndicator(
+                      value: progress,
+                      minHeight: 6,
+                      backgroundColor: isDark
+                          ? Colors.white.withValues(alpha: 0.08)
+                          : Colors.black.withValues(alpha: 0.06),
+                      valueColor: AlwaysStoppedAnimation<Color>(progressColor),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isAtLimit
+                          ? Colors.orange
+                          : (isDark
+                              ? AppColors.darkSecondaryText
+                              : AppColors.lightSecondaryText),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildDivider(bool isDark) {
     return Padding(
       padding: const EdgeInsets.only(left: 68),
@@ -1012,13 +1651,139 @@ class _SettingsScreenState extends State<SettingsScreen> {
         height: 1,
         thickness: 1,
         color: isDark
-            ? AppColors.darkTextSecondary.withValues(alpha: 0.1)
-            : AppColors.lightTextSecondary.withValues(alpha: 0.1),
+            ? AppColors.darkSecondaryText.withValues(alpha: 0.1)
+            : AppColors.lightSecondaryText.withValues(alpha: 0.1),
       ),
     );
   }
 
   // ==================== Modals and Dialogs ====================
+
+  void _showUsageDetailsSheet(BuildContext context, bool isDark) {
+    final subService = SubscriptionService();
+    final tier = subService.currentTier;
+    final habitProvider = context.read<HabitProvider>();
+    final habitCount = habitProvider.habits.length;
+    final isUnlimited = tier == SubscriptionTier.mastery;
+
+    final maxSuggestions = tier.maxAISuggestionsPerDay;
+    final remainingSuggestions = subService.getRemainingAISuggestions();
+    final usedSuggestions = maxSuggestions == -1
+        ? 0
+        : maxSuggestions - remainingSuggestions;
+
+    final maxReports = tier.maxAIReportsPerMonth;
+    final remainingReports = subService.getRemainingAIReports();
+    final usedReports = maxReports == -1
+        ? 0
+        : maxReports - remainingReports;
+
+    final maxHabits = tier.maxHabits;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+          borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(UIConstants.radiusXLarge)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 12),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.2)
+                    : Colors.black.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                children: [
+                  Text(
+                    'Usage Details',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                      color:
+                          isDark ? Colors.white : AppColors.lightPrimaryText,
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: (isDark
+                              ? AppColors.darkCoral
+                              : AppColors.lightCoral)
+                          .withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${tier.displayName} Plan',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: isDark
+                            ? AppColors.darkCoral
+                            : AppColors.lightCoral,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            _buildUsageRow(
+              isDark: isDark,
+              icon: Icons.bolt_rounded,
+              label: 'AI Suggestions',
+              subtitle: isUnlimited
+                  ? 'Unlimited'
+                  : '$usedSuggestions of $maxSuggestions used today',
+              used: usedSuggestions,
+              max: maxSuggestions,
+              isUnlimited: isUnlimited,
+            ),
+            _buildDivider(isDark),
+            _buildUsageRow(
+              isDark: isDark,
+              icon: Icons.bar_chart_rounded,
+              label: 'AI Reports',
+              subtitle: isUnlimited
+                  ? 'Unlimited'
+                  : '$usedReports of $maxReports used this month',
+              used: usedReports,
+              max: maxReports,
+              isUnlimited: isUnlimited,
+            ),
+            _buildDivider(isDark),
+            _buildUsageRow(
+              isDark: isDark,
+              icon: Icons.checklist_rounded,
+              label: 'Habits',
+              subtitle: isUnlimited
+                  ? 'Unlimited'
+                  : '$habitCount of $maxHabits habits',
+              used: habitCount,
+              max: maxHabits,
+              isUnlimited: isUnlimited,
+            ),
+            SizedBox(height: MediaQuery.of(context).padding.bottom + 16),
+          ],
+        ),
+      ),
+    );
+  }
 
   void _showEditProfileModal(
     BuildContext context,
@@ -1044,7 +1809,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
             color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(UIConstants.radiusXLarge)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1060,7 +1825,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         fontWeight: FontWeight.w600,
                         color: isDark
                             ? Colors.white
-                            : AppColors.lightTextPrimary,
+                            : AppColors.lightPrimaryText,
                       ),
                     ),
                   ),
@@ -1069,8 +1834,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     icon: Icon(
                       Icons.close_rounded,
                       color: isDark
-                          ? AppColors.darkTextSecondary
-                          : AppColors.lightTextSecondary,
+                          ? AppColors.darkSecondaryText
+                          : AppColors.lightSecondaryText,
                     ),
                   ),
                 ],
@@ -1081,7 +1846,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 decoration: InputDecoration(
                   labelText: 'First Name',
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: UIConstants.borderRadiusMedium,
                   ),
                 ),
               ),
@@ -1091,7 +1856,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 decoration: InputDecoration(
                   labelText: 'Last Name',
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: UIConstants.borderRadiusMedium,
                   ),
                 ),
               ),
@@ -1101,7 +1866,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 decoration: InputDecoration(
                   labelText: 'Display Name (Optional)',
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: UIConstants.borderRadiusMedium,
                   ),
                 ),
               ),
@@ -1112,7 +1877,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 decoration: InputDecoration(
                   labelText: 'Bio (Optional)',
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: UIConstants.borderRadiusMedium,
                   ),
                 ),
               ),
@@ -1141,7 +1906,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         : AppColors.lightCoral,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: UIConstants.borderRadiusLarge,
                     ),
                   ),
                   child: const Text(
@@ -1175,7 +1940,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             color: currentIsDark
                 ? AppColors.darkSurface
                 : AppColors.lightSurface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(UIConstants.radiusXLarge)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1188,7 +1953,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   fontWeight: FontWeight.w600,
                   color: currentIsDark
                       ? Colors.white
-                      : AppColors.lightTextPrimary,
+                      : AppColors.lightPrimaryText,
                 ),
               ),
               const SizedBox(height: 24),
@@ -1247,7 +2012,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
         Navigator.pop(context);
       },
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: UIConstants.borderRadiusMedium,
       child: Container(
         padding: const EdgeInsets.all(16),
         margin: const EdgeInsets.only(bottom: 8),
@@ -1256,7 +2021,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ? (isDark ? AppColors.darkCoral : AppColors.lightCoral)
                     .withValues(alpha: 0.1)
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: UIConstants.borderRadiusMedium,
           border: Border.all(
             color: isSelected
                 ? (isDark ? AppColors.darkCoral : AppColors.lightCoral)
@@ -1271,8 +2036,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               color: isSelected
                   ? (isDark ? AppColors.darkCoral : AppColors.lightCoral)
                   : (isDark
-                        ? AppColors.darkTextSecondary
-                        : AppColors.lightTextSecondary),
+                        ? AppColors.darkSecondaryText
+                        : AppColors.lightSecondaryText),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -1281,7 +2046,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                  color: isDark ? Colors.white : AppColors.lightTextPrimary,
+                  color: isDark ? Colors.white : AppColors.lightPrimaryText,
                 ),
               ),
             ),
@@ -1296,7 +2061,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  void _showTimePicker(
+  Future<TimeOfDay?> _showTimePicker(
     BuildContext context,
     TimeOfDay current,
     bool isDark,
@@ -1304,45 +2069,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final picked = await showTimePicker(context: context, initialTime: current);
     if (picked != null && context.mounted) {
       HapticFeedback.lightImpact();
-      context.read<SettingsProvider>().setDefaultReminderTime(picked);
     }
+    return picked;
   }
 
-  void _showFrequencySelector(
-    BuildContext context,
-    NotificationFrequency current,
-    bool isDark,
-  ) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Suggestion Frequency',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-                color: isDark ? Colors.white : AppColors.lightTextPrimary,
-              ),
-            ),
-            const SizedBox(height: 24),
-            ...NotificationFrequency.values.map(
-              (freq) =>
-                  _buildFrequencyOption(context, freq, current == freq, isDark),
-            ),
-          ],
-        ),
-      ),
-    );
+  String _formatTime(TimeOfDay time) {
+    final hour = time.hourOfPeriod == 0 ? 12 : time.hourOfPeriod;
+    final minute = time.minute.toString().padLeft(2, '0');
+    final period = time.period == DayPeriod.am ? 'AM' : 'PM';
+    return '$hour:$minute $period';
   }
 
   void _showChangelog(BuildContext context, bool isDark) {
@@ -1357,7 +2092,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         decoration: BoxDecoration(
           color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(UIConstants.radiusXLarge)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1368,7 +2103,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w600,
-                color: isDark ? Colors.white : AppColors.lightTextPrimary,
+                color: isDark ? Colors.white : AppColors.lightPrimaryText,
               ),
             ),
             const SizedBox(height: 24),
@@ -1377,6 +2112,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    _buildChangelogVersion(
+                      isDark,
+                      version: '1.0.1',
+                      date: 'January 2026',
+                      changes: [
+                        '🐛 Bug fixes and stability improvements',
+                        '🎨 UI improvements and visual polish',
+                        '⚡ Performance enhancements',
+                      ],
+                    ),
                     _buildChangelogVersion(
                       isDark,
                       version: '1.0.0',
@@ -1414,7 +2159,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 color: isDark ? AppColors.darkCoral : AppColors.lightCoral,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: UIConstants.borderRadiusSmall,
               ),
               child: Text(
                 'v$version',
@@ -1429,8 +2174,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               date,
               style: TextStyle(
                 color: isDark
-                    ? AppColors.darkTextSecondary
-                    : AppColors.lightTextSecondary,
+                    ? AppColors.darkSecondaryText
+                    : AppColors.lightSecondaryText,
               ),
             ),
           ],
@@ -1445,7 +2190,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 fontSize: 14,
                 color: isDark
                     ? AppColors.darkPrimaryText
-                    : AppColors.lightTextPrimary,
+                    : AppColors.lightPrimaryText,
               ),
             ),
           ),
@@ -1467,7 +2212,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         decoration: BoxDecoration(
           color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(UIConstants.radiusXLarge)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1479,7 +2224,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w600,
-                    color: isDark ? Colors.white : AppColors.lightTextPrimary,
+                    color: isDark ? Colors.white : AppColors.lightPrimaryText,
                   ),
                 ),
                 const Spacer(),
@@ -1488,8 +2233,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   icon: Icon(
                     Icons.close_rounded,
                     color: isDark
-                        ? AppColors.darkTextSecondary
-                        : AppColors.lightTextSecondary,
+                        ? AppColors.darkSecondaryText
+                        : AppColors.lightSecondaryText,
                   ),
                 ),
               ],
@@ -1528,15 +2273,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       isDark,
                       title: 'Contact Us',
                       content:
-                          'For privacy questions, email us at:\nprivacy@habittracker.app',
+                          'For privacy questions, email us at:\nxiaostone0125@gmail.com',
                     ),
                     Text(
-                      'Last updated: December 2024',
+                      'Last updated: January 2026',
                       style: TextStyle(
                         fontSize: 12,
                         color: isDark
-                            ? AppColors.darkTextTertiary
-                            : AppColors.lightTextTertiary,
+                            ? AppColors.darkTertiaryText
+                            : AppColors.lightTertiaryText,
                       ),
                     ),
                   ],
@@ -1561,7 +2306,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         decoration: BoxDecoration(
           color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(UIConstants.radiusXLarge)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1573,7 +2318,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w600,
-                    color: isDark ? Colors.white : AppColors.lightTextPrimary,
+                    color: isDark ? Colors.white : AppColors.lightPrimaryText,
                   ),
                 ),
                 const Spacer(),
@@ -1582,8 +2327,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   icon: Icon(
                     Icons.close_rounded,
                     color: isDark
-                        ? AppColors.darkTextSecondary
-                        : AppColors.lightTextSecondary,
+                        ? AppColors.darkSecondaryText
+                        : AppColors.lightSecondaryText,
                   ),
                 ),
               ],
@@ -1637,12 +2382,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           'We may update these terms. Continued use after changes constitutes acceptance of new terms.',
                     ),
                     Text(
-                      'Last updated: December 2024',
+                      'Last updated: January 2026',
                       style: TextStyle(
                         fontSize: 12,
                         color: isDark
-                            ? AppColors.darkTextTertiary
-                            : AppColors.lightTextTertiary,
+                            ? AppColors.darkTertiaryText
+                            : AppColors.lightTertiaryText,
                       ),
                     ),
                   ],
@@ -1672,7 +2417,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               fontWeight: FontWeight.w600,
               color: isDark
                   ? AppColors.darkPrimaryText
-                  : AppColors.lightTextPrimary,
+                  : AppColors.lightPrimaryText,
             ),
           ),
           const SizedBox(height: 8),
@@ -1682,80 +2427,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
               fontSize: 14,
               height: 1.5,
               color: isDark
-                  ? AppColors.darkTextSecondary
-                  : AppColors.lightTextSecondary,
+                  ? AppColors.darkSecondaryText
+                  : AppColors.lightSecondaryText,
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildFrequencyOption(
-    BuildContext context,
-    NotificationFrequency freq,
-    bool isSelected,
-    bool isDark,
-  ) {
-    return InkWell(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        context.read<SettingsProvider>().setSuggestionFrequency(freq);
-        Navigator.pop(context);
-      },
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        margin: const EdgeInsets.only(bottom: 8),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? (isDark ? AppColors.darkCoral : AppColors.lightCoral)
-                    .withValues(alpha: 0.1)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected
-                ? (isDark ? AppColors.darkCoral : AppColors.lightCoral)
-                : Colors.transparent,
-            width: 2,
-          ),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    freq.displayName,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: isSelected
-                          ? FontWeight.w600
-                          : FontWeight.w500,
-                      color: isDark ? Colors.white : AppColors.lightTextPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    freq.description,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: isDark
-                          ? AppColors.darkTextSecondary
-                          : AppColors.lightTextSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (isSelected)
-              Icon(
-                Icons.check_rounded,
-                color: isDark ? AppColors.darkCoral : AppColors.lightCoral,
-              ),
-          ],
-        ),
       ),
     );
   }
@@ -1775,8 +2451,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           TextButton(
             onPressed: () async {
+              final settingsProvider = context.read<SettingsProvider>();
               Navigator.pop(context);
-              await context.read<SettingsProvider>().signOut();
+              await settingsProvider.signOut();
               // In real app, would navigate to login screen
             },
             child: const Text('Sign Out'),
@@ -1801,9 +2478,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           TextButton(
             onPressed: () async {
+              final settingsProvider = context.read<SettingsProvider>();
+              final messenger = ScaffoldMessenger.of(context);
               Navigator.pop(context);
-              await context.read<SettingsProvider>().deleteAccount();
-              // In real app, would navigate to login/welcome screen
+              try {
+                await settingsProvider.deleteAccount();
+                // Auth state listener in AuthWrapper will redirect to login
+              } catch (e) {
+                messenger.showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      e.toString().contains('requires-recent-login')
+                          ? 'Please sign out, sign back in, and try again.'
+                          : 'Failed to delete account. Please try again.',
+                    ),
+                  ),
+                );
+              }
             },
             style: TextButton.styleFrom(
               foregroundColor: isDark ? AppColors.darkRed : AppColors.lightRed,
@@ -1812,31 +2503,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ],
       ),
-    );
-  }
-
-  void _showContactSupport(BuildContext context, bool isDark) {
-    _launchEmail(
-      'support@habittracker.app',
-      subject: 'Habit Tracker Support Request',
-      body: 'Hi, I need help with...',
-    );
-  }
-
-  void _showReportBug(BuildContext context, bool isDark) {
-    _launchEmail(
-      'bugs@habittracker.app',
-      subject: 'Habit Tracker Bug Report',
-      body:
-          'Bug Description:\n\nSteps to Reproduce:\n1.\n2.\n3.\n\nExpected Behavior:\n\nActual Behavior:\n',
-    );
-  }
-
-  void _showRequestFeature(BuildContext context, bool isDark) {
-    _launchEmail(
-      'features@habittracker.app',
-      subject: 'Habit Tracker Feature Request',
-      body: 'Feature Description:\n\nWhy it would be useful:\n',
     );
   }
 
@@ -1851,30 +2517,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Could not open $url')));
-      }
-    }
-  }
-
-  Future<void> _launchEmail(
-    String email, {
-    String? subject,
-    String? body,
-  }) async {
-    final uri = Uri(
-      scheme: 'mailto',
-      path: email,
-      queryParameters: {
-        if (subject != null) 'subject': subject,
-        if (body != null) 'body': body,
-      },
-    );
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not open email app')),
-        );
       }
     }
   }
@@ -1924,8 +2566,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               title: 'CSV Spreadsheet',
               subtitle: 'Open in Excel or Google Sheets',
               onTap: () async {
-                Navigator.pop(context);
                 final habits = context.read<HabitProvider>().habits;
+                Navigator.pop(context);
                 await ExportService().exportAndShareCSV(habits);
               },
             ),
@@ -1937,8 +2579,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               title: 'JSON Backup',
               subtitle: 'Full data backup with history',
               onTap: () async {
-                Navigator.pop(context);
                 final habits = context.read<HabitProvider>().habits;
+                Navigator.pop(context);
                 await ExportService().exportAndShareJSON(habits);
               },
             ),
@@ -1959,10 +2601,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }) {
     return Material(
       color: isDark ? AppColors.darkBackground : AppColors.lightBackground,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: UIConstants.borderRadiusMedium,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: UIConstants.borderRadiusMedium,
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
@@ -1974,7 +2616,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   color: isDark
                       ? AppColors.darkCoral.withValues(alpha: 0.2)
                       : AppColors.lightCoral.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: UIConstants.borderRadiusMedium,
                 ),
                 child: Icon(
                   icon,
@@ -2020,5 +2662,490 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       ),
     );
+  }
+
+  // ==================== Upgrade Bottom Sheet ====================
+
+  void _showUpgradeBottomSheet(BuildContext context, bool isDark) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (sheetContext) => _UpgradeBottomSheet(isDark: isDark),
+    );
+  }
+}
+
+/// Stateful bottom sheet for upgrade flow (needs to manage loading/purchase state)
+class _UpgradeBottomSheet extends StatefulWidget {
+  final bool isDark;
+  const _UpgradeBottomSheet({required this.isDark});
+
+  @override
+  State<_UpgradeBottomSheet> createState() => _UpgradeBottomSheetState();
+}
+
+class _UpgradeBottomSheetState extends State<_UpgradeBottomSheet> {
+  bool _isLoading = true;
+  bool _isPurchasing = false;
+  String? _error;
+  // RevenueCat offerings mapped by tier
+  Map<SubscriptionTier, dynamic> _packages = {};
+
+  bool get isDark => widget.isDark;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadOfferings();
+  }
+
+  Future<void> _loadOfferings() async {
+    try {
+      final offerings = await SubscriptionService().getOfferings();
+      final mapped = <SubscriptionTier, dynamic>{};
+
+      for (final pkg in offerings) {
+        // Match packages to tiers by identifier
+        final id = pkg.storeProduct.identifier.toLowerCase();
+        if (id.contains('growth')) {
+          mapped[SubscriptionTier.growth] = pkg;
+        } else if (id.contains('mastery')) {
+          mapped[SubscriptionTier.mastery] = pkg;
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _packages = mapped;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = 'Failed to load subscription options';
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _purchase(dynamic package) async {
+    setState(() => _isPurchasing = true);
+
+    try {
+      final success = await SubscriptionService().purchasePackage(package);
+      if (mounted) {
+        Navigator.of(context).pop();
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Welcome to Pro! Enjoy your new features.')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isPurchasing = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Purchase failed: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _restorePurchases() async {
+    setState(() => _isPurchasing = true);
+    try {
+      final restored = await SubscriptionService().restorePurchases();
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(restored
+                ? 'Subscription restored successfully!'
+                : 'No active subscription found to restore'),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isPurchasing = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Restore failed: $e')),
+        );
+      }
+    }
+  }
+
+  String _getPriceString(SubscriptionTier tier) {
+    final pkg = _packages[tier];
+    if (pkg != null) {
+      return pkg.storeProduct.priceString;
+    }
+    return tier == SubscriptionTier.growth ? '\$4.99/mo' : '\$9.99/mo';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.85,
+      ),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkSurface : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Drag handle
+          Container(
+            margin: const EdgeInsets.only(top: 12),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          Flexible(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Header
+                  Icon(
+                    Icons.workspace_premium_rounded,
+                    size: 48,
+                    color: isDark ? AppColors.darkGold : AppColors.lightGold,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Choose Your Plan',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? AppColors.darkPrimaryText : AppColors.lightPrimaryText,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Unlock your full potential',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: isDark ? AppColors.darkSecondaryText : AppColors.lightSecondaryText,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  if (_isLoading)
+                    Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: CircularProgressIndicator(
+                        color: isDark ? AppColors.darkCoral : AppColors.lightCoral,
+                      ),
+                    )
+                  else if (_error != null)
+                    _buildErrorState()
+                  else ...[
+                    // Starter tier (current plan reference)
+                    _buildTierCard(
+                      tier: SubscriptionTier.starter,
+                      price: 'Free',
+                      isCurrent: true,
+                      isHighlighted: false,
+                    ),
+                    const SizedBox(height: 12),
+                    // Growth tier
+                    _buildTierCard(
+                      tier: SubscriptionTier.growth,
+                      price: _getPriceString(SubscriptionTier.growth),
+                      isCurrent: false,
+                      isHighlighted: false,
+                    ),
+                    const SizedBox(height: 12),
+                    // Mastery tier (highlighted)
+                    _buildTierCard(
+                      tier: SubscriptionTier.mastery,
+                      price: _getPriceString(SubscriptionTier.mastery),
+                      isCurrent: false,
+                      isHighlighted: true,
+                    ),
+                  ],
+
+                  const SizedBox(height: 20),
+
+                  // Restore purchases
+                  TextButton(
+                    onPressed: _isPurchasing ? null : _restorePurchases,
+                    child: Text(
+                      'Restore Purchases',
+                      style: TextStyle(
+                        color: isDark ? AppColors.darkSecondaryText : AppColors.lightSecondaryText,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorState() {
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        children: [
+          Icon(
+            Icons.error_outline_rounded,
+            size: 48,
+            color: isDark ? AppColors.darkSecondaryText : AppColors.lightSecondaryText,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            _error!,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: isDark ? AppColors.darkSecondaryText : AppColors.lightSecondaryText,
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextButton(
+            onPressed: () {
+              setState(() {
+                _isLoading = true;
+                _error = null;
+              });
+              _loadOfferings();
+            },
+            child: Text(
+              'Retry',
+              style: TextStyle(
+                color: isDark ? AppColors.darkCoral : AppColors.lightCoral,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTierCard({
+    required SubscriptionTier tier,
+    required String price,
+    required bool isCurrent,
+    required bool isHighlighted,
+  }) {
+    final features = _getFeaturesForTier(tier);
+    final goldColor = isDark ? AppColors.darkGold : AppColors.lightGold;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isHighlighted
+            ? (isDark ? goldColor.withValues(alpha: 0.1) : goldColor.withValues(alpha: 0.08))
+            : (isDark ? AppColors.darkBackground : AppColors.lightBackground),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isHighlighted
+              ? goldColor.withValues(alpha: 0.5)
+              : (isDark ? AppColors.darkBorder : AppColors.lightBorder),
+          width: isHighlighted ? 2 : 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Tier name + badge
+          Row(
+            children: [
+              Text(
+                tier.displayName,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: isDark ? AppColors.darkPrimaryText : AppColors.lightPrimaryText,
+                ),
+              ),
+              if (isHighlighted) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: goldColor,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    'Best Value',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black,
+                    ),
+                  ),
+                ),
+              ],
+              if (isCurrent) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    'Current',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? AppColors.darkSecondaryText : AppColors.lightSecondaryText,
+                    ),
+                  ),
+                ),
+              ],
+              const Spacer(),
+              Text(
+                price,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: isHighlighted
+                      ? goldColor
+                      : (isDark ? AppColors.darkPrimaryText : AppColors.lightPrimaryText),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            tier.description,
+            style: TextStyle(
+              fontSize: 12,
+              color: isDark ? AppColors.darkSecondaryText : AppColors.lightSecondaryText,
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Feature list
+          ...features.map((feature) => Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.check_circle_rounded,
+                  size: 16,
+                  color: isHighlighted
+                      ? goldColor
+                      : (isDark ? AppColors.darkCoral : AppColors.lightCoral),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    feature,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: isDark ? AppColors.darkPrimaryText : AppColors.lightPrimaryText,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          )),
+
+          // Subscribe button (not for current plan)
+          if (!isCurrent) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _isPurchasing
+                    ? null
+                    : () {
+                        HapticFeedback.mediumImpact();
+                        final pkg = _packages[tier];
+                        if (pkg != null) {
+                          _purchase(pkg);
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('This plan is not yet available. Please try again later.'),
+                            ),
+                          );
+                        }
+                      },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isHighlighted
+                      ? goldColor
+                      : (isDark ? AppColors.darkCoral : AppColors.lightCoral),
+                  foregroundColor: isHighlighted
+                      ? Colors.black
+                      : (isDark ? AppColors.darkBackground : Colors.white),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 0,
+                ),
+                child: _isPurchasing
+                    ? SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: isHighlighted ? Colors.black : Colors.white,
+                        ),
+                      )
+                    : Text(
+                        'Subscribe',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  List<String> _getFeaturesForTier(SubscriptionTier tier) {
+    switch (tier) {
+      case SubscriptionTier.starter:
+        return [
+          'Up to 5 habits',
+          '1 AI suggestion per day',
+          '10 AI reports per month',
+          'Basic progress tracking',
+        ];
+      case SubscriptionTier.growth:
+        return [
+          'Up to 10 habits',
+          '5 AI suggestions per day',
+          '30 AI reports per month',
+          'Trend charts & analytics',
+          'Daily AI coaching reports',
+        ];
+      case SubscriptionTier.mastery:
+        return [
+          'Unlimited habits',
+          'Unlimited AI suggestions',
+          'Unlimited AI reports',
+          'Full analytics & insights',
+          'Health data integration',
+          'Achievement badges',
+          'Priority support',
+        ];
+    }
   }
 }

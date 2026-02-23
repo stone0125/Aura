@@ -17,6 +17,8 @@ import 'settings_screen.dart';
 
 /// Home Screen - Primary Dashboard
 class HomeScreen extends StatefulWidget {
+  static final GlobalKey<HomeScreenState> homeKey =
+      GlobalKey<HomeScreenState>();
   const HomeScreen({super.key});
 
   @override
@@ -67,28 +69,44 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   void _checkAndLoadAI() {
-    if (_habitProvider == null) return;
+    if (_habitProvider == null || !mounted) return;
 
     final coachProvider = Provider.of<AICoachProvider>(context, listen: false);
 
     // 1. Check if habits are loaded to fetch Suggestions & Tips
     if (!_habitProvider!.isLoadingHabits && _habitProvider!.habits.isNotEmpty) {
+      // Extract data in single iteration to avoid multiple .map() calls
+      final habits = _habitProvider!.habits;
+      final categories = <String>{};
+      final habitNames = <String>[];
+      int combinedStreaks = 0;
+
+      for (final h in habits) {
+        categories.add(h.category.name);
+        habitNames.add(h.name);
+        combinedStreaks += h.streak;
+      }
+
       // Load suggestions if empty
       if (coachProvider.suggestions.isEmpty &&
           !coachProvider.isLoadingSuggestions) {
         coachProvider.loadSuggestions(
-          categories: _habitProvider!.habits
-              .map((h) => h.category.name)
-              .toSet()
-              .toList(),
-          currentHabits: _habitProvider!.habits.map((h) => h.name).toList(),
+          categories: categories.toList(),
+          currentHabits: habitNames,
+          completionRate: _habitProvider!.completionRate * 100,
+          bestStreak: _habitProvider!.bestStreak,
         );
       }
 
-      // Load tips if empty
+      // Load tips if empty (with user data for personalization)
       if (coachProvider.tipsByCategory.isEmpty &&
           !coachProvider.isLoadingTips) {
-        coachProvider.loadTips();
+        coachProvider.loadTips(
+          userHabits: habitNames,
+          completionRate: _habitProvider!.completionRate * 100,
+          bestStreak: _habitProvider!.bestStreak,
+          totalCompletions: combinedStreaks, // approximation: sum of current streaks
+        );
       }
     }
 
@@ -116,7 +134,7 @@ class HomeScreenState extends State<HomeScreen> {
           'completionRate': _progressProvider!.stats!.completionRate,
         };
 
-        coachProvider.loadInsights(weekData: weekData);
+        coachProvider.loadInsights(weekData: weekData, habits: _habitProvider!.habits);
       }
     }
   }
@@ -214,10 +232,11 @@ class _HomeTab extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header Section
-                Consumer<SettingsProvider>(
-                  builder: (context, settings, child) {
-                    return HomeHeader(userName: settings.userProfile.firstName);
+                // Header Section - uses Selector to only rebuild when firstName changes
+                Selector<SettingsProvider, String>(
+                  selector: (context, settings) => settings.userProfile.firstName,
+                  builder: (context, firstName, child) {
+                    return HomeHeader(userName: firstName);
                   },
                 ),
 

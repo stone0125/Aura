@@ -17,12 +17,17 @@ extension DateRangeExtension on DateRange {
     }
   }
 
-  int? get days {
+  /// Returns the start date for this range (inclusive).
+  /// null means "all time" - the provider computes from earliest history.
+  DateTime? get startDate {
+    final now = DateTime.now();
     switch (this) {
       case DateRange.thisWeek:
-        return 7;
+        // Monday of the current week
+        return DateTime(now.year, now.month, now.day - (now.weekday - 1));
       case DateRange.thisMonth:
-        return 30;
+        // 1st of the current month
+        return DateTime(now.year, now.month, 1);
       case DateRange.allTime:
         return null;
     }
@@ -158,7 +163,11 @@ class Achievement {
     this.unlockedAt,
   });
 
-  double get progress => currentValue / targetValue;
+  /// Progress towards the achievement (0.0 to 1.0, clamped)
+  double get progress {
+    if (targetValue <= 0) return 0.0;
+    return (currentValue / targetValue).clamp(0.0, 1.0);
+  }
 
   String get progressText {
     if (isUnlocked) {
@@ -193,7 +202,9 @@ class Achievement {
         'Nov',
         'Dec',
       ];
-      return '${months[unlockedAt!.month - 1]} ${unlockedAt!.day}, ${unlockedAt!.year}';
+      final monthIndex = unlockedAt!.month;
+      if (monthIndex < 1 || monthIndex > 12) return 'Unknown';
+      return '${months[monthIndex - 1]} ${unlockedAt!.day}, ${unlockedAt!.year}';
     }
   }
 

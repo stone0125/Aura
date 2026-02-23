@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:fl_chart/fl_chart.dart';
 import '../models/habit.dart';
 import '../models/habit_category.dart';
 import '../models/habit_stats.dart';
@@ -8,6 +9,8 @@ import '../providers/habit_detail_provider.dart';
 
 import '../providers/theme_provider.dart';
 import '../config/theme/app_colors.dart';
+import '../config/theme/ui_constants.dart';
+import 'habit_creation_screen.dart';
 
 /// Habit Detail Screen - Comprehensive habit statistics and management
 class HabitDetailScreen extends StatefulWidget {
@@ -21,24 +24,19 @@ class HabitDetailScreen extends StatefulWidget {
 
 class _HabitDetailScreenState extends State<HabitDetailScreen> {
   final _scrollController = ScrollController();
-  double _scrollOffset = 0.0;
   TimeRange _selectedTimeRange = TimeRange.month;
+  bool _isInsightExpanded = false;
 
   @override
   void initState() {
     super.initState();
-    _scrollController.addListener(_onScroll);
+    // Removed _scrollController.addListener(_onScroll) to avoid 60 rebuilds/second
+    // Now using AnimatedBuilder with _scrollController as Listenable for opacity calculations
 
     // Load habit details
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = Provider.of<HabitDetailProvider>(context, listen: false);
       provider.loadHabitDetails(widget.habit);
-    });
-  }
-
-  void _onScroll() {
-    setState(() {
-      _scrollOffset = _scrollController.offset;
     });
   }
 
@@ -53,16 +51,24 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final detailProvider = Provider.of<HabitDetailProvider>(context);
 
-    // Calculate app bar opacity based on scroll
-    final appBarOpacity = (_scrollOffset / 100).clamp(0.0, 1.0);
-    final titleOpacity = ((_scrollOffset - 80) / 20).clamp(0.0, 1.0);
-
     return Scaffold(
       backgroundColor: isDark
           ? AppColors.darkBackground
           : AppColors.lightBackground,
       extendBodyBehindAppBar: true,
-      appBar: _buildAppBar(isDark, appBarOpacity, titleOpacity),
+      // Use AnimatedBuilder to rebuild only the AppBar on scroll, not the entire widget tree
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(kToolbarHeight),
+        child: AnimatedBuilder(
+          animation: _scrollController,
+          builder: (context, child) {
+            final scrollOffset = _scrollController.hasClients ? _scrollController.offset : 0.0;
+            final appBarOpacity = (scrollOffset / 100).clamp(0.0, 1.0);
+            final titleOpacity = ((scrollOffset - 80) / 20).clamp(0.0, 1.0);
+            return _buildAppBar(isDark, appBarOpacity, titleOpacity);
+          },
+        ),
+      ),
       body: Stack(
         children: [
           // Main scrollable content
@@ -76,11 +82,15 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
               SliverToBoxAdapter(
                 child: Column(
                   children: [
-                    // AI Insight Card (overlapping hero)
-                    Transform.translate(
-                      offset: const Offset(0, -20),
-                      child: _buildAIInsightCard(isDark, detailProvider),
-                    ),
+                    // Space between Hero and AI Insight Card
+                    const SizedBox(height: 24),
+
+                    // AI Insight Card
+                    _buildAIInsightCard(isDark, detailProvider),
+                    const SizedBox(height: 20),
+
+                    // Reminder Info
+                    _buildReminderRow(isDark),
 
                     // Statistics Grid
                     _buildStatisticsGrid(isDark, detailProvider),
@@ -92,10 +102,6 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
 
                     // Progress Chart
                     _buildProgressChart(isDark, detailProvider),
-                    const SizedBox(height: 24),
-
-                    // Completion History
-                    _buildCompletionHistory(isDark, detailProvider),
 
                     // Bottom spacing for FAB
                     const SizedBox(height: 120),
@@ -143,8 +149,8 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
             color: isDark
                 ? AppColors.darkPrimaryText
                 : AppColors.lightPrimaryText,
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
+            fontSize: UIConstants.appBarTitleSize,
+            fontWeight: UIConstants.appBarTitleWeight,
           ),
         ),
       ),
@@ -157,8 +163,12 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
                 : AppColors.lightPrimaryText,
           ),
           onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Edit habit coming soon!')),
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => HabitCreationScreen(
+                  habitToEdit: widget.habit,
+                ),
+              ),
             );
           },
         ),
@@ -198,7 +208,7 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
 
     return SliverToBoxAdapter(
       child: Container(
-        height: 240,
+        constraints: const BoxConstraints(minHeight: 300),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: gradientColors,
@@ -206,97 +216,118 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
             end: Alignment.bottomRight,
           ),
         ),
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Category Icon
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    colors: gradientColors.map((c) {
-                      return Color.lerp(c, Colors.white, 0.2)!;
-                    }).toList(),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SizedBox(height: MediaQuery.of(context).padding.top + kToolbarHeight),
+            // Category Icon
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  colors: gradientColors.map((c) {
+                    return Color.lerp(c, Colors.white, 0.2)!;
+                  }).toList(),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.15),
+                    blurRadius: 16,
+                    offset: const Offset(0, 8),
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.15),
-                      blurRadius: 16,
-                      offset: const Offset(0, 8),
+                ],
+              ),
+              child: Icon(
+                widget.habit.category.icon,
+                size: 40,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Habit Name
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Text(
+                widget.habit.name,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: isDark ? AppColors.darkPrimaryText : Colors.white,
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  shadows: [
+                    Shadow(
+                      color: Colors.black.withValues(alpha: 0.2),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
                     ),
                   ],
                 ),
-                child: Icon(
-                  widget.habit.category.icon,
-                  size: 40,
-                  color: Colors.white,
-                ),
               ),
-              const SizedBox(height: 16),
+            ),
+            const SizedBox(height: 8),
 
-              // Habit Name
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 32),
-                child: Text(
-                  widget.habit.name,
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: isDark ? AppColors.darkPrimaryText : Colors.white,
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    shadows: [
-                      Shadow(
-                        color: Colors.black.withValues(alpha: 0.2),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                ),
+            // Frequency Label
+            Text(
+              'Daily',
+              style: TextStyle(
+                color: (isDark ? AppColors.darkPrimaryText : Colors.white)
+                    .withValues(alpha: 0.85),
+                fontSize: 14,
+                fontWeight: FontWeight.w400,
               ),
-              const SizedBox(height: 8),
-
-              // Frequency Label
-              Text(
-                'Daily',
-                style: TextStyle(
-                  color: (isDark ? AppColors.darkPrimaryText : Colors.white)
-                      .withValues(alpha: 0.85),
-                  fontSize: 14,
-                  fontWeight: FontWeight.w400,
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              // Category Badge
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: isDark ? 0.15 : 0.2),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: isDark ? 0.2 : 0.3),
+            ),
+            if (widget.habit.reminderEnabled && widget.habit.reminderTime != null) ...[
+              const SizedBox(height: 6),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.alarm_rounded,
+                    size: 14,
+                    color: (isDark ? AppColors.darkPrimaryText : Colors.white)
+                        .withValues(alpha: 0.85),
                   ),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  widget.habit.category.displayName,
-                  style: TextStyle(
-                    color: isDark ? AppColors.darkPrimaryText : Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
+                  const SizedBox(width: 4),
+                  Text(
+                    _formatTimeOfDay(widget.habit.reminderTime!),
+                    style: TextStyle(
+                      color: (isDark ? AppColors.darkPrimaryText : Colors.white)
+                          .withValues(alpha: 0.85),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w400,
+                    ),
                   ),
-                ),
+                ],
               ),
             ],
-          ),
+            const SizedBox(height: 12),
+
+            // Category Badge
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: isDark ? 0.15 : 0.2),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: isDark ? 0.2 : 0.3),
+                ),
+                borderRadius: UIConstants.borderRadiusMedium,
+              ),
+              child: Text(
+                widget.habit.category.displayName,
+                style: TextStyle(
+                  color: isDark ? AppColors.darkPrimaryText : Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
         ),
       ),
     );
@@ -308,17 +339,17 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(UIConstants.radiusXLarge),
         border: Border.all(
           color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
         ),
         boxShadow: [
           BoxShadow(
             color: isDark
-                ? Colors.black.withValues(alpha: 0.4)
-                : Colors.black.withValues(alpha: 0.12),
-            blurRadius: isDark ? 24 : 16,
-            offset: const Offset(0, 8),
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.black.withValues(alpha: 0.08),
+            blurRadius: isDark ? 12 : 8,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -373,14 +404,37 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
   }
 
   Widget _buildAIInsightLoading(bool isDark) {
+    final coral = isDark ? AppColors.darkCoral : AppColors.lightCoral;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Row(
+          children: [
+            SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: coral,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Analyzing your habit patterns...',
+              style: TextStyle(
+                color: coral,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
         Container(
           width: double.infinity,
           height: 16,
           decoration: BoxDecoration(
-            color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+            color: coral.withValues(alpha: 0.10),
             borderRadius: BorderRadius.circular(4),
           ),
         ),
@@ -389,18 +443,8 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
           width: 200,
           height: 16,
           decoration: BoxDecoration(
-            color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+            color: coral.withValues(alpha: 0.10),
             borderRadius: BorderRadius.circular(4),
-          ),
-        ),
-        const SizedBox(height: 12),
-        Text(
-          'AI is analyzing your patterns...',
-          style: TextStyle(
-            color: isDark
-                ? AppColors.darkSecondaryText
-                : AppColors.lightSecondaryText,
-            fontSize: 12,
           ),
         ),
       ],
@@ -408,54 +452,69 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
   }
 
   Widget _buildAIInsightContent(bool isDark, AIInsight insight) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          insight.text,
-          style: TextStyle(
-            color: isDark
-                ? AppColors.darkPrimaryText
-                : AppColors.lightPrimaryText,
-            fontSize: 15,
-            height: 1.5,
-          ),
+    final textStyle = TextStyle(
+      color: isDark
+          ? AppColors.darkPrimaryText
+          : AppColors.lightPrimaryText,
+      fontSize: 15,
+      height: 1.5,
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final textSpan = TextSpan(text: insight.text, style: textStyle);
+        final textPainter = TextPainter(
+          text: textSpan,
           maxLines: 3,
-          overflow: TextOverflow.ellipsis,
-        ),
-        const SizedBox(height: 12),
-        TextButton(
-          onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('AI Coach screen coming soon!')),
-            );
-          },
-          style: TextButton.styleFrom(
-            padding: EdgeInsets.zero,
-            minimumSize: const Size(0, 0),
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Get More Insights',
-                style: TextStyle(
-                  color: isDark ? AppColors.darkCoral : AppColors.lightCoral,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
+          textDirection: TextDirection.ltr,
+        )..layout(maxWidth: constraints.maxWidth);
+
+        final isOverflowing = textPainter.didExceedMaxLines;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AnimatedSize(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeInOut,
+              alignment: Alignment.topCenter,
+              child: Text(
+                insight.text,
+                style: textStyle,
+                maxLines: _isInsightExpanded ? null : 3,
+                overflow: _isInsightExpanded ? null : TextOverflow.ellipsis,
+              ),
+            ),
+            if (isOverflowing) ...[
+              const SizedBox(height: 12),
+              GestureDetector(
+                onTap: () => setState(() => _isInsightExpanded = !_isInsightExpanded),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _isInsightExpanded ? 'Show Less' : 'Show More',
+                      style: TextStyle(
+                        color: isDark ? AppColors.darkCoral : AppColors.lightCoral,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      _isInsightExpanded
+                          ? Icons.keyboard_arrow_up_rounded
+                          : Icons.keyboard_arrow_down_rounded,
+                      size: 18,
+                      color: isDark ? AppColors.darkCoral : AppColors.lightCoral,
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 4),
-              Icon(
-                Icons.arrow_forward_rounded,
-                size: 16,
-                color: isDark ? AppColors.darkCoral : AppColors.lightCoral,
-              ),
             ],
-          ),
-        ),
-      ],
+          ],
+        );
+      },
     );
   }
 
@@ -484,7 +543,103 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
     );
   }
 
+  Widget _buildReminderRow(bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 16, right: 16, bottom: 20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+          borderRadius: UIConstants.borderRadiusMedium,
+          border: Border.all(
+            color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.alarm_rounded,
+              size: 20,
+              color: isDark ? AppColors.darkCoral : AppColors.lightCoral,
+            ),
+            const SizedBox(width: 10),
+            Text(
+              'Daily reminder',
+              style: TextStyle(
+                color: isDark
+                    ? AppColors.darkSecondaryText
+                    : AppColors.lightSecondaryText,
+                fontSize: 14,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+            const Spacer(),
+            Text(
+              widget.habit.reminderEnabled && widget.habit.reminderTime != null
+                  ? _formatTimeOfDay(widget.habit.reminderTime!)
+                  : 'Not set',
+              style: TextStyle(
+                color: widget.habit.reminderEnabled && widget.habit.reminderTime != null
+                    ? (isDark
+                        ? AppColors.darkPrimaryText
+                        : AppColors.lightPrimaryText)
+                    : (isDark
+                        ? AppColors.darkSecondaryText
+                        : AppColors.lightSecondaryText),
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildStatisticsGrid(bool isDark, HabitDetailProvider provider) {
+    // Show loading indicator while data loads
+    if (provider.isLoadingData) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 40),
+        child: Center(
+          child: CircularProgressIndicator(
+            color: isDark ? AppColors.darkCoral : AppColors.lightCoral,
+          ),
+        ),
+      );
+    }
+
+    // Show error message if loading failed
+    if (provider.errorMessage != null) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+        child: Center(
+          child: Column(
+            children: [
+              Icon(
+                Icons.error_outline_rounded,
+                size: 48,
+                color: isDark
+                    ? AppColors.darkSecondaryText
+                    : AppColors.lightSecondaryText,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                provider.errorMessage!,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: isDark
+                      ? AppColors.darkSecondaryText
+                      : AppColors.lightSecondaryText,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     if (provider.stats == null) return const SizedBox.shrink();
 
     final stats = provider.stats!;
@@ -494,10 +649,13 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
       child: GridView.count(
         crossAxisCount: 2,
         shrinkWrap: true,
+        primary: false,
+        padding: EdgeInsets.zero,
         physics: const NeverScrollableScrollPhysics(),
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        childAspectRatio: 1.4,
+        mainAxisSpacing: 16,
+        crossAxisSpacing: 16,
+        childAspectRatio:
+            1.0, // Increased vertical space (square) to prevent text overflow
         children: [
           _buildStatCard(
             isDark: isDark,
@@ -558,7 +716,7 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: UIConstants.borderRadiusLarge,
         boxShadow: [
           BoxShadow(
             color: isDark
@@ -625,27 +783,39 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
   }
 
   Widget _buildCalendarSection(bool isDark, HabitDetailProvider provider) {
+    final now = DateTime.now();
+    final daysInMonth = DateUtils.getDaysInMonth(now.year, now.month);
+    final firstDayOfMonth = DateTime(now.year, now.month, 1);
+    final firstWeekday = firstDayOfMonth.weekday; // 1 = Mon, 7 = Sun
+    // Adjust for Sunday start if needed (Flutter uses Mon=1), let's stick to Mon-Sun
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Calendar',
-            style: TextStyle(
-              color: isDark
-                  ? AppColors.darkPrimaryText
-                  : AppColors.lightPrimaryText,
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '${_getMonthName(now.month)} ${now.year}',
+                style: TextStyle(
+                  color: isDark
+                      ? AppColors.darkPrimaryText
+                      : AppColors.lightPrimaryText,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              // Legend or minimal controls could go here
+            ],
           ),
           const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: UIConstants.borderRadiusLarge,
               boxShadow: [
                 BoxShadow(
                   color: isDark
@@ -658,24 +828,100 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
             ),
             child: Column(
               children: [
-                Text(
-                  'Calendar view coming soon!',
-                  style: TextStyle(
-                    color: isDark
-                        ? AppColors.darkSecondaryText
-                        : AppColors.lightSecondaryText,
-                    fontSize: 14,
-                  ),
+                // Weekday Headers
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: ['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day) {
+                    return SizedBox(
+                      width: 32,
+                      child: Text(
+                        day,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: isDark
+                              ? AppColors.darkSecondaryText
+                              : AppColors.lightSecondaryText,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    );
+                  }).toList(),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'Will show completion patterns',
-                  style: TextStyle(
-                    color: isDark
-                        ? AppColors.darkSecondaryText
-                        : AppColors.lightSecondaryText,
-                    fontSize: 12,
+                const SizedBox(height: 12),
+                // Days Grid
+                GridView.builder(
+                  shrinkWrap: true,
+                  primary: false,
+                  padding: EdgeInsets.zero,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 7,
+                    mainAxisSpacing: 8,
+                    crossAxisSpacing: 8,
                   ),
+                  itemCount: daysInMonth + (firstWeekday - 1),
+                  itemBuilder: (context, index) {
+                    if (index < firstWeekday - 1) {
+                      return const SizedBox.shrink();
+                    }
+
+                    final day = index - (firstWeekday - 1) + 1;
+                    final date = DateTime(now.year, now.month, day);
+                    final isToday = day == now.day;
+
+                    final isCompleted = provider.completions.any(
+                      (c) =>
+                          c.date.year == date.year &&
+                          c.date.month == date.month &&
+                          c.date.day == date.day,
+                    );
+
+                    return Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isCompleted
+                            ? (isDark
+                                  ? AppColors.darkCoral
+                                  : AppColors.lightCoral)
+                            : isToday
+                            ? (isDark
+                                  ? AppColors.darkCoral.withValues(alpha: 0.2)
+                                  : AppColors.lightCoral.withValues(alpha: 0.2))
+                            : Colors.transparent,
+                        border: isToday && !isCompleted
+                            ? Border.all(
+                                color: isDark
+                                    ? AppColors.darkCoral
+                                    : AppColors.lightCoral,
+                                width: 1.5,
+                              )
+                            : null,
+                      ),
+                      child: Center(
+                        child: Text(
+                          '$day',
+                          style: TextStyle(
+                            color: isCompleted
+                                ? (isDark
+                                      ? AppColors.darkBackground
+                                      : Colors.white)
+                                : isToday
+                                ? (isDark
+                                      ? AppColors.darkCoral
+                                      : AppColors.lightCoral)
+                                : (isDark
+                                      ? AppColors.darkSecondaryText
+                                      : AppColors.lightSecondaryText),
+                            fontSize: 12,
+                            fontWeight: isCompleted || isToday
+                                ? FontWeight.w600
+                                : FontWeight.normal,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ],
             ),
@@ -683,6 +929,33 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
         ],
       ),
     );
+  }
+
+  String _formatTimeOfDay(TimeOfDay time) {
+    final hour = time.hourOfPeriod == 0 ? 12 : time.hourOfPeriod;
+    final minute = time.minute.toString().padLeft(2, '0');
+    final period = time.period == DayPeriod.am ? 'AM' : 'PM';
+    return '$hour:$minute $period';
+  }
+
+  String _getMonthName(int month) {
+    const months = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+    // Ensure month is within valid range (1-12)
+    if (month < 1 || month > 12) return '';
+    return months[month - 1];
   }
 
   Widget _buildProgressChart(bool isDark, HabitDetailProvider provider) {
@@ -711,7 +984,7 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
                   color: isDark
                       ? AppColors.darkSurfaceVariant
                       : AppColors.lightBorder.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: UIConstants.borderRadiusSmall,
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -756,13 +1029,19 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 16),
+
+          const SizedBox(height: 24),
           Container(
             height: 240,
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.only(
+              right: 8,
+              left: 8,
+              top: 24,
+              bottom: 12,
+            ),
             decoration: BoxDecoration(
               color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: UIConstants.borderRadiusLarge,
               boxShadow: [
                 BoxShadow(
                   color: isDark
@@ -773,15 +1052,10 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
                 ),
               ],
             ),
-            child: Center(
-              child: Text(
-                'Chart coming soon!',
-                style: TextStyle(
-                  color: isDark
-                      ? AppColors.darkSecondaryText
-                      : AppColors.lightSecondaryText,
-                  fontSize: 14,
-                ),
+            child: RepaintBoundary(
+              child: LineChart(
+                _buildChartData(isDark, provider.completions, _selectedTimeRange),
+                duration: const Duration(milliseconds: 250), // Animation duration
               ),
             ),
           ),
@@ -790,150 +1064,208 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
     );
   }
 
-  Widget _buildCompletionHistory(bool isDark, HabitDetailProvider provider) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'History',
-            style: TextStyle(
-              color: isDark
-                  ? AppColors.darkPrimaryText
-                  : AppColors.lightPrimaryText,
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            constraints: const BoxConstraints(maxHeight: 400),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: isDark
-                      ? Colors.black.withValues(alpha: 0.3)
-                      : Colors.black.withValues(alpha: 0.06),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: provider.completions.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.calendar_today_rounded,
-                          size: 48,
-                          color: isDark
-                              ? AppColors.darkSecondaryText
-                              : AppColors.lightSecondaryText,
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          'No history yet',
-                          style: TextStyle(
-                            color: isDark
-                                ? AppColors.darkSecondaryText
-                                : AppColors.lightSecondaryText,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                : ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: provider.completions.length > 5
-                        ? 5
-                        : provider.completions.length,
-                    separatorBuilder: (context, index) => Divider(
-                      color: isDark
-                          ? AppColors.darkBorder
-                          : AppColors.lightBorder,
-                      height: 24,
-                    ),
-                    itemBuilder: (context, index) {
-                      final completion = provider.completions[index];
-                      return _buildHistoryEntry(isDark, completion);
-                    },
-                  ),
-          ),
-        ],
+  LineChartData _buildChartData(
+    bool isDark,
+    List<HabitCompletion> completions,
+    TimeRange range,
+  ) {
+    final spots = _getChartSpots(completions, range);
+    final color = isDark ? AppColors.darkCoral : AppColors.lightCoral;
+
+    return LineChartData(
+      gridData: FlGridData(
+        show: true,
+        drawVerticalLine: false,
+        horizontalInterval: 25,
+        getDrawingHorizontalLine: (value) {
+          return FlLine(
+            color: isDark
+                ? Colors.white10
+                : Colors.black.withValues(alpha: 0.05),
+            strokeWidth: 1,
+          );
+        },
       ),
-    );
-  }
-
-  Widget _buildHistoryEntry(bool isDark, HabitCompletion completion) {
-    return Row(
-      children: [
-        // Icon
-        Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: isDark ? AppColors.darkCoral : AppColors.lightCoral,
-          ),
-          child: Icon(
-            Icons.check_rounded,
-            color: isDark ? AppColors.darkBackground : Colors.white,
-            size: 20,
+      titlesData: FlTitlesData(
+        show: true,
+        bottomTitles: AxisTitles(
+          sideTitles: SideTitles(
+            showTitles: true,
+            reservedSize: 30,
+            interval: 1,
+            getTitlesWidget: (value, meta) {
+              // Custom labels based on range could be added here
+              // For simplicity, showing generic labels or leaving sparse
+              if (value % (range == TimeRange.quarter ? 2 : 1) != 0) {
+                return const SizedBox.shrink();
+              }
+              return Padding(
+                padding: const EdgeInsets.only(top: 8.0),
+                child: Text(
+                  _getBottomLabel(value.toInt(), range),
+                  style: TextStyle(
+                    color: isDark
+                        ? AppColors.darkSecondaryText
+                        : AppColors.lightSecondaryText,
+                    fontSize: 10,
+                  ),
+                ),
+              );
+            },
           ),
         ),
-        const SizedBox(width: 12),
-
-        // Date
-        Expanded(
-          child: Text(
-            completion.formattedDate,
-            style: TextStyle(
-              color: isDark
-                  ? AppColors.darkPrimaryText
-                  : AppColors.lightPrimaryText,
-              fontSize: 15,
-              fontWeight: FontWeight.w500,
+        leftTitles: AxisTitles(
+          sideTitles: SideTitles(
+            showTitles: true,
+            interval: 25,
+            reservedSize: 40,
+            getTitlesWidget: (value, meta) {
+              return Text(
+                '${value.toInt()}%',
+                style: TextStyle(
+                  color: isDark
+                      ? AppColors.darkSecondaryText
+                      : AppColors.lightSecondaryText,
+                  fontSize: 10,
+                ),
+              );
+            },
+          ),
+        ),
+        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        rightTitles: const AxisTitles(
+          sideTitles: SideTitles(showTitles: false),
+        ),
+      ),
+      borderData: FlBorderData(show: false),
+      minX: 0,
+      maxX: (spots.length - 1).toDouble(),
+      minY: -5,
+      maxY: 105,
+      lineBarsData: [
+        LineChartBarData(
+          spots: spots,
+          isCurved: true, // Smooth curve
+          curveSmoothness: 0.35,
+          preventCurveOverShooting: true,
+          color: color,
+          barWidth: 3,
+          isStrokeCapRound: true,
+          dotData: FlDotData(
+            show: true,
+            getDotPainter: (spot, percent, barData, index) {
+              return FlDotCirclePainter(
+                radius: 4,
+                color: isDark ? AppColors.darkBackground : Colors.white,
+                strokeWidth: 2,
+                strokeColor: color,
+              );
+            },
+          ),
+          belowBarData: BarAreaData(
+            show: true,
+            gradient: LinearGradient(
+              colors: [
+                color.withValues(alpha: 0.3),
+                color.withValues(alpha: 0.0),
+              ],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
             ),
           ),
-        ),
-
-        // Status Badge
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            color: const Color(
-              0xFFE8F5E9,
-            ).withValues(alpha: isDark ? 0.2 : 1.0),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Text(
-            'Completed',
-            style: TextStyle(
-              color: isDark ? const Color(0xFF69F0AE) : const Color(0xFF27AE60),
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-
-        // Arrow
-        Icon(
-          Icons.chevron_right_rounded,
-          color: isDark
-              ? AppColors.darkSecondaryText
-              : AppColors.lightSecondaryText,
-          size: 20,
         ),
       ],
     );
+  }
+
+  List<FlSpot> _getChartSpots(
+    List<HabitCompletion> completions,
+    TimeRange range,
+  ) {
+    final now = DateTime.now();
+    List<FlSpot> spots = [];
+
+    // Pre-calculate completed dates for O(1) lookup
+    // Format: "YYYY-MM-DD"
+    final completedDates = completions.map((c) {
+      return '${c.date.year}-${c.date.month}-${c.date.day}';
+    }).toSet();
+
+    bool isCompleted(DateTime d) {
+      return completedDates.contains('${d.year}-${d.month}-${d.day}');
+    }
+
+    if (range == TimeRange.week) {
+      // Last 7 days
+      for (int i = 6; i >= 0; i--) {
+        final date = now.subtract(Duration(days: i));
+        spots.add(FlSpot((6 - i).toDouble(), isCompleted(date) ? 100 : 0));
+      }
+    } else if (range == TimeRange.month) {
+      // Last 4 weeks
+      for (int i = 3; i >= 0; i--) {
+        int completedCount = 0;
+        for (int d = 0; d < 7; d++) {
+          final dayOffset = (i * 7) + d;
+          final date = now.subtract(Duration(days: dayOffset));
+          if (isCompleted(date)) {
+            completedCount++;
+          }
+        }
+        final percentage = (completedCount / 7) * 100;
+        spots.add(FlSpot((3 - i).toDouble(), percentage));
+      }
+    } else {
+      // Quarter: Last 12 weeks
+      for (int i = 11; i >= 0; i--) {
+        int completedCount = 0;
+        for (int d = 0; d < 7; d++) {
+          final dayOffset = (i * 7) + d;
+          final date = now.subtract(Duration(days: dayOffset));
+          if (isCompleted(date)) {
+            completedCount++;
+          }
+        }
+        final percentage = (completedCount / 7) * 100;
+        spots.add(FlSpot((11 - i).toDouble(), percentage));
+      }
+    }
+
+    return spots;
+  }
+
+  String _getBottomLabel(int index, TimeRange range) {
+    final now = DateTime.now();
+    if (range == TimeRange.week) {
+      // Index 0 = 6 days ago
+      final date = now.subtract(Duration(days: 6 - index));
+      // Return weekday initial
+      const weekdays = ['', 'M', 'T', 'W', 'T', 'F', 'S', 'S']; // 1-based
+      return weekdays[date.weekday];
+    } else if (range == TimeRange.month) {
+      return 'W${index + 1}'; // W1..W4
+    } else {
+      // Quarter - show monthly labels roughly?
+      // 12 data points = 12 weeks.
+      // Let's show Month name for every ~4th week?
+      final date = DateTime.now().subtract(Duration(days: (11 - index) * 7));
+      const months = [
+        '',
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
+      ];
+      return months[date.month];
+    }
   }
 
   Widget _buildBottomActionButton(bool isDark, HabitDetailProvider provider) {
@@ -982,7 +1314,7 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
                             : const Color(0xFF27AE60),
                         width: 2,
                       ),
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: UIConstants.borderRadiusLarge,
                     ),
                     child: Center(
                       child: Row(
@@ -1015,14 +1347,6 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
                 TextButton(
                   onPressed: () async {
                     await provider.undoCompletion();
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Completion removed'),
-                          duration: Duration(seconds: 2),
-                        ),
-                      );
-                    }
                   },
                   child: Text(
                     'Undo',
@@ -1046,24 +1370,6 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
                 onPressed: () async {
                   HapticFeedback.mediumImpact();
                   await provider.completeHabit();
-
-                  if (mounted) {
-                    // Update main habit provider (optional, stream handles it)
-                    // final habitProvider = Provider.of<HabitProvider>(
-                    //   context,
-                    //   listen: false,
-                    // );
-                    // habitProvider.toggleHabitCompletion(widget.habit.id);
-
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          '+1 day streak! 🔥 Now ${provider.stats?.currentStreak ?? 0} days',
-                        ),
-                        duration: const Duration(seconds: 2),
-                      ),
-                    );
-                  }
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: isDark
@@ -1073,7 +1379,7 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
                       ? AppColors.darkBackground
                       : Colors.white,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: UIConstants.borderRadiusLarge,
                   ),
                   elevation: 4,
                 ),

@@ -74,7 +74,9 @@ class HabitCompletion {
         'Nov',
         'Dec'
       ];
-      final month = months[date.month - 1];
+      final monthIndex = date.month;
+      if (monthIndex < 1 || monthIndex > 12) return 'Unknown';
+      final month = months[monthIndex - 1];
       return time != null
           ? '$month ${date.day}, $time'
           : '$month ${date.day}';

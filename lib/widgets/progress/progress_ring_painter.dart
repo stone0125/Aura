@@ -72,6 +72,8 @@ class ProgressRingPainter extends CustomPainter {
   bool shouldRepaint(ProgressRingPainter oldDelegate) {
     return oldDelegate.progress != progress ||
         oldDelegate.backgroundColor != backgroundColor ||
-        oldDelegate.progressColor != progressColor;
+        oldDelegate.progressColor != progressColor ||
+        oldDelegate.strokeWidth != strokeWidth ||
+        oldDelegate.showGlow != showGlow;
   }
 }

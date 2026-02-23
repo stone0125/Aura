@@ -29,14 +29,15 @@ service cloud.firestore {
       allow read: if isOwner(userId);
       allow create: if isOwner(userId);
       allow update: if isOwner(userId)
-        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['createdAt']));
-      allow delete: if false; // Prevent accidental deletion
+        && (!request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['createdAt', 'tierCache', 'isPro']));
+      allow delete: if isOwner(userId); // Allow account deletion
       
       // Habits subcollection
       match /habits/{habitId} {
         allow read: if isOwner(userId);
         allow create: if isOwner(userId) && isValidHabit();
-        allow update: if isOwner(userId);
+        allow update: if isOwner(userId) && isValidHabit();
         allow delete: if isOwner(userId);
         
         // History subcollection (completion records)
@@ -49,8 +50,54 @@ service cloud.firestore {
           allow delete: if isOwner(userId); // Allow undo
         }
       }
+
+      // Daily reviews subcollection (AI-generated daily reports)
+      match /dailyReviews/{date} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId);
+        allow update: if isOwner(userId);
+        allow delete: if false;
+      }
+
+      // Habit scores subcollection (AI-generated scores)
+      match /habitScores/{habitId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId);
+        allow update: if isOwner(userId);
+        allow delete: if false;
+
+        match /history/{date} {
+          allow read: if isOwner(userId);
+          allow create: if isOwner(userId);
+          allow update: if false;
+          allow delete: if isOwner(userId);
+        }
+      }
+
+      // Health correlations subcollection
+      match /healthCorrelations/{docId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId);
+        allow update: if isOwner(userId);
+        allow delete: if false;
+      }
+
+      // Usage counters subcollection (server-side subscription enforcement)
+      match /usageCounters/{counterId} {
+        allow read: if isOwner(userId);
+        allow write: if false; // Only server (admin SDK) can write
+      }
     }
     
+    // Support messages (submitted via Cloud Function)
+    match /supportMessages/{messageId} {
+      allow create: if isAuthenticated()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.type in ['contact_support', 'bug_report', 'feature_request']
+        && request.resource.data.status == 'new';
+      allow read, update, delete: if false;
+    }
+
     // Deny all other access by default
     match /{document=**} {
       allow read, write: if false;

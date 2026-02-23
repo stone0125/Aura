@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import '../models/progress_models.dart';
@@ -133,5 +135,15 @@ Tracked with Aura Habit Tracker 💜
     await _share.share(
       ShareParams(text: text, subject: 'My Habit Achievements'),
     );
+  }
+
+  /// Share a file (e.g. CSV export)
+  Future<void> shareFile(String path, String subject) async {
+    // Verify file exists before attempting to share
+    if (!File(path).existsSync()) {
+      debugPrint('ShareService: File does not exist at path: $path');
+      return;
+    }
+    await _share.share(ShareParams(files: [XFile(path)], subject: subject));
   }
 }

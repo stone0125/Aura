@@ -6,6 +6,7 @@ import 'package:share_plus/share_plus.dart';
 import '../models/habit.dart';
 import 'firestore_service.dart';
 import 'analytics_service.dart';
+import 'notification_service.dart';
 
 /// Service for exporting habit data to various formats
 class ExportService {
@@ -15,7 +16,7 @@ class ExportService {
 
   final FirestoreService _firestoreService = FirestoreService();
 
-  /// Export all habit data to CSV format
+  /// Export all habit data to CSV format (saves to Downloads on Android)
   Future<String?> exportToCSV(List<Habit> habits) async {
     try {
       final buffer = StringBuffer();
@@ -34,7 +35,7 @@ class ExportService {
             habit.lastCompletedDate?.toIso8601String() ?? '';
 
         buffer.writeln(
-          '"${_escapeCSV(habit.name)}",'
+          '${_escapeCSV(habit.name)},'
           '${habit.category.name},'
           '${habit.streak},'
           '${habit.isCompleted},'
@@ -44,13 +45,49 @@ class ExportService {
         );
       }
 
-      // Save to file
-      final directory = await getApplicationDocumentsDirectory();
+      // Try to save to Downloads folder (Android) or Documents (iOS)
+      Directory directory;
+      if (Platform.isAndroid) {
+        // Try external storage first, fall back to app documents
+        final externalDirs = await getExternalStorageDirectories();
+        if (externalDirs != null && externalDirs.isNotEmpty) {
+          // Navigate to Download folder from external storage path
+          final pathParts = externalDirs.first.path.split('Android');
+          if (pathParts.length > 1) {
+            final basePath = pathParts[0];
+            final downloadDir = Directory('${basePath}Download');
+            if (await downloadDir.exists()) {
+              directory = downloadDir;
+            } else {
+              directory = await getApplicationDocumentsDirectory();
+            }
+          } else {
+            directory = await getApplicationDocumentsDirectory();
+          }
+        } else {
+          directory = await getApplicationDocumentsDirectory();
+        }
+      } else {
+        directory = await getApplicationDocumentsDirectory();
+      }
+
       final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final file = File('${directory.path}/habits_export_$timestamp.csv');
+      final fileName = 'aura_habits_$timestamp.csv';
+      final file = File('${directory.path}/$fileName');
       await file.writeAsString(buffer.toString());
 
-      debugPrint('Exported ${habits.length} habits to CSV: ${file.path}');
+      // Verify file was written successfully
+      if (!await file.exists()) {
+        debugPrint('Error: CSV file was not created at ${file.path}');
+        return null;
+      }
+      final writtenLength = await file.length();
+      if (writtenLength == 0) {
+        debugPrint('Error: CSV file is empty at ${file.path}');
+        return null;
+      }
+
+      debugPrint('Exported ${habits.length} habits to CSV: ${file.path} ($writtenLength bytes)');
       return file.path;
     } catch (e) {
       debugPrint('Error exporting to CSV: $e');
@@ -61,12 +98,16 @@ class ExportService {
   /// Export all habit data to JSON format (full backup)
   Future<String?> exportToJSON(List<Habit> habits) async {
     try {
+      // Fetch all histories in parallel (fixes N+1 query pattern)
+      final historyFutures = habits.map((h) => _firestoreService.getHabitHistory(h.id)).toList();
+      final allHistories = await Future.wait(historyFutures);
+
       // Build habits with history
       final List<Map<String, dynamic>> habitsData = [];
 
-      for (final habit in habits) {
-        // Fetch history for each habit
-        final history = await _firestoreService.getHabitHistory(habit.id);
+      for (int i = 0; i < habits.length; i++) {
+        final habit = habits[i];
+        final history = allHistories[i];
 
         habitsData.add({
           'id': habit.id,
@@ -96,13 +137,49 @@ class ExportService {
 
       final jsonString = const JsonEncoder.withIndent('  ').convert(exportData);
 
-      // Save to file
-      final directory = await getApplicationDocumentsDirectory();
+      // Try to save to Downloads folder (Android) or Documents (iOS)
+      Directory directory;
+      if (Platform.isAndroid) {
+        // Try external storage first, fall back to app documents
+        final externalDirs = await getExternalStorageDirectories();
+        if (externalDirs != null && externalDirs.isNotEmpty) {
+          // Navigate to Download folder from external storage path
+          final pathParts = externalDirs.first.path.split('Android');
+          if (pathParts.length > 1) {
+            final basePath = pathParts[0];
+            final downloadDir = Directory('${basePath}Download');
+            if (await downloadDir.exists()) {
+              directory = downloadDir;
+            } else {
+              directory = await getApplicationDocumentsDirectory();
+            }
+          } else {
+            directory = await getApplicationDocumentsDirectory();
+          }
+        } else {
+          directory = await getApplicationDocumentsDirectory();
+        }
+      } else {
+        directory = await getApplicationDocumentsDirectory();
+      }
+
       final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final file = File('${directory.path}/habits_backup_$timestamp.json');
+      final fileName = 'aura_habits_backup_$timestamp.json';
+      final file = File('${directory.path}/$fileName');
       await file.writeAsString(jsonString);
 
-      debugPrint('Exported ${habits.length} habits to JSON: ${file.path}');
+      // Verify file was written successfully
+      if (!await file.exists()) {
+        debugPrint('Error: JSON file was not created at ${file.path}');
+        return null;
+      }
+      final writtenLength = await file.length();
+      if (writtenLength == 0) {
+        debugPrint('Error: JSON file is empty at ${file.path}');
+        return null;
+      }
+
+      debugPrint('Exported ${habits.length} habits to JSON: ${file.path} ($writtenLength bytes)');
       return file.path;
     } catch (e) {
       debugPrint('Error exporting to JSON: $e');
@@ -126,6 +203,12 @@ class ExportService {
   Future<void> exportAndShareCSV(List<Habit> habits) async {
     final filePath = await exportToCSV(habits);
     if (filePath != null) {
+      // Show download notification
+      await NotificationService().show(
+        title: 'Export Complete',
+        body: 'aura_habits.csv saved to Downloads',
+        payload: filePath,
+      );
       await shareFile(filePath, subject: 'My Habits - CSV Export');
       await AnalyticsService().logDataExported(
         format: 'csv',
@@ -138,6 +221,12 @@ class ExportService {
   Future<void> exportAndShareJSON(List<Habit> habits) async {
     final filePath = await exportToJSON(habits);
     if (filePath != null) {
+      // Show download notification
+      await NotificationService().show(
+        title: 'Export Complete',
+        body: 'aura_habits_backup.json saved to Downloads',
+        payload: filePath,
+      );
       await shareFile(filePath, subject: 'My Habits - Full Backup');
       await AnalyticsService().logDataExported(
         format: 'json',
@@ -147,7 +236,14 @@ class ExportService {
   }
 
   /// Escape special characters for CSV
+  /// Handles double quotes, newlines, and commas
   String _escapeCSV(String value) {
-    return value.replaceAll('"', '""');
+    // Replace double quotes with escaped double quotes
+    var escaped = value.replaceAll('"', '""');
+    // If value contains special characters, wrap in quotes
+    if (escaped.contains(',') || escaped.contains('\n') || escaped.contains('\r') || escaped.contains('"')) {
+      escaped = '"$escaped"';
+    }
+    return escaped;
   }
 }

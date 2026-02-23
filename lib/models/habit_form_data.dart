@@ -26,7 +26,7 @@ class HabitFormData {
     this.category,
     this.selectedIcon,
     this.frequencyType = FrequencyType.daily,
-    this.weeklyDays = const [],
+    List<int>? weeklyDays,
     this.customInterval = 1,
     this.customUnit = CustomFrequencyUnit.days,
     this.goalType = GoalType.none,
@@ -37,7 +37,7 @@ class HabitFormData {
     this.aiOptimizedTiming = false,
     this.notificationStyle = NotificationStyle.standard,
     this.isAISuggested = false,
-  });
+  }) : weeklyDays = weeklyDays ?? [];
 
   /// Check if form is valid
   bool get isValid {
@@ -46,8 +46,19 @@ class HabitFormData {
     if (frequencyType == FrequencyType.weekly && weeklyDays.isEmpty) {
       return false;
     }
+    if (frequencyType == FrequencyType.custom && customInterval <= 0) {
+      return false;
+    }
+    // Validate reminder time bounds if reminders are enabled
+    if (reminderEnabled) {
+      if (reminderTime.hour < 0 || reminderTime.hour > 23) return false;
+      if (reminderTime.minute < 0 || reminderTime.minute > 59) return false;
+    }
     return true;
   }
+
+  /// Check if icon is selected (has a valid icon)
+  bool get hasValidIcon => selectedIcon != null;
 
   /// Get character count for name
   int get nameCharCount => name.length;

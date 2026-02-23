@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'config/theme/app_colors.dart';
 import 'config/theme/app_theme.dart';
 import 'providers/theme_provider.dart';
 import 'providers/habit_provider.dart';
@@ -8,29 +10,19 @@ import 'providers/habit_detail_provider.dart';
 import 'providers/ai_coach_provider.dart';
 import 'providers/progress_provider.dart';
 import 'providers/settings_provider.dart';
+import 'providers/ai_scoring_provider.dart';
 import 'screens/home_screen.dart';
+import 'screens/splash_screen.dart';
 
-import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'firebase_options.dart';
 import 'screens/login_screen.dart';
-import 'services/notification_service.dart';
-import 'services/subscription_service.dart';
 
 void main() async {
-  // Ensure Flutter binding is initialized
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Firebase
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  await NotificationService().initialize();
-  await SubscriptionService().initialize();
-
-  // Set system UI overlay style
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(statusBarColor: Colors.transparent),
   );
-
   runApp(const MyApp());
 }
 
@@ -62,6 +54,9 @@ class MyApp extends StatelessWidget {
 
         // Settings Provider
         ChangeNotifierProvider(create: (_) => SettingsProvider()),
+
+        // AI Scoring Provider
+        ChangeNotifierProvider(create: (_) => AIScoringProvider()),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, child) {
@@ -75,7 +70,9 @@ class MyApp extends StatelessWidget {
             themeMode: themeProvider.themeMode,
 
             // Home screen wrapper for Auth
-            home: const AuthWrapper(),
+            home: AnimatedSplashScreen(
+              destinationBuilder: () => const AuthWrapper(),
+            ),
           );
         },
       ),
@@ -83,8 +80,46 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class AuthWrapper extends StatelessWidget {
+class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
+
+  @override
+  State<AuthWrapper> createState() => _AuthWrapperState();
+}
+
+class _AuthWrapperState extends State<AuthWrapper> {
+  late final StreamSubscription<User?> _authSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _authSubscription = FirebaseAuth.instance.authStateChanges().listen((user) {
+      if (user == null) {
+        // User logged out — clear all provider data to prevent cross-user leaks
+        _clearAllProviderData();
+      }
+    });
+  }
+
+  void _clearAllProviderData() {
+    if (!mounted) return;
+    try {
+      context.read<HabitProvider>().clearUserData();
+      context.read<AICoachProvider>().clearUserData();
+      context.read<ProgressProvider>().clearUserData();
+      context.read<AIScoringProvider>().clearUserData();
+      context.read<HabitDetailProvider>().clearUserData();
+      context.read<ThemeProvider>().clearUserData();
+    } catch (e) {
+      debugPrint('Error clearing provider data on logout: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    _authSubscription.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -92,13 +127,18 @@ class AuthWrapper extends StatelessWidget {
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
+          final isDark =
+              MediaQuery.platformBrightnessOf(context) == Brightness.dark;
+          return Scaffold(
+            backgroundColor: isDark
+                ? AppColors.splashDarkGradientStart
+                : AppColors.splashGradientStart,
+            body: const SizedBox.shrink(),
           );
         }
 
         if (snapshot.hasData) {
-          return const HomeScreen();
+          return HomeScreen(key: HomeScreen.homeKey);
         }
 
         return const LoginScreen();

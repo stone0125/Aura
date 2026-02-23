@@ -5,6 +5,7 @@ import '../../models/habit_category.dart';
 import '../../providers/habit_provider.dart';
 import '../../providers/ai_coach_provider.dart';
 import '../../config/theme/app_colors.dart';
+import '../../config/theme/ui_constants.dart';
 import '../../screens/habit_creation_screen.dart';
 import '../../screens/home_screen.dart';
 
@@ -17,6 +18,9 @@ class AISuggestionCard extends StatefulWidget {
 }
 
 class _AISuggestionCardState extends State<AISuggestionCard> {
+  final GlobalKey _refreshButtonKey = GlobalKey();
+  OverlayEntry? _cooldownTooltip;
+
   @override
   void initState() {
     super.initState();
@@ -48,8 +52,70 @@ class _AISuggestionCardState extends State<AISuggestionCard> {
       aiCoachProvider.loadSuggestions(
         categories: categories,
         currentHabits: currentHabitNames,
+        completionRate: habitProvider.completionRate * 100,
+        bestStreak: habitProvider.bestStreak,
       );
     }
+  }
+
+  void _showCooldownTooltip() {
+    // Prevent duplicates
+    _cooldownTooltip?.remove();
+    _cooldownTooltip = null;
+
+    final provider = Provider.of<AICoachProvider>(context, listen: false);
+    final remaining = provider.refreshCooldownFormatted;
+
+    final renderBox =
+        _refreshButtonKey.currentContext?.findRenderObject() as RenderBox?;
+    if (renderBox == null) return;
+
+    final overlay = Overlay.of(context);
+    final buttonPos = renderBox.localToGlobal(Offset.zero);
+    final buttonSize = renderBox.size;
+
+    final entry = OverlayEntry(
+      builder: (context) => Positioned(
+        top: buttonPos.dy - 36,
+        left: buttonPos.dx + buttonSize.width / 2 - 60,
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.black87,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              'Try again in $remaining',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                decoration: TextDecoration.none,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    _cooldownTooltip = entry;
+    overlay.insert(entry);
+
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted && _cooldownTooltip == entry) {
+        entry.remove();
+        _cooldownTooltip = null;
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _cooldownTooltip?.remove();
+    _cooldownTooltip = null;
+    super.dispose();
   }
 
   void _refreshSuggestions() {
@@ -65,15 +131,27 @@ class _AISuggestionCardState extends State<AISuggestionCard> {
     aiCoachProvider.loadSuggestions(
       categories: categories,
       currentHabits: currentHabitNames,
+      completionRate: habitProvider.completionRate * 100,
+      bestStreak: habitProvider.bestStreak,
+      forceRefresh: true,
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    // Listen to AICoachProvider for data
-    final aiCoachProvider = Provider.of<AICoachProvider>(context);
-    final suggestions = aiCoachProvider.suggestions;
-    final isLoading = aiCoachProvider.isLoadingSuggestions;
+    // Use Selector to only rebuild when specific fields change
+    final suggestions = context.select<AICoachProvider, List<AICoachSuggestion>>(
+      (provider) => provider.suggestions,
+    );
+    final isLoading = context.select<AICoachProvider, bool>(
+      (provider) => provider.isLoadingSuggestions,
+    );
+    final usedFallback = context.select<AICoachProvider, bool>(
+      (provider) => provider.usedFallback,
+    );
+    final canRefresh = context.select<AICoachProvider, bool>(
+      (provider) => provider.canRefreshSuggestions,
+    );
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
@@ -81,7 +159,7 @@ class _AISuggestionCardState extends State<AISuggestionCard> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: UIConstants.borderRadiusLarge,
         border: Border.all(
           color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
           width: 1,
@@ -142,16 +220,21 @@ class _AISuggestionCardState extends State<AISuggestionCard> {
               Material(
                 color: Colors.transparent,
                 child: InkWell(
-                  onTap: isLoading ? null : _refreshSuggestions,
-                  borderRadius: BorderRadius.circular(16),
+                  onTap: isLoading
+                      ? null
+                      : canRefresh
+                          ? _refreshSuggestions
+                          : _showCooldownTooltip,
+                  borderRadius: UIConstants.borderRadiusLarge,
                   child: Container(
+                    key: _refreshButtonKey,
                     width: 32,
                     height: 32,
                     decoration: BoxDecoration(
                       color: isDark
                           ? AppColors.darkBorder
                           : AppColors.lightBorder.withValues(alpha: 0.5),
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: UIConstants.borderRadiusLarge,
                     ),
                     child: isLoading
                         ? SizedBox(
@@ -170,9 +253,13 @@ class _AISuggestionCardState extends State<AISuggestionCard> {
                           )
                         : Icon(
                             Icons.refresh_rounded,
-                            color: isDark
-                                ? AppColors.darkSecondaryText
-                                : AppColors.lightSecondaryText,
+                            color: canRefresh
+                                ? (isDark
+                                    ? AppColors.darkSecondaryText
+                                    : AppColors.lightSecondaryText)
+                                : (isDark
+                                    ? AppColors.darkSecondaryText.withValues(alpha: 0.3)
+                                    : AppColors.lightSecondaryText.withValues(alpha: 0.3)),
                             size: 18,
                           ),
                   ),
@@ -182,21 +269,67 @@ class _AISuggestionCardState extends State<AISuggestionCard> {
           ),
           const SizedBox(height: 4),
 
-          // Subtitle
-          Text(
-            'Personalized using advanced AI',
-            style: TextStyle(
-              color: isDark
-                  ? AppColors.darkSecondaryText
-                  : AppColors.lightSecondaryText,
-              fontSize: 12,
-              fontWeight: FontWeight.w400,
+          // Subtitle (with fallback warning if applicable)
+          if (usedFallback)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              margin: const EdgeInsets.only(bottom: 4),
+              decoration: BoxDecoration(
+                color: isDark
+                    ? Colors.orange.withValues(alpha: 0.2)
+                    : Colors.orange.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.info_outline_rounded,
+                    size: 14,
+                    color: isDark ? Colors.orange[300] : Colors.orange[700],
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Using default suggestions',
+                    style: TextStyle(
+                      color: isDark ? Colors.orange[300] : Colors.orange[700],
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: _refreshSuggestions,
+                    child: Text(
+                      'Retry',
+                      style: TextStyle(
+                        color: isDark
+                            ? AppColors.darkCoral
+                            : AppColors.lightCoral,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            Text(
+              'Personalized using advanced AI',
+              style: TextStyle(
+                color: isDark
+                    ? AppColors.darkSecondaryText
+                    : AppColors.lightSecondaryText,
+                fontSize: 12,
+                fontWeight: FontWeight.w400,
+              ),
             ),
-          ),
           const SizedBox(height: 16),
 
           // Suggestions Preview
-          if (isLoading && suggestions.isEmpty)
+          if (isLoading)
             _buildLoadingState(isDark)
           else if (suggestions.isEmpty)
             _buildEmptyState(isDark)
@@ -208,62 +341,84 @@ class _AISuggestionCardState extends State<AISuggestionCard> {
   }
 
   Widget _buildLoadingState(bool isDark) {
-    return SizedBox(
-      height: 120,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: 2,
-        itemBuilder: (context, index) {
-          return Container(
-            width: 240,
-            margin: EdgeInsets.only(right: index == 0 ? 12 : 0),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: isDark
-                  ? AppColors.darkSurfaceVariant
-                  : AppColors.lightBorder.withValues(alpha: 0.3),
-              borderRadius: BorderRadius.circular(12),
+    final coral = isDark ? AppColors.darkCoral : AppColors.lightCoral;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: coral,
+              ),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? AppColors.darkBorder
-                        : AppColors.lightBorder,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  width: 150,
-                  height: 16,
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? AppColors.darkBorder
-                        : AppColors.lightBorder,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  width: 200,
-                  height: 12,
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? AppColors.darkBorder
-                        : AppColors.lightBorder,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-              ],
+            const SizedBox(width: 8),
+            Text(
+              'Generating suggestions...',
+              style: TextStyle(
+                color: coral,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-          );
-        },
-      ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 120,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: 2,
+            itemBuilder: (context, index) {
+              return Container(
+                width: 240,
+                margin: EdgeInsets.only(right: index == 0 ? 12 : 0),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? AppColors.darkCoral.withValues(alpha: 0.08)
+                      : AppColors.lightCoral.withValues(alpha: 0.06),
+                  borderRadius: UIConstants.borderRadiusMedium,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: coral.withValues(alpha: 0.15),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      width: 150,
+                      height: 16,
+                      decoration: BoxDecoration(
+                        color: coral.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      width: 200,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: coral.withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 
@@ -310,6 +465,10 @@ class _AISuggestionCardState extends State<AISuggestionCard> {
             scrollDirection: Axis.horizontal,
             itemCount: suggestions.length,
             itemBuilder: (context, index) {
+              // Bounds check to prevent race condition if list is modified during build
+              if (index >= suggestions.length) {
+                return const SizedBox.shrink();
+              }
               final suggestion = suggestions[index];
               final gradientColors = suggestion.category.getGradient(
                 isDark ? Brightness.dark : Brightness.light,
@@ -325,7 +484,7 @@ class _AISuggestionCardState extends State<AISuggestionCard> {
                   color: isDark
                       ? AppColors.darkSurfaceVariant
                       : AppColors.lightBorder.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: UIConstants.borderRadiusMedium,
                   border: Border.all(
                     color: isDark
                         ? AppColors.darkBorder
@@ -381,7 +540,7 @@ class _AISuggestionCardState extends State<AISuggestionCard> {
                               ),
                               minimumSize: const Size(0, 28),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
+                                borderRadius: UIConstants.borderRadiusMedium,
                               ),
                               elevation: 0,
                             ),

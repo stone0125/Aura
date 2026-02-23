@@ -1,13 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart' show DateFormat;
 import 'package:provider/provider.dart';
 import '../models/ai_coach_models.dart';
+import '../models/ai_scoring_models.dart';
+import '../models/daily_review_models.dart';
 import '../providers/ai_coach_provider.dart';
+import '../providers/ai_scoring_provider.dart';
 import '../providers/habit_provider.dart';
+import '../providers/settings_provider.dart';
+import '../providers/theme_provider.dart';
 
+import '../services/firestore_service.dart';
+import '../services/subscription_service.dart';
+import '../models/subscription_models.dart';
 import '../config/theme/app_colors.dart';
+import '../models/settings_models.dart';
+import '../config/theme/ui_constants.dart';
 import '../models/habit_category.dart';
 import 'habit_creation_screen.dart';
+import '../widgets/outdated_report_banner.dart';
 
 /// AI Coach Screen with personalized suggestions and insights
 class AICoachScreen extends StatefulWidget {
@@ -20,9 +32,15 @@ class AICoachScreen extends StatefulWidget {
 }
 
 class _AICoachScreenState extends State<AICoachScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
+  late AnimationController _skeletonController;
+  late AnimationController _pulseController;
+  late Animation<double> _pulseAnimation;
+  final GlobalKey _refreshButtonKey = GlobalKey();
+  OverlayEntry? _cooldownTooltip;
+  final Set<String> _expandedHabits = {};
 
   @override
   void initState() {
@@ -38,6 +56,21 @@ class _AICoachScreenState extends State<AICoachScreen>
       curve: Curves.easeOut,
     );
     _animationController.forward();
+
+    // Skeleton pulse animation
+    _skeletonController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
+
+    // Usage icon pulse animation (for limit-reached state)
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    )..repeat(reverse: true);
+    _pulseAnimation = Tween<double>(begin: 0.85, end: 1.15).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
 
     // Load data
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -56,7 +89,11 @@ class _AICoachScreenState extends State<AICoachScreen>
 
   @override
   void dispose() {
+    _cooldownTooltip?.remove();
+    _cooldownTooltip = null;
     _animationController.dispose();
+    _skeletonController.dispose();
+    _pulseController.dispose();
     super.dispose();
   }
 
@@ -211,6 +248,46 @@ class _AICoachScreenState extends State<AICoachScreen>
                 ],
               ),
             ),
+
+            // Dark mode toggle - top right
+            Positioned(
+              top: 16,
+              right: 16,
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    context.read<ThemeProvider>().toggleTheme();
+                    final newIsDark = !isDark;
+                    context
+                        .read<SettingsProvider>()
+                        .setThemePreference(
+                          newIsDark
+                              ? ThemePreference.dark
+                              : ThemePreference.light,
+                        );
+                  },
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      isDark
+                          ? Icons.dark_mode_rounded
+                          : Icons.light_mode_rounded,
+                      color: isDark
+                          ? AppColors.darkPrimaryText
+                          : AppColors.lightPrimaryText,
+                      size: 24,
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -219,65 +296,330 @@ class _AICoachScreenState extends State<AICoachScreen>
 
   /// Tab navigation
   Widget _buildTabNavigation(bool isDark, AICoachProvider coachProvider) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: isDark
-            ? AppColors.darkBorder.withValues(alpha: 0.3)
-            : AppColors.lightBorder.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(12),
+    final tier = SubscriptionService().currentTier;
+    final isUnlimited = tier == SubscriptionTier.mastery;
+    final isAtLimit = !isUnlimited &&
+        (!coachProvider.canUseAISuggestion || !coachProvider.canUseAIReport);
+    final coralColor = isDark ? AppColors.darkCoral : AppColors.lightCoral;
+
+    final usageIcon = GestureDetector(
+      onTap: () => _showUsageBottomSheet(context, isDark, coachProvider),
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: isAtLimit
+              ? Colors.red.withValues(alpha: isDark ? 0.15 : 0.08)
+              : coralColor.withValues(alpha: isDark ? 0.15 : 0.08),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(
+          isAtLimit
+              ? Icons.warning_amber_rounded
+              : Icons.data_usage_rounded,
+          color: isAtLimit ? Colors.red : coralColor,
+          size: 20,
+        ),
       ),
+    );
+
+    return Padding(
+      padding: const EdgeInsets.only(left: 20, right: 20, top: 20, bottom: 12),
       child: Row(
-        children: AICoachTab.values.map((tab) {
-          final isSelected = coachProvider.currentTab == tab;
-          return Expanded(
-            child: GestureDetector(
-              onTap: () {
-                HapticFeedback.lightImpact();
-                coachProvider.setTab(tab);
-                _loadTabData(tab, context);
-              },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(vertical: 12),
+        children: [
+          // Spacer to balance the icon on the right
+          const SizedBox(width: 36),
+          // Tab bar (centered)
+          Expanded(
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
-                  color: isSelected
-                      ? (isDark
-                            ? AppColors.darkSurface
-                            : AppColors.lightSurface)
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: isSelected
-                      ? [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.1),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ]
-                      : null,
+                  color: isDark
+                      ? AppColors.darkBorder.withValues(alpha: 0.3)
+                      : AppColors.lightBorder.withValues(alpha: 0.5),
+                  borderRadius: UIConstants.borderRadiusMedium,
                 ),
-                child: Text(
-                  tab.displayName,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: isSelected
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: AICoachTab.values.map((tab) {
+                    final isSelected = coachProvider.currentTab == tab;
+                    final tabColor = isSelected
                         ? (isDark
                               ? AppColors.darkPrimaryText
                               : AppColors.lightPrimaryText)
                         : (isDark
                               ? AppColors.darkSecondaryText
-                              : AppColors.lightSecondaryText),
-                    fontSize: 14,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                  ),
+                              : AppColors.lightSecondaryText);
+                    return GestureDetector(
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        coachProvider.setTab(tab);
+                        _loadTabData(tab, context);
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeOutCubic,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isSelected ? 14 : 12,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? (isDark
+                                  ? AppColors.darkBorder
+                                  : AppColors.lightSurface)
+                              : Colors.transparent,
+                          borderRadius: UIConstants.borderRadiusSmall,
+                          boxShadow: isSelected
+                              ? [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.05),
+                                    blurRadius: 2,
+                                    offset: const Offset(0, 1),
+                                  ),
+                                ]
+                              : null,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(tab.icon, size: 20, color: tabColor),
+                            if (isSelected)
+                              Padding(
+                                padding: const EdgeInsets.only(left: 6),
+                                child: Text(
+                                  tab.displayName,
+                                  style: TextStyle(
+                                    color: tabColor,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
                 ),
               ),
             ),
-          );
-        }).toList(),
+          ),
+          // Usage icon (pulses when at limit)
+          if (isAtLimit)
+            AnimatedBuilder(
+              animation: _pulseAnimation,
+              builder: (context, child) {
+                return Transform.scale(
+                  scale: _pulseAnimation.value,
+                  child: child,
+                );
+              },
+              child: usageIcon,
+            )
+          else
+            usageIcon,
+        ],
       ),
+    );
+  }
+
+  /// Show bottom sheet with AI usage breakdown
+  void _showUsageBottomSheet(
+    BuildContext context,
+    bool isDark,
+    AICoachProvider coachProvider,
+  ) {
+    final tier = SubscriptionService().currentTier;
+    final isUnlimited = tier == SubscriptionTier.mastery;
+    final coralColor = isDark ? AppColors.darkCoral : AppColors.lightCoral;
+
+    final maxSuggestions = tier.maxAISuggestionsPerDay;
+    final remainingSuggestions = coachProvider.remainingAISuggestions;
+    final usedSuggestions =
+        isUnlimited ? 0 : maxSuggestions - remainingSuggestions;
+
+    final maxReports = tier.maxAIReportsPerMonth;
+    final remainingReports = coachProvider.remainingAIReports;
+    final usedReports = isUnlimited ? 0 : maxReports - remainingReports;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Drag handle
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? AppColors.darkBorder
+                        : AppColors.lightBorder,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Title
+              Text(
+                'AI Usage',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: isDark
+                      ? AppColors.darkPrimaryText
+                      : AppColors.lightPrimaryText,
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Suggestions row
+              _buildUsageRow(
+                isDark: isDark,
+                icon: Icons.bolt_rounded,
+                label: 'AI Suggestions',
+                sublabel: isUnlimited
+                    ? 'Unlimited'
+                    : '$usedSuggestions of $maxSuggestions used today',
+                used: usedSuggestions,
+                max: maxSuggestions,
+                isUnlimited: isUnlimited,
+                coralColor: coralColor,
+              ),
+              const SizedBox(height: 16),
+
+              // Reports row
+              _buildUsageRow(
+                isDark: isDark,
+                icon: Icons.bar_chart_rounded,
+                label: 'AI Reports',
+                sublabel: isUnlimited
+                    ? 'Unlimited'
+                    : '$usedReports of $maxReports used this month',
+                used: usedReports,
+                max: maxReports,
+                isUnlimited: isUnlimited,
+                coralColor: coralColor,
+              ),
+
+              // Upgrade button
+              if (!isUnlimited) ...[
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      SubscriptionService().presentPaywall();
+                    },
+                    style: TextButton.styleFrom(
+                      backgroundColor: coralColor.withValues(alpha: 0.1),
+                      foregroundColor: coralColor,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'Upgrade for more',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// Build a single usage row for the bottom sheet
+  Widget _buildUsageRow({
+    required bool isDark,
+    required IconData icon,
+    required String label,
+    required String sublabel,
+    required int used,
+    required int max,
+    required bool isUnlimited,
+    required Color coralColor,
+  }) {
+    final isAtLimit = !isUnlimited && used >= max;
+    final color = isAtLimit ? Colors.red : coralColor;
+    final progress = isUnlimited ? 0.0 : (max > 0 ? (used / max).clamp(0.0, 1.0) : 0.0);
+
+    return Row(
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: isDark ? 0.15 : 0.08),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: color, size: 20),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: isDark
+                      ? AppColors.darkPrimaryText
+                      : AppColors.lightPrimaryText,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                sublabel,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: isAtLimit
+                      ? Colors.red
+                      : (isDark
+                          ? AppColors.darkSecondaryText
+                          : AppColors.lightSecondaryText),
+                ),
+              ),
+              if (!isUnlimited) ...[
+                const SizedBox(height: 6),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(3),
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    minHeight: 4,
+                    backgroundColor: isDark
+                        ? AppColors.darkBorder.withValues(alpha: 0.3)
+                        : AppColors.lightBorder.withValues(alpha: 0.5),
+                    color: color,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -288,37 +630,180 @@ class _AICoachScreenState extends State<AICoachScreen>
         return _buildSuggestionsTab(isDark, coachProvider);
       case AICoachTab.insights:
         return _buildInsightsTab(isDark, coachProvider);
-      case AICoachTab.tips:
-        return _buildTipsTab(isDark, coachProvider);
+      case AICoachTab.scores:
+        return _buildScoresTab(isDark);
+      case AICoachTab.actions:
+        return _buildActionsTab(isDark, coachProvider);
     }
   }
 
   /// Suggestions Tab
   Widget _buildSuggestionsTab(bool isDark, AICoachProvider coachProvider) {
     if (coachProvider.isLoadingSuggestions) {
-      return _buildLoadingState(isDark, 'Loading suggestions...');
+      return _buildSuggestionsLoadingSkeleton(isDark);
     }
 
-    if (coachProvider.suggestions.isEmpty) {
-      return _buildEmptyState(
-        isDark,
-        icon: Icons.lightbulb_outline_rounded,
-        title: 'No suggestions yet',
-        subtitle:
-            'Keep tracking your habits and we\'ll find patterns to suggest new ones',
-      );
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      itemCount: coachProvider.suggestions.length,
-      itemBuilder: (context, index) {
-        return _buildSuggestionCard(
-          isDark,
-          coachProvider.suggestions[index],
-          coachProvider,
-        );
+    return RefreshIndicator(
+      onRefresh: () async {
+        if (!coachProvider.canRefreshSuggestions) return;
+        await _refreshSuggestions(context);
       },
+      color: isDark ? AppColors.darkCoral : AppColors.lightCoral,
+      child: coachProvider.suggestions.isEmpty
+          ? SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: SizedBox(
+                height: MediaQuery.of(context).size.height * 0.6,
+                child: _buildEmptyState(
+                  isDark,
+                  icon: Icons.lightbulb_outline_rounded,
+                  title: 'No suggestions yet',
+                  subtitle:
+                      'Keep tracking your habits and we\'ll find patterns to suggest new ones',
+                ),
+              ),
+            )
+          : ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              children: [
+                // Header row with refresh button and rate limit info
+                _buildSuggestionsHeader(isDark, coachProvider),
+                const SizedBox(height: 8),
+                // Fallback banner
+                if (coachProvider.usedFallback)
+                  _buildFallbackBanner(isDark, coachProvider),
+                // Suggestion cards
+                ...coachProvider.suggestions.map(
+                  (suggestion) => _buildSuggestionCard(
+                    isDark,
+                    suggestion,
+                    coachProvider,
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+
+  /// Header row for suggestions tab with refresh button and rate limit
+  Widget _buildSuggestionsHeader(bool isDark, AICoachProvider coachProvider) {
+    return Row(
+      children: [
+        Text(
+          'Suggestions',
+          style: TextStyle(
+            color: isDark
+                ? AppColors.darkPrimaryText
+                : AppColors.lightPrimaryText,
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const Spacer(),
+        // Refresh button
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: coachProvider.isLoadingSuggestions
+                ? null
+                : coachProvider.canRefreshSuggestions
+                    ? () => _refreshSuggestions(context)
+                    : () => _showCooldownTooltip(context),
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              key: _refreshButtonKey,
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: isDark
+                    ? AppColors.darkBorder.withValues(alpha: 0.5)
+                    : AppColors.lightBorder.withValues(alpha: 0.5),
+                shape: BoxShape.circle,
+              ),
+              child: coachProvider.isLoadingSuggestions
+                  ? Padding(
+                      padding: const EdgeInsets.all(10),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: isDark
+                            ? AppColors.darkCoral
+                            : AppColors.lightCoral,
+                      ),
+                    )
+                  : Icon(
+                      Icons.refresh_rounded,
+                      color: coachProvider.canRefreshSuggestions
+                          ? (isDark
+                              ? AppColors.darkSecondaryText
+                              : AppColors.lightSecondaryText)
+                          : (isDark
+                              ? AppColors.darkSecondaryText.withValues(alpha: 0.3)
+                              : AppColors.lightSecondaryText.withValues(alpha: 0.3)),
+                      size: 20,
+                    ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Fallback/error banner for suggestions
+  Widget _buildFallbackBanner(bool isDark, AICoachProvider coachProvider) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: isDark
+            ? Colors.red.withValues(alpha: 0.15)
+            : Colors.red.withValues(alpha: 0.08),
+        borderRadius: UIConstants.borderRadiusSmall,
+        border: Border.all(
+          color: isDark
+              ? Colors.red.withValues(alpha: 0.3)
+              : Colors.red.withValues(alpha: 0.2),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.info_outline_rounded,
+            size: 16,
+            color: isDark ? Colors.red[300] : Colors.red[700],
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              coachProvider.suggestionsError ??
+                  'Using default suggestions',
+              style: TextStyle(
+                color: isDark ? Colors.red[300] : Colors.red[700],
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: coachProvider.canRefreshSuggestions
+                ? () => _refreshSuggestions(context)
+                : () => _showCooldownTooltip(context),
+            child: Text(
+              'Retry',
+              style: TextStyle(
+                color: coachProvider.canRefreshSuggestions
+                    ? (isDark ? AppColors.darkCoral : AppColors.lightCoral)
+                    : (isDark
+                        ? AppColors.darkCoral.withValues(alpha: 0.3)
+                        : AppColors.lightCoral.withValues(alpha: 0.3)),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                decoration: TextDecoration.underline,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -336,7 +821,7 @@ class _AICoachScreenState extends State<AICoachScreen>
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: UIConstants.borderRadiusLarge,
         border: Border.all(
           color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
           width: 1,
@@ -475,7 +960,7 @@ class _AICoachScreenState extends State<AICoachScreen>
                     color: isDark
                         ? AppColors.darkBorder.withValues(alpha: 0.3)
                         : AppColors.lightBorder.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: UIConstants.borderRadiusSmall,
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -588,7 +1073,7 @@ class _AICoachScreenState extends State<AICoachScreen>
                           : Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: UIConstants.borderRadiusSmall,
                       ),
                       elevation: 0,
                     ),
@@ -612,7 +1097,7 @@ class _AICoachScreenState extends State<AICoachScreen>
   /// Insights Tab
   Widget _buildInsightsTab(bool isDark, AICoachProvider coachProvider) {
     if (coachProvider.isLoadingInsights) {
-      return _buildLoadingState(isDark, 'Loading insights...');
+      return _buildInsightsLoadingSkeleton(isDark);
     }
 
     return SingleChildScrollView(
@@ -620,6 +1105,30 @@ class _AICoachScreenState extends State<AICoachScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Outdated banner for weekly summary
+          if (coachProvider.weeklySummary != null)
+            Builder(builder: (context) {
+              final habitProvider = context.watch<HabitProvider>();
+              if (!coachProvider.isWeeklySummaryOutdated(habitProvider.habits)) {
+                return const SizedBox.shrink();
+              }
+              return OutdatedReportBanner(
+                isRefreshing: coachProvider.isLoadingInsights,
+                onRefresh: () {
+                  final hp = Provider.of<HabitProvider>(context, listen: false);
+                  final weekData = {
+                    'totalCompletions': hp.totalCount,
+                    'currentStreak': hp.bestStreak,
+                  };
+                  coachProvider.loadInsights(
+                    weekData: weekData,
+                    habits: hp.habits,
+                    forceRefresh: true,
+                  );
+                },
+              );
+            }),
+
           // Weekly Summary
           if (coachProvider.weeklySummary != null)
             _buildWeeklySummaryCard(isDark, coachProvider.weeklySummary!),
@@ -639,9 +1148,55 @@ class _AICoachScreenState extends State<AICoachScreen>
           ),
           const SizedBox(height: 12),
 
-          // Pattern Cards
-          ...coachProvider.patterns.map(
-            (pattern) => _buildPatternCard(isDark, pattern),
+          // Pattern Cards or Empty Hint
+          if (coachProvider.patterns.isNotEmpty)
+            ...coachProvider.patterns.map(
+              (pattern) => _buildPatternCard(isDark, pattern),
+            )
+          else if (!coachProvider.isLoadingInsights)
+            _buildPatternsEmptyHint(isDark),
+        ],
+      ),
+    );
+  }
+
+  /// Empty state hint when no patterns are available yet
+  Widget _buildPatternsEmptyHint(bool isDark) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+      decoration: BoxDecoration(
+        color: isDark
+            ? AppColors.darkSurface.withValues(alpha: 0.5)
+            : AppColors.lightSurface.withValues(alpha: 0.5),
+        borderRadius: UIConstants.borderRadiusMedium,
+        border: Border.all(
+          color: isDark
+              ? AppColors.darkBorder.withValues(alpha: 0.5)
+              : AppColors.lightBorder.withValues(alpha: 0.5),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.insights_rounded,
+            color: isDark
+                ? AppColors.darkSecondaryText
+                : AppColors.lightSecondaryText,
+            size: 24,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Complete more habits over the next few days and we\'ll discover your behavioral patterns.',
+              style: TextStyle(
+                color: isDark
+                    ? AppColors.darkSecondaryText
+                    : AppColors.lightSecondaryText,
+                fontSize: 13,
+                height: 1.4,
+              ),
+            ),
           ),
         ],
       ),
@@ -666,7 +1221,7 @@ class _AICoachScreenState extends State<AICoachScreen>
                   AppColors.lightCoral.withValues(alpha: 0.05),
                 ],
         ),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: UIConstants.borderRadiusLarge,
         border: Border.all(
           color: (isDark ? AppColors.darkCoral : AppColors.lightCoral)
               .withValues(alpha: 0.2),
@@ -739,7 +1294,7 @@ class _AICoachScreenState extends State<AICoachScreen>
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: summary.getPerformanceColor(isDark).withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: UIConstants.borderRadiusSmall,
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -836,6 +1391,1208 @@ class _AICoachScreenState extends State<AICoachScreen>
     );
   }
 
+  /// Scores Tab - Daily Review and Habit Scores
+  Widget _buildScoresTab(bool isDark) {
+    final scoringProvider = Provider.of<AIScoringProvider>(context);
+    final habitProvider = Provider.of<HabitProvider>(context);
+
+    // Initialize scoring provider if needed
+    if (!scoringProvider.isInitialized) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        scoringProvider.initialize();
+      });
+    }
+
+    if (scoringProvider.isLoadingReview) {
+      return _buildScoresLoadingSkeleton(isDark);
+    }
+
+    return RefreshIndicator(
+      onRefresh: () async {
+        HapticFeedback.mediumImpact();
+        await scoringProvider.generateDailyReview(habitProvider.habits);
+      },
+      color: isDark ? AppColors.darkCoral : AppColors.lightCoral,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Outdated banner for daily review
+            if (scoringProvider.todaysReview != null &&
+                scoringProvider.isDailyReviewOutdated(habitProvider.habits))
+              OutdatedReportBanner(
+                isRefreshing: scoringProvider.isLoadingReview,
+                onRefresh: () {
+                  HapticFeedback.mediumImpact();
+                  scoringProvider.generateDailyReview(habitProvider.habits);
+                },
+              ),
+
+            // Daily Review Card
+            if (scoringProvider.todaysReview != null)
+              _buildDailyReviewCard(isDark, scoringProvider.todaysReview!)
+            else
+              _buildGenerateReviewCard(isDark, scoringProvider, habitProvider),
+
+            const SizedBox(height: 24),
+
+            // Overall Score Summary
+            if (scoringProvider.habitScores.isNotEmpty) ...[
+              Text(
+                'Habit Scores',
+                style: TextStyle(
+                  color: isDark
+                      ? AppColors.darkPrimaryText
+                      : AppColors.lightPrimaryText,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 12),
+              _buildOverallScoreSummary(isDark, scoringProvider),
+              const SizedBox(height: 16),
+            ],
+
+            // Health Insights (if available)
+            if (scoringProvider.healthIntegrationEnabled &&
+                scoringProvider.healthCorrelations != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Health Insights',
+                style: TextStyle(
+                  color: isDark
+                      ? AppColors.darkPrimaryText
+                      : AppColors.lightPrimaryText,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 12),
+              _buildHealthInsightsCard(isDark, scoringProvider),
+            ],
+
+            const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Generate Review Call-to-Action Card
+  Widget _buildGenerateReviewCard(
+    bool isDark,
+    AIScoringProvider scoringProvider,
+    HabitProvider habitProvider,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+        borderRadius: UIConstants.borderRadiusLarge,
+        border: Border.all(
+          color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+          width: 1,
+        ),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            Icons.analytics_outlined,
+            size: 48,
+            color: isDark ? AppColors.darkCoral : AppColors.lightCoral,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Get Your Daily Review',
+            style: TextStyle(
+              color: isDark
+                  ? AppColors.darkPrimaryText
+                  : AppColors.lightPrimaryText,
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Receive personalized AI coaching based on your habit performance today',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: isDark
+                  ? AppColors.darkSecondaryText
+                  : AppColors.lightSecondaryText,
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: habitProvider.habits.isEmpty || scoringProvider.isLoadingReview
+                  ? null
+                  : () {
+                      HapticFeedback.mediumImpact();
+                      scoringProvider.generateDailyReview(habitProvider.habits);
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: isDark
+                    ? AppColors.darkCoral
+                    : AppColors.lightCoral,
+                foregroundColor: isDark
+                    ? AppColors.darkBackground
+                    : Colors.white,
+                disabledBackgroundColor: isDark
+                    ? AppColors.darkCoral.withValues(alpha: 0.5)
+                    : AppColors.lightCoral.withValues(alpha: 0.5),
+                disabledForegroundColor: isDark
+                    ? AppColors.darkBackground.withValues(alpha: 0.7)
+                    : Colors.white.withValues(alpha: 0.7),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: UIConstants.borderRadiusMedium,
+                ),
+                elevation: 0,
+              ),
+              child: scoringProvider.isLoadingReview
+                  ? Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: isDark
+                                ? AppColors.darkBackground.withValues(alpha: 0.7)
+                                : Colors.white.withValues(alpha: 0.7),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          'Generating...',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    )
+                  : const Text(
+                      'Generate Review',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Daily Review Card
+  Widget _buildDailyReviewCard(bool isDark, DailyReview review) {
+    final scoreColor = review.overallScore >= 80
+        ? (isDark ? const Color(0xFF66BB6A) : const Color(0xFF4CAF50))
+        : review.overallScore >= 60
+            ? (isDark ? const Color(0xFFFFB74D) : const Color(0xFFFF9800))
+            : (isDark ? const Color(0xFFEF5350) : const Color(0xFFF44336));
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDark
+              ? [
+                  scoreColor.withValues(alpha: 0.15),
+                  scoreColor.withValues(alpha: 0.05),
+                ]
+              : [
+                  scoreColor.withValues(alpha: 0.15),
+                  scoreColor.withValues(alpha: 0.05),
+                ],
+        ),
+        borderRadius: UIConstants.borderRadiusLarge,
+        border: Border.all(
+          color: scoreColor.withValues(alpha: 0.3),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header with score
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                // Score circle
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: scoreColor.withValues(alpha: 0.2),
+                    border: Border.all(
+                      color: scoreColor,
+                      width: 3,
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        '${review.overallScore}',
+                        style: TextStyle(
+                          color: scoreColor,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        review.grade,
+                        style: TextStyle(
+                          color: scoreColor,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Today's Review",
+                        style: TextStyle(
+                          color: isDark
+                              ? AppColors.darkPrimaryText
+                              : AppColors.lightPrimaryText,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(
+                            review.scoreChange >= 0
+                                ? Icons.trending_up_rounded
+                                : Icons.trending_down_rounded,
+                            size: 16,
+                            color: review.scoreChange >= 0
+                                ? (isDark
+                                    ? const Color(0xFF66BB6A)
+                                    : const Color(0xFF4CAF50))
+                                : (isDark
+                                    ? const Color(0xFFEF5350)
+                                    : const Color(0xFFF44336)),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${review.scoreChange >= 0 ? '+' : ''}${review.scoreChange} from yesterday',
+                            style: TextStyle(
+                              color: isDark
+                                  ? AppColors.darkSecondaryText
+                                  : AppColors.lightSecondaryText,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${review.completedCount}/${review.totalHabits} habits completed',
+                        style: TextStyle(
+                          color: isDark
+                              ? AppColors.darkSecondaryText
+                              : AppColors.lightSecondaryText,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Coach Comments
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isDark
+                    ? AppColors.darkSurface
+                    : AppColors.lightSurface,
+                borderRadius: UIConstants.borderRadiusMedium,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.psychology_rounded,
+                        size: 18,
+                        color: isDark
+                            ? AppColors.darkCoral
+                            : AppColors.lightCoral,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Coach Analysis',
+                        style: TextStyle(
+                          color: isDark
+                              ? AppColors.darkPrimaryText
+                              : AppColors.lightPrimaryText,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    review.coachComments.summary,
+                    style: TextStyle(
+                      color: isDark
+                          ? AppColors.darkSecondaryText
+                          : AppColors.lightSecondaryText,
+                      fontSize: 13,
+                      height: 1.5,
+                    ),
+                  ),
+                  if (review.coachComments.highlight.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    _buildCoachCommentItem(
+                      isDark,
+                      Icons.star_rounded,
+                      'Highlight',
+                      review.coachComments.highlight,
+                      const Color(0xFFFFB74D),
+                    ),
+                  ],
+                  if (review.coachComments.concern != null) ...[
+                    const SizedBox(height: 8),
+                    _buildCoachCommentItem(
+                      isDark,
+                      Icons.info_outline_rounded,
+                      'Attention',
+                      review.coachComments.concern!,
+                      const Color(0xFFEF5350),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                  _buildCoachCommentItem(
+                    isDark,
+                    Icons.play_arrow_rounded,
+                    'Action Item',
+                    review.coachComments.actionItem,
+                    isDark ? AppColors.darkCoral : AppColors.lightCoral,
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Per-Habit Score Breakdown
+          if (review.habitScores.isNotEmpty)
+            _buildHabitScoreBreakdown(isDark, review),
+
+          // Score Trend (7-day history)
+          _buildScoreTrendDots(isDark),
+
+          // Health Insights
+          if (review.healthInsights.hasData)
+            _buildReviewHealthInsights(isDark, review),
+
+          // Tomorrow's Focus
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: (isDark ? AppColors.darkCoral : AppColors.lightCoral)
+                    .withValues(alpha: 0.1),
+                borderRadius: UIConstants.borderRadiusSmall,
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.wb_sunny_rounded,
+                    size: 18,
+                    color: isDark ? AppColors.darkCoral : AppColors.lightCoral,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Tomorrow\'s Focus',
+                          style: TextStyle(
+                            color: isDark
+                                ? AppColors.darkPrimaryText
+                                : AppColors.lightPrimaryText,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          review.tomorrowFocus,
+                          style: TextStyle(
+                            color: isDark
+                                ? AppColors.darkSecondaryText
+                                : AppColors.lightSecondaryText,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Motivational Message
+          if (review.motivationalMessage.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? AppColors.darkBorder.withValues(alpha: 0.3)
+                      : AppColors.lightBorder.withValues(alpha: 0.3),
+                  borderRadius: UIConstants.borderRadiusMedium,
+                  border: Border(
+                    left: BorderSide(
+                      color: isDark
+                          ? AppColors.darkCoral
+                          : AppColors.lightCoral,
+                      width: 3,
+                    ),
+                  ),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.format_quote_rounded,
+                      size: 20,
+                      color: isDark
+                          ? AppColors.darkCoral
+                          : AppColors.lightCoral,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        review.motivationalMessage,
+                        style: TextStyle(
+                          color: isDark
+                              ? AppColors.darkPrimaryText
+                              : AppColors.lightPrimaryText,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          fontStyle: FontStyle.italic,
+                          height: 1.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Per-habit score breakdown section with expandable details
+  Widget _buildHabitScoreBreakdown(bool isDark, DailyReview review) {
+    final habitProvider = Provider.of<HabitProvider>(context, listen: false);
+    final scoringProvider =
+        Provider.of<AIScoringProvider>(context, listen: false);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+          borderRadius: UIConstants.borderRadiusMedium,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Habit Breakdown',
+              style: TextStyle(
+                color: isDark
+                    ? AppColors.darkPrimaryText
+                    : AppColors.lightPrimaryText,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 12),
+            ...review.habitScores.map((habitScore) {
+              final habit = habitProvider.habits
+                  .where((h) =>
+                      h.id == habitScore.habitId ||
+                      h.name == habitScore.habitId)
+                  .firstOrNull;
+              final habitName = habit?.name ?? habitScore.habitId;
+              final habitId = habit?.id ?? habitScore.habitId;
+              final isExpanded = _expandedHabits.contains(habitId);
+
+              final statusIcon = _getStatusIcon(habitScore.status);
+              final statusColor =
+                  _getStatusColor(habitScore.status, isDark);
+              final scoreColor = habitScore.score >= 80
+                  ? (isDark
+                      ? const Color(0xFF66BB6A)
+                      : const Color(0xFF4CAF50))
+                  : habitScore.score >= 60
+                      ? (isDark
+                          ? const Color(0xFFFFB74D)
+                          : const Color(0xFFFF9800))
+                      : (isDark
+                          ? const Color(0xFFEF5350)
+                          : const Color(0xFFF44336));
+
+              // Look up detailed HabitScore from AIScoringProvider
+              final detailedScore =
+                  scoringProvider.getScoreForHabit(habitId);
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Collapsed header row — always visible
+                    GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          if (isExpanded) {
+                            _expandedHabits.remove(habitId);
+                          } else {
+                            _expandedHabits.add(habitId);
+                          }
+                        });
+                      },
+                      behavior: HitTestBehavior.opaque,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          children: [
+                            Icon(statusIcon,
+                                size: 16, color: statusColor),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                habitName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: isDark
+                                      ? AppColors.darkPrimaryText
+                                      : AppColors.lightPrimaryText,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color:
+                                    scoreColor.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                '${habitScore.score}',
+                                style: TextStyle(
+                                  color: scoreColor,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            AnimatedRotation(
+                              turns: isExpanded ? 0.5 : 0.0,
+                              duration:
+                                  const Duration(milliseconds: 200),
+                              child: Icon(
+                                Icons.expand_more_rounded,
+                                size: 18,
+                                color: isDark
+                                    ? AppColors.darkSecondaryText
+                                    : AppColors.lightSecondaryText,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    // Expanded detail area
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 250),
+                      curve: Curves.easeInOut,
+                      alignment: Alignment.topCenter,
+                      child: isExpanded
+                          ? _buildExpandedHabitDetail(
+                              isDark,
+                              habitScore,
+                              detailedScore,
+                            )
+                          : const SizedBox.shrink(),
+                    ),
+                    // Divider between items
+                    Divider(
+                      height: 1,
+                      color: (isDark
+                              ? AppColors.darkSecondaryText
+                              : AppColors.lightSecondaryText)
+                          .withValues(alpha: 0.15),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Expanded detail for a single habit in the breakdown
+  Widget _buildExpandedHabitDetail(
+    bool isDark,
+    HabitDayScore habitScore,
+    HabitScore? detailedScore,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 24, top: 4, bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // AI comment
+          if (habitScore.comment.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                habitScore.comment,
+                style: TextStyle(
+                  color: isDark
+                      ? AppColors.darkSecondaryText
+                      : AppColors.lightSecondaryText,
+                  fontSize: 11.5,
+                  height: 1.4,
+                ),
+              ),
+            ),
+          // 4-dimension breakdown bars (only if detailed score exists)
+          if (detailedScore != null) ...[
+            _buildDimensionBar(
+                isDark, 'Consistency', detailedScore.breakdown.consistency.score),
+            _buildDimensionBar(
+                isDark, 'Momentum', detailedScore.breakdown.momentum.score),
+            _buildDimensionBar(
+                isDark, 'Resilience', detailedScore.breakdown.resilience.score),
+            _buildDimensionBar(
+                isDark, 'Engagement', detailedScore.breakdown.engagement.score),
+            const SizedBox(height: 6),
+            // Primary strength
+            if (detailedScore.primaryStrength.isNotEmpty)
+              _buildInsightRow(isDark, Icons.star_rounded,
+                  const Color(0xFFFFB74D), detailedScore.primaryStrength),
+            // Primary weakness
+            if (detailedScore.primaryWeakness.isNotEmpty)
+              _buildInsightRow(isDark, Icons.flag_rounded,
+                  const Color(0xFFEF5350), detailedScore.primaryWeakness),
+            // Recommendation
+            if (detailedScore.recommendation.isNotEmpty)
+              _buildInsightRow(isDark, Icons.lightbulb_outline_rounded,
+                  const Color(0xFF66BB6A), detailedScore.recommendation),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Single dimension progress bar (e.g. Consistency: 72)
+  Widget _buildDimensionBar(bool isDark, String label, int score) {
+    final barColor = score >= 70
+        ? (isDark ? const Color(0xFF66BB6A) : const Color(0xFF4CAF50))
+        : score >= 50
+            ? (isDark ? const Color(0xFFFFB74D) : const Color(0xFFFF9800))
+            : (isDark ? const Color(0xFFEF5350) : const Color(0xFFF44336));
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 5),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 72,
+            child: Text(
+              label,
+              style: TextStyle(
+                color: isDark
+                    ? AppColors.darkSecondaryText
+                    : AppColors.lightSecondaryText,
+                fontSize: 10.5,
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(3),
+              child: LinearProgressIndicator(
+                value: (score / 100.0).clamp(0.0, 1.0),
+                minHeight: 5,
+                backgroundColor: (isDark
+                        ? AppColors.darkSecondaryText
+                        : AppColors.lightSecondaryText)
+                    .withValues(alpha: 0.12),
+                valueColor: AlwaysStoppedAnimation<Color>(barColor),
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          SizedBox(
+            width: 22,
+            child: Text(
+              '$score',
+              textAlign: TextAlign.right,
+              style: TextStyle(
+                color: barColor,
+                fontSize: 10.5,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Small insight row with icon + text
+  Widget _buildInsightRow(
+      bool isDark, IconData icon, Color iconColor, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 13, color: iconColor),
+          const SizedBox(width: 5),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                color: isDark
+                    ? AppColors.darkSecondaryText
+                    : AppColors.lightSecondaryText,
+                fontSize: 11,
+                height: 1.3,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  IconData _getStatusIcon(HabitDayStatus status) {
+    switch (status) {
+      case HabitDayStatus.completed:
+        return Icons.check_circle_rounded;
+      case HabitDayStatus.missed:
+        return Icons.cancel_rounded;
+      case HabitDayStatus.streakMilestone:
+        return Icons.local_fire_department_rounded;
+      case HabitDayStatus.streakBroken:
+        return Icons.link_off_rounded;
+    }
+  }
+
+  Color _getStatusColor(HabitDayStatus status, bool isDark) {
+    switch (status) {
+      case HabitDayStatus.completed:
+        return isDark ? const Color(0xFF66BB6A) : const Color(0xFF4CAF50);
+      case HabitDayStatus.missed:
+        return isDark ? const Color(0xFFEF5350) : const Color(0xFFF44336);
+      case HabitDayStatus.streakMilestone:
+        return isDark ? const Color(0xFFFFB74D) : const Color(0xFFFF9800);
+      case HabitDayStatus.streakBroken:
+        return isDark ? const Color(0xFF90A4AE) : const Color(0xFF607D8B);
+    }
+  }
+
+  /// 7-day score trend line chart
+  Widget _buildScoreTrendDots(bool isDark) {
+    final scoringProvider =
+        Provider.of<AIScoringProvider>(context, listen: false);
+    final history = scoringProvider.reviewHistory;
+
+    if (history.length < 2) return const SizedBox.shrink();
+
+    // Deduplicate by date (keep the most recent entry per day), then take up to 7
+    final seenDates = <String>{};
+    final deduplicated = <DailyReview>[];
+    for (final r in history) {
+      if (seenDates.add(r.date)) deduplicated.add(r);
+    }
+    final recentReviews =
+        deduplicated.take(7).toList().reversed.toList();
+    final scores = recentReviews.map((r) => r.overallScore).toList();
+    final dayLabels = recentReviews.map((r) {
+      try {
+        final date = DateTime.parse(r.date);
+        return DateFormat('E').format(date); // Mon, Tue, etc.
+      } catch (_) {
+        return '';
+      }
+    }).toList();
+
+    final lineColor =
+        isDark ? AppColors.darkCoral : AppColors.lightCoral;
+    final labelStyle = TextStyle(
+      color: isDark
+          ? AppColors.darkSecondaryText
+          : AppColors.lightSecondaryText,
+      fontSize: 10,
+      fontWeight: FontWeight.w500,
+    );
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+          borderRadius: UIConstants.borderRadiusMedium,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '7-Day Score Trend',
+              style: TextStyle(
+                color: isDark
+                    ? AppColors.darkPrimaryText
+                    : AppColors.lightPrimaryText,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 120,
+              child: CustomPaint(
+                size: Size.infinite,
+                painter: ScoreTrendChartPainter(
+                  scores: scores,
+                  dayLabels: dayLabels,
+                  lineColor: lineColor,
+                  isDark: isDark,
+                  labelStyle: labelStyle,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Health insights from daily review
+  Widget _buildReviewHealthInsights(bool isDark, DailyReview review) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isDark
+              ? const Color(0xFF1A2636)
+              : const Color(0xFFE8F5E9),
+          borderRadius: UIConstants.borderRadiusSmall,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.favorite_rounded,
+                  size: 16,
+                  color: isDark
+                      ? const Color(0xFFEF5350)
+                      : const Color(0xFFF44336),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'Health Insights',
+                  style: TextStyle(
+                    color: isDark
+                        ? AppColors.darkPrimaryText
+                        : AppColors.lightPrimaryText,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            if (review.healthInsights.correlation != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                review.healthInsights.correlation!,
+                style: TextStyle(
+                  color: isDark
+                      ? AppColors.darkSecondaryText
+                      : AppColors.lightSecondaryText,
+                  fontSize: 12,
+                  height: 1.4,
+                ),
+              ),
+            ],
+            if (review.healthInsights.recommendation != null) ...[
+              const SizedBox(height: 6),
+              Text(
+                review.healthInsights.recommendation!,
+                style: TextStyle(
+                  color: isDark
+                      ? AppColors.darkSecondaryText
+                      : AppColors.lightSecondaryText,
+                  fontSize: 12,
+                  fontStyle: FontStyle.italic,
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCoachCommentItem(
+    bool isDark,
+    IconData icon,
+    String label,
+    String content,
+    Color iconColor,
+  ) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 16, color: iconColor),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  color: isDark
+                      ? AppColors.darkPrimaryText
+                      : AppColors.lightPrimaryText,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              Text(
+                content,
+                style: TextStyle(
+                  color: isDark
+                      ? AppColors.darkSecondaryText
+                      : AppColors.lightSecondaryText,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Overall Score Summary
+  Widget _buildOverallScoreSummary(bool isDark, AIScoringProvider provider) {
+    final avgScore = provider.overallAverageScore;
+    final scoreColor = avgScore >= 80
+        ? (isDark ? const Color(0xFF66BB6A) : const Color(0xFF4CAF50))
+        : avgScore >= 60
+            ? (isDark ? const Color(0xFFFFB74D) : const Color(0xFFFF9800))
+            : (isDark ? const Color(0xFFEF5350) : const Color(0xFFF44336));
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+        borderRadius: UIConstants.borderRadiusMedium,
+        border: Border.all(
+          color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+          width: 1,
+        ),
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Average Score',
+                style: TextStyle(
+                  color: isDark
+                      ? AppColors.darkSecondaryText
+                      : AppColors.lightSecondaryText,
+                  fontSize: 14,
+                ),
+              ),
+              Row(
+                children: [
+                  Text(
+                    avgScore.toStringAsFixed(0),
+                    style: TextStyle(
+                      color: scoreColor,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    '/100',
+                    style: TextStyle(
+                      color: isDark
+                          ? AppColors.darkSecondaryText
+                          : AppColors.lightSecondaryText,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: avgScore / 100,
+              backgroundColor: scoreColor.withValues(alpha: 0.2),
+              valueColor: AlwaysStoppedAnimation<Color>(scoreColor),
+              minHeight: 8,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            '${provider.habitScores.length} habits scored',
+            style: TextStyle(
+              color: isDark
+                  ? AppColors.darkSecondaryText
+                  : AppColors.lightSecondaryText,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Health Insights Card
+  Widget _buildHealthInsightsCard(bool isDark, AIScoringProvider provider) {
+    final correlations = provider.healthCorrelations;
+    if (correlations == null) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+        borderRadius: UIConstants.borderRadiusMedium,
+        border: Border.all(
+          color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.favorite_rounded,
+                size: 20,
+                color: isDark ? AppColors.darkCoral : AppColors.lightCoral,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Health-Habit Correlations',
+                style: TextStyle(
+                  color: isDark
+                      ? AppColors.darkPrimaryText
+                      : AppColors.lightPrimaryText,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          ...correlations.keyFindings.take(3).map(
+                (finding) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        margin: const EdgeInsets.only(top: 6),
+                        width: 4,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isDark
+                              ? AppColors.darkCoral
+                              : AppColors.lightCoral,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          finding,
+                          style: TextStyle(
+                            color: isDark
+                                ? AppColors.darkSecondaryText
+                                : AppColors.lightSecondaryText,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+        ],
+      ),
+    );
+  }
+
   /// Pattern Card
   Widget _buildPatternCard(bool isDark, AIPattern pattern) {
     return Container(
@@ -843,7 +2600,7 @@ class _AICoachScreenState extends State<AICoachScreen>
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: UIConstants.borderRadiusMedium,
         border: Border.all(
           color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
           width: 1,
@@ -967,305 +2724,729 @@ class _AICoachScreenState extends State<AICoachScreen>
     );
   }
 
-  /// Tips Tab
-  Widget _buildTipsTab(bool isDark, AICoachProvider coachProvider) {
-    if (coachProvider.isLoadingTips) {
-      return _buildLoadingState(isDark, 'Loading tips...');
+  /// Actions Tab (replaces Tips)
+  Widget _buildActionsTab(bool isDark, AICoachProvider coachProvider) {
+    if (coachProvider.isLoadingActions) {
+      return _buildActionsLoadingSkeleton(isDark);
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      itemCount: TipCategory.values.length,
-      itemBuilder: (context, index) {
-        final category = TipCategory.values[index];
-        final tips = coachProvider.tipsByCategory[category] ?? [];
-        final isExpanded = coachProvider.expandedTipCategory == category;
+    if (coachProvider.actionItems.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _buildEmptyState(
+              isDark,
+              icon: Icons.task_alt_rounded,
+              title: 'No action items yet',
+              subtitle: 'Track habits for a few days and we\'ll generate personalized actions',
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: coachProvider.canUseAIReport
+                  ? () {
+                      HapticFeedback.mediumImpact();
+                      _loadActionItems(context);
+                    }
+                  : null,
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: const Text('Generate Actions'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: isDark
+                    ? AppColors.darkCoral
+                    : AppColors.lightCoral,
+                foregroundColor: isDark
+                    ? AppColors.darkBackground
+                    : Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: UIConstants.borderRadiusMedium,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
-        return _buildTipCategoryCard(
-          isDark,
-          category,
-          tips,
-          isExpanded,
-          coachProvider,
+    // Group by type
+    final dailyActions = coachProvider.actionItems
+        .where((a) => a.type == ActionItemType.daily)
+        .toList();
+    final weeklyActions = coachProvider.actionItems
+        .where((a) => a.type == ActionItemType.weekly)
+        .toList();
+    final challenges = coachProvider.actionItems
+        .where((a) => a.type == ActionItemType.challenge)
+        .toList();
+
+    return RefreshIndicator(
+      onRefresh: () async {
+        HapticFeedback.mediumImpact();
+        await _loadActionItems(context, forceRefresh: true);
+      },
+      color: isDark ? AppColors.darkCoral : AppColors.lightCoral,
+      child: ListView(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        children: [
+          // Header with refresh
+          Row(
+            children: [
+              Text(
+                'Your Action Items',
+                style: TextStyle(
+                  color: isDark
+                      ? AppColors.darkPrimaryText
+                      : AppColors.lightPrimaryText,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const Spacer(),
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: coachProvider.isLoadingActions
+                      ? null
+                      : () => _loadActionItems(context, forceRefresh: true),
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? AppColors.darkBorder.withValues(alpha: 0.5)
+                          : AppColors.lightBorder.withValues(alpha: 0.5),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.refresh_rounded,
+                      color: isDark
+                          ? AppColors.darkSecondaryText
+                          : AppColors.lightSecondaryText,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Daily actions
+          if (dailyActions.isNotEmpty) ...[
+            _buildActionGroupHeader(isDark, "Today's Actions", Icons.today_rounded),
+            const SizedBox(height: 8),
+            ...dailyActions.map((action) =>
+                _buildActionItemCard(isDark, action, coachProvider)),
+            const SizedBox(height: 20),
+          ],
+
+          // Weekly actions
+          if (weeklyActions.isNotEmpty) ...[
+            _buildActionGroupHeader(isDark, 'This Week', Icons.date_range_rounded),
+            const SizedBox(height: 8),
+            ...weeklyActions.map((action) =>
+                _buildActionItemCard(isDark, action, coachProvider)),
+            const SizedBox(height: 20),
+          ],
+
+          // Challenges
+          if (challenges.isNotEmpty) ...[
+            _buildActionGroupHeader(isDark, 'Challenges', Icons.emoji_events_rounded),
+            const SizedBox(height: 8),
+            ...challenges.map((action) =>
+                _buildActionItemCard(isDark, action, coachProvider)),
+          ],
+
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionGroupHeader(bool isDark, String title, IconData icon) {
+    return Row(
+      children: [
+        Icon(
+          icon,
+          size: 18,
+          color: isDark ? AppColors.darkCoral : AppColors.lightCoral,
+        ),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: TextStyle(
+            color: isDark
+                ? AppColors.darkPrimaryText
+                : AppColors.lightPrimaryText,
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionItemCard(
+    bool isDark,
+    AIActionItem action,
+    AICoachProvider coachProvider,
+  ) {
+    final priorityColor = action.priority.getColor(isDark);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+        borderRadius: UIConstants.borderRadiusMedium,
+        border: Border.all(
+          color: action.isCompleted
+              ? (isDark ? const Color(0xFF66BB6A) : const Color(0xFF4CAF50))
+                  .withValues(alpha: 0.3)
+              : (isDark ? AppColors.darkBorder : AppColors.lightBorder),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Checkbox
+          GestureDetector(
+            onTap: () {
+              HapticFeedback.lightImpact();
+              coachProvider.completeActionItem(action.id);
+            },
+            child: Container(
+              width: 24,
+              height: 24,
+              margin: const EdgeInsets.only(top: 2),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: action.isCompleted
+                    ? (isDark
+                        ? const Color(0xFF66BB6A)
+                        : const Color(0xFF4CAF50))
+                    : Colors.transparent,
+                border: Border.all(
+                  color: action.isCompleted
+                      ? (isDark
+                          ? const Color(0xFF66BB6A)
+                          : const Color(0xFF4CAF50))
+                      : (isDark
+                          ? AppColors.darkSecondaryText
+                          : AppColors.lightSecondaryText),
+                  width: 2,
+                ),
+              ),
+              child: action.isCompleted
+                  ? const Icon(Icons.check, size: 14, color: Colors.white)
+                  : null,
+            ),
+          ),
+          const SizedBox(width: 12),
+
+          // Content
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Title row with priority
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        action.title,
+                        style: TextStyle(
+                          color: isDark
+                              ? AppColors.darkPrimaryText
+                              : AppColors.lightPrimaryText,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          decoration: action.isCompleted
+                              ? TextDecoration.lineThrough
+                              : null,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: priorityColor,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+
+                // Description
+                Text(
+                  action.description,
+                  style: TextStyle(
+                    color: isDark
+                        ? AppColors.darkSecondaryText
+                        : AppColors.lightSecondaryText,
+                    fontSize: 12,
+                    height: 1.4,
+                  ),
+                ),
+
+                const SizedBox(height: 8),
+
+                // Tags row
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: [
+                    // Related habit badge
+                    if (action.relatedHabit != null &&
+                        action.relatedHabit!.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: (isDark
+                                  ? AppColors.darkCoral
+                                  : AppColors.lightCoral)
+                              .withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          action.relatedHabit!,
+                          style: TextStyle(
+                            color: isDark
+                                ? AppColors.darkCoral
+                                : AppColors.lightCoral,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    // Metric badge
+                    if (action.metric != null && action.metric!.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? AppColors.darkBorder.withValues(alpha: 0.4)
+                              : AppColors.lightBorder.withValues(alpha: 0.4),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          action.metric!,
+                          style: TextStyle(
+                            color: isDark
+                                ? AppColors.darkSecondaryText
+                                : AppColors.lightSecondaryText,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Skeleton building block - rounded rectangle placeholder
+  Widget _buildSkeletonBox(bool isDark, double width, double height) {
+    return AnimatedBuilder(
+      animation: _skeletonController,
+      builder: (context, child) {
+        return Opacity(
+          opacity: 0.3 + (_skeletonController.value * 0.4),
+          child: Container(
+            width: width,
+            height: height,
+            decoration: BoxDecoration(
+              color: isDark
+                  ? AppColors.darkCoral.withValues(alpha: 0.12)
+                  : AppColors.lightCoral.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(6),
+            ),
+          ),
         );
       },
     );
   }
 
-  /// Tip Category Card
-  Widget _buildTipCategoryCard(
-    bool isDark,
-    TipCategory category,
-    List<AITip> tips,
-    bool isExpanded,
-    AICoachProvider coachProvider,
-  ) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
-          width: 1,
-        ),
-      ),
-      child: Column(
-        children: [
-          // Category Header
-          InkWell(
-            onTap: () {
-              HapticFeedback.lightImpact();
-              coachProvider.toggleTipCategory(category);
-            },
-            borderRadius: BorderRadius.circular(12),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  // Icon
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: category.getColor(isDark).withValues(alpha: 0.15),
-                    ),
-                    child: Icon(
-                      category.icon,
-                      color: category.getColor(isDark),
-                      size: 20,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-
-                  // Title and count
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          category.displayName,
-                          style: TextStyle(
-                            color: isDark
-                                ? AppColors.darkPrimaryText
-                                : AppColors.lightPrimaryText,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '${tips.length} ${tips.length == 1 ? 'tip' : 'tips'}',
-                          style: TextStyle(
-                            color: isDark
-                                ? AppColors.darkSecondaryText
-                                : AppColors.lightSecondaryText,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Expand icon
-                  AnimatedRotation(
-                    turns: isExpanded ? 0.5 : 0,
-                    duration: const Duration(milliseconds: 200),
-                    child: Icon(
-                      Icons.keyboard_arrow_down_rounded,
-                      color: isDark
-                          ? AppColors.darkSecondaryText
-                          : AppColors.lightSecondaryText,
-                      size: 24,
-                    ),
-                  ),
-                ],
-              ),
+  /// Skeleton building block - circle placeholder
+  Widget _buildSkeletonCircle(bool isDark, double size) {
+    return AnimatedBuilder(
+      animation: _skeletonController,
+      builder: (context, child) {
+        return Opacity(
+          opacity: 0.3 + (_skeletonController.value * 0.4),
+          child: Container(
+            width: size,
+            height: size,
+            decoration: BoxDecoration(
+              color: isDark
+                  ? AppColors.darkCoral.withValues(alpha: 0.12)
+                  : AppColors.lightCoral.withValues(alpha: 0.10),
+              shape: BoxShape.circle,
             ),
           ),
-
-          // Expanded Tips
-          if (isExpanded)
-            Column(
-              children: tips
-                  .map((tip) => _buildTipCard(isDark, tip, coachProvider))
-                  .toList(),
-            ),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  /// Individual Tip Card
-  Widget _buildTipCard(bool isDark, AITip tip, AICoachProvider coachProvider) {
+  /// Branded AI generating header for loading skeletons
+  Widget _buildAIGeneratingHeader(bool isDark, String message) {
+    final coral = isDark ? AppColors.darkCoral : AppColors.lightCoral;
+    final pink = isDark ? AppColors.darkPink : AppColors.lightPink;
     return Container(
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        border: Border(
-          top: BorderSide(
-            color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
-            width: 1,
-          ),
+        gradient: LinearGradient(
+          colors: [
+            coral.withValues(alpha: 0.08),
+            pink.withValues(alpha: 0.06),
+          ],
         ),
+        borderRadius: UIConstants.borderRadiusMedium,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          // Title and bookmark
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  tip.title,
+          AnimatedBuilder(
+            animation: _skeletonController,
+            builder: (context, child) {
+              return Opacity(
+                opacity: 0.5 + (_skeletonController.value * 0.5),
+                child: Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [coral, pink],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.auto_awesome_rounded,
+                    color: Colors.white,
+                    size: 18,
+                  ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  message,
                   style: TextStyle(
-                    color: isDark
-                        ? AppColors.darkPrimaryText
-                        : AppColors.lightPrimaryText,
+                    color: coral,
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-              ),
-              IconButton(
-                onPressed: () {
-                  HapticFeedback.lightImpact();
-                  coachProvider.toggleTipBookmark(tip.id);
-                },
-                icon: Icon(
-                  tip.isBookmarked
-                      ? Icons.bookmark_rounded
-                      : Icons.bookmark_outline_rounded,
-                  size: 20,
-                  color: tip.isBookmarked
-                      ? (isDark ? AppColors.darkCoral : AppColors.lightCoral)
-                      : (isDark
-                            ? AppColors.darkSecondaryText
-                            : AppColors.lightSecondaryText),
+                const SizedBox(height: 2),
+                Text(
+                  'Powered by AI',
+                  style: TextStyle(
+                    color: coral.withValues(alpha: 0.6),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-
-          // Content
-          Text(
-            tip.content,
-            style: TextStyle(
-              color: isDark
-                  ? AppColors.darkSecondaryText
-                  : AppColors.lightSecondaryText,
-              fontSize: 13,
-              fontWeight: FontWeight.w400,
-              height: 1.4,
+              ],
             ),
           ),
-          const SizedBox(height: 12),
-
-          // Key Points
-          ...tip.keyPoints.map(
-            (point) => Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    margin: const EdgeInsets.only(top: 6),
-                    width: 4,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isDark
-                          ? AppColors.darkCoral
-                          : AppColors.lightCoral,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      point,
-                      style: TextStyle(
-                        color: isDark
-                            ? AppColors.darkSecondaryText
-                            : AppColors.lightSecondaryText,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w400,
-                        height: 1.4,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+          SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: coral,
             ),
           ),
-
-          // Actionable
-          if (tip.actionable != null) ...[
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: (isDark ? AppColors.darkCoral : AppColors.lightCoral)
-                    .withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(
-                    Icons.play_arrow_rounded,
-                    size: 14,
-                    color: isDark ? AppColors.darkCoral : AppColors.lightCoral,
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      tip.actionable!,
-                      style: TextStyle(
-                        color: isDark
-                            ? AppColors.darkPrimaryText
-                            : AppColors.lightPrimaryText,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        height: 1.3,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
         ],
       ),
     );
   }
 
-  /// Loading state
-  /// Loading state
-  Widget _buildLoadingState(bool isDark, String message) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          CircularProgressIndicator(
-            color: isDark ? AppColors.darkCoral : AppColors.lightCoral,
+  /// Suggestions skeleton loading
+  Widget _buildSuggestionsLoadingSkeleton(bool isDark) {
+    return ListView(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      children: [
+        _buildAIGeneratingHeader(isDark, 'Generating personalized suggestions...'),
+        ...List.generate(3, (index) {
+        return Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+            borderRadius: UIConstants.borderRadiusLarge,
+            border: Border.all(
+              color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+            ),
           ),
-          const SizedBox(height: 16),
-          Text(
-            message,
-            style: TextStyle(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  _buildSkeletonCircle(isDark, 48),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildSkeletonBox(isDark, 160, 16),
+                        const SizedBox(height: 8),
+                        _buildSkeletonBox(isDark, 100, 12),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              _buildSkeletonBox(isDark, double.infinity, 1),
+              const SizedBox(height: 16),
+              _buildSkeletonBox(isDark, double.infinity, 14),
+              const SizedBox(height: 8),
+              _buildSkeletonBox(isDark, 200, 14),
+              const SizedBox(height: 12),
+              _buildSkeletonBox(isDark, double.infinity, 60),
+            ],
+          ),
+        );
+      }),
+      ],
+    );
+  }
+
+  /// Insights skeleton loading
+  Widget _buildInsightsLoadingSkeleton(bool isDark) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildAIGeneratingHeader(isDark, 'Analyzing your weekly patterns...'),
+          // Weekly summary card skeleton
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
               color: isDark
-                  ? AppColors.darkSecondaryText
-                  : AppColors.lightSecondaryText,
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
+                  ? AppColors.darkCoral.withValues(alpha: 0.08)
+                  : AppColors.lightCoral.withValues(alpha: 0.08),
+              borderRadius: UIConstants.borderRadiusLarge,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    _buildSkeletonCircle(isDark, 20),
+                    const SizedBox(width: 8),
+                    _buildSkeletonBox(isDark, 120, 16),
+                    const Spacer(),
+                    _buildSkeletonBox(isDark, 80, 12),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    _buildSkeletonBox(isDark, 60, 28),
+                    const SizedBox(width: 24),
+                    _buildSkeletonBox(isDark, 60, 28),
+                    const SizedBox(width: 24),
+                    _buildSkeletonBox(isDark, 60, 28),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _buildSkeletonBox(isDark, double.infinity, 50),
+                const SizedBox(height: 12),
+                _buildSkeletonBox(isDark, double.infinity, 14),
+                const SizedBox(height: 6),
+                _buildSkeletonBox(isDark, 240, 14),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          _buildSkeletonBox(isDark, 140, 18),
+          const SizedBox(height: 12),
+          // Pattern card skeletons
+          ...List.generate(2, (_) => Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+                borderRadius: UIConstants.borderRadiusMedium,
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildSkeletonCircle(isDark, 40),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildSkeletonBox(isDark, 80, 12),
+                        const SizedBox(height: 8),
+                        _buildSkeletonBox(isDark, 180, 15),
+                        const SizedBox(height: 6),
+                        _buildSkeletonBox(isDark, double.infinity, 13),
+                        const SizedBox(height: 4),
+                        _buildSkeletonBox(isDark, 160, 13),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          )),
+        ],
+      ),
+    );
+  }
+
+  /// Scores skeleton loading
+  Widget _buildScoresLoadingSkeleton(bool isDark) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildAIGeneratingHeader(isDark, 'Generating your daily review...'),
+          // Daily review card skeleton
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+              borderRadius: UIConstants.borderRadiusLarge,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    _buildSkeletonCircle(isDark, 72),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildSkeletonBox(isDark, 140, 18),
+                          const SizedBox(height: 8),
+                          _buildSkeletonBox(isDark, 180, 13),
+                          const SizedBox(height: 4),
+                          _buildSkeletonBox(isDark, 160, 13),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                _buildSkeletonBox(isDark, double.infinity, 120),
+                const SizedBox(height: 16),
+                _buildSkeletonBox(isDark, double.infinity, 40),
+              ],
             ),
           ),
         ],
       ),
+    );
+  }
+
+  /// Actions skeleton loading
+  Widget _buildActionsLoadingSkeleton(bool isDark) {
+    return ListView(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      children: [
+        _buildAIGeneratingHeader(isDark, 'Creating your action plan...'),
+        _buildSkeletonBox(isDark, 120, 16),
+        const SizedBox(height: 12),
+        ...List.generate(3, (index) {
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+              borderRadius: UIConstants.borderRadiusMedium,
+              border: Border.all(
+                color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+              ),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildSkeletonBox(isDark, 24, 24),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildSkeletonBox(isDark, 200, 15),
+                      const SizedBox(height: 6),
+                      _buildSkeletonBox(isDark, double.infinity, 13),
+                      const SizedBox(height: 4),
+                      _buildSkeletonBox(isDark, 160, 13),
+                      const SizedBox(height: 8),
+                      _buildSkeletonBox(isDark, 100, 12),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
+        const SizedBox(height: 16),
+        _buildSkeletonBox(isDark, 100, 16),
+        const SizedBox(height: 12),
+        ...List.generate(2, (index) {
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+              borderRadius: UIConstants.borderRadiusMedium,
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildSkeletonBox(isDark, 24, 24),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildSkeletonBox(isDark, 180, 15),
+                      const SizedBox(height: 6),
+                      _buildSkeletonBox(isDark, double.infinity, 13),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
+      ],
     );
   }
 
@@ -1327,11 +3508,114 @@ class _AICoachScreenState extends State<AICoachScreen>
     );
   }
 
+  Future<void> _refreshSuggestions(BuildContext context) async {
+    final coachProvider = Provider.of<AICoachProvider>(context, listen: false);
+    final habitProvider = Provider.of<HabitProvider>(context, listen: false);
+
+    HapticFeedback.mediumImpact();
+
+    await coachProvider.loadSuggestions(
+      categories: habitProvider.habits
+          .map((h) => h.category.name)
+          .toSet()
+          .toList(),
+      currentHabits: habitProvider.habits.map((h) => h.name).toList(),
+      completionRate: habitProvider.completionRate * 100,
+      bestStreak: habitProvider.bestStreak,
+      forceRefresh: true,
+    );
+  }
+
+  void _showCooldownTooltip(BuildContext context) {
+    _cooldownTooltip?.remove();
+    _cooldownTooltip = null;
+
+    final provider = Provider.of<AICoachProvider>(context, listen: false);
+    final remaining = provider.refreshCooldownFormatted;
+
+    final renderBox =
+        _refreshButtonKey.currentContext?.findRenderObject() as RenderBox?;
+    if (renderBox == null) return;
+
+    final overlay = Overlay.of(context);
+    final buttonPos = renderBox.localToGlobal(Offset.zero);
+    final buttonSize = renderBox.size;
+
+    final entry = OverlayEntry(
+      builder: (context) => Positioned(
+        top: buttonPos.dy - 36,
+        left: buttonPos.dx + buttonSize.width / 2 - 60,
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.black87,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              'Try again in $remaining',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                decoration: TextDecoration.none,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    _cooldownTooltip = entry;
+    overlay.insert(entry);
+
+    Future.delayed(const Duration(seconds: 2), () {
+      if (_cooldownTooltip == entry) {
+        entry.remove();
+        _cooldownTooltip = null;
+      }
+    });
+  }
+
+  Future<void> _loadActionItems(BuildContext context,
+      {bool forceRefresh = false}) async {
+    final coachProvider = Provider.of<AICoachProvider>(context, listen: false);
+    final habitProvider = Provider.of<HabitProvider>(context, listen: false);
+
+    final habitsData = habitProvider.habits
+        .map((h) => {
+              'name': h.name,
+              'category': h.category.name,
+              'streak': h.streak,
+              'completed': h.isCompleted,
+            })
+        .toList();
+
+    await coachProvider.loadActionItems(
+      habits: habitsData,
+      completionRate: habitProvider.completionRate * 100,
+      bestStreak: habitProvider.bestStreak,
+      forceRefresh: forceRefresh,
+    );
+
+    if (forceRefresh && coachProvider.actionsError != null) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(coachProvider.actionsError!)),
+        );
+        coachProvider.clearActionsError();
+      }
+    }
+  }
+
   void _loadTabData(AICoachTab tab, BuildContext context) {
     final coachProvider = Provider.of<AICoachProvider>(context, listen: false);
     final habitProvider = Provider.of<HabitProvider>(context, listen: false);
 
-    if (tab == AICoachTab.suggestions && coachProvider.suggestions.isEmpty) {
+    if (tab == AICoachTab.suggestions &&
+        coachProvider.suggestions.isEmpty &&
+        !coachProvider.isLoadingSuggestions) {
       coachProvider.loadSuggestions(
         categories: habitProvider.habits
             .map((h) => h.category.name)
@@ -1340,12 +3624,266 @@ class _AICoachScreenState extends State<AICoachScreen>
         currentHabits: habitProvider.habits.map((h) => h.name).toList(),
       );
     } else if (tab == AICoachTab.insights &&
-        coachProvider.weeklySummary == null) {
+        coachProvider.weeklySummary == null &&
+        !coachProvider.isLoadingInsights) {
       final weekData = {
-        'totalCompletions': habitProvider.totalCount, // Simplified
+        'totalCompletions': habitProvider.totalCount,
         'currentStreak': habitProvider.bestStreak,
       };
-      coachProvider.loadInsights(weekData: weekData);
+      coachProvider.loadInsights(weekData: weekData, habits: habitProvider.habits);
+      // Also load patterns if not already populated
+      if (coachProvider.patterns.isEmpty) {
+        _loadPatterns(context);
+      }
+    } else if (tab == AICoachTab.actions &&
+        coachProvider.actionItems.isEmpty &&
+        !coachProvider.isLoadingActions) {
+      _loadActionItems(context);
     }
   }
+
+  Future<void> _loadPatterns(BuildContext context) async {
+    final habitProvider = Provider.of<HabitProvider>(context, listen: false);
+    final coachProvider = Provider.of<AICoachProvider>(context, listen: false);
+    final habits = habitProvider.habits;
+
+    // Need at least 2 habits for meaningful patterns
+    if (habits.length < 2) return;
+
+    final List<Map<String, dynamic>> habitsData = [];
+    int totalCompletions = 0;
+
+    for (final habit in habits) {
+      List<String> completionDates = [];
+      try {
+        final history = await FirestoreService().getHabitHistory(
+          habit.id,
+          limitDays: 30,
+        );
+        completionDates = history.map((d) => d.toIso8601String()).toList();
+      } catch (e) {
+        debugPrint('Failed to fetch history for ${habit.name}: $e');
+        // Continue with empty dates for this habit
+      }
+      totalCompletions += completionDates.length;
+
+      final reminderStr = habit.reminderTime != null
+          ? '${habit.reminderTime!.hour.toString().padLeft(2, '0')}:${habit.reminderTime!.minute.toString().padLeft(2, '0')}'
+          : '';
+
+      habitsData.add({
+        'name': habit.name,
+        'category': habit.category.name,
+        'streak': habit.streak,
+        'reminderTime': reminderStr,
+        'completionDates': completionDates,
+      });
+    }
+
+    // Need at least 5 total completions for meaningful analysis
+    if (totalCompletions < 5) return;
+
+    if (!mounted) return;
+    await coachProvider.loadPatterns(habitsData: habitsData);
+  }
+
+}
+
+/// Custom painter for the 7-day score trend line chart
+class ScoreTrendChartPainter extends CustomPainter {
+  final List<int> scores;
+  final List<String> dayLabels;
+  final Color lineColor;
+  final bool isDark;
+  final TextStyle labelStyle;
+
+  ScoreTrendChartPainter({
+    required this.scores,
+    required this.dayLabels,
+    required this.lineColor,
+    required this.isDark,
+    required this.labelStyle,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (scores.isEmpty) return;
+
+    // Layout constants
+    const double topPadding = 18; // room for score labels above dots
+    const double bottomPadding = 18; // room for day labels below
+    const double leftPadding = 24; // room for Y-axis min/max labels
+    const double rightPadding = 12;
+
+    final chartLeft = leftPadding;
+    final chartRight = size.width - rightPadding;
+    final chartTop = topPadding;
+    final chartBottom = size.height - bottomPadding;
+    final chartWidth = chartRight - chartLeft;
+    final chartHeight = chartBottom - chartTop;
+
+    // Determine Y range with some padding
+    final minScore = scores.reduce((a, b) => a < b ? a : b);
+    final maxScore = scores.reduce((a, b) => a > b ? a : b);
+    final yMin = (minScore - 5).clamp(0, 100);
+    final yMax = (maxScore + 5).clamp(0, 100);
+    final yRange = (yMax - yMin).clamp(1, 100); // avoid division by zero
+
+    // Calculate data points
+    final points = <Offset>[];
+    for (int i = 0; i < scores.length; i++) {
+      final x = scores.length == 1
+          ? chartLeft + chartWidth / 2
+          : chartLeft + (i / (scores.length - 1)) * chartWidth;
+      final y =
+          chartBottom - ((scores[i] - yMin) / yRange) * chartHeight;
+      points.add(Offset(x, y));
+    }
+
+    // Draw axis lines
+    final axisPaint = Paint()
+      ..color = (isDark
+              ? const Color(0xFFB0BEC5)
+              : const Color(0xFF90A4AE))
+          .withValues(alpha: 0.3)
+      ..strokeWidth = 1.0;
+
+    // Y-axis (left edge)
+    canvas.drawLine(
+      Offset(chartLeft, chartTop),
+      Offset(chartLeft, chartBottom),
+      axisPaint,
+    );
+    // X-axis (bottom edge)
+    canvas.drawLine(
+      Offset(chartLeft, chartBottom),
+      Offset(chartRight, chartBottom),
+      axisPaint,
+    );
+
+    // Horizontal grid lines (light dashes at midpoint)
+    final midY = (chartTop + chartBottom) / 2;
+    final gridPaint = Paint()
+      ..color = (isDark
+              ? const Color(0xFFB0BEC5)
+              : const Color(0xFF90A4AE))
+          .withValues(alpha: 0.12)
+      ..strokeWidth = 0.5;
+    canvas.drawLine(
+        Offset(chartLeft, midY), Offset(chartRight, midY), gridPaint);
+
+    // Draw gradient fill below the curve
+    if (points.length >= 2) {
+      final fillPath = Path()..moveTo(points.first.dx, chartBottom);
+      // Build smooth curve for fill
+      for (int i = 0; i < points.length - 1; i++) {
+        final p0 = points[i];
+        final p1 = points[i + 1];
+        final cx = (p0.dx + p1.dx) / 2;
+        fillPath.cubicTo(cx, p0.dy, cx, p1.dy, p1.dx, p1.dy);
+      }
+      fillPath
+        ..lineTo(points.last.dx, chartBottom)
+        ..close();
+
+      final fillPaint = Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            lineColor.withValues(alpha: 0.18),
+            lineColor.withValues(alpha: 0.0),
+          ],
+        ).createShader(
+            Rect.fromLTRB(chartLeft, chartTop, chartRight, chartBottom));
+
+      canvas.drawPath(fillPath, fillPaint);
+    }
+
+    // Draw line
+    if (points.length >= 2) {
+      final linePath = Path()..moveTo(points.first.dx, points.first.dy);
+      for (int i = 0; i < points.length - 1; i++) {
+        final p0 = points[i];
+        final p1 = points[i + 1];
+        final cx = (p0.dx + p1.dx) / 2;
+        linePath.cubicTo(cx, p0.dy, cx, p1.dy, p1.dx, p1.dy);
+      }
+      final linePaint = Paint()
+        ..color = lineColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.5
+        ..strokeCap = StrokeCap.round;
+      canvas.drawPath(linePath, linePaint);
+    }
+
+    // Draw dots and labels
+    for (int i = 0; i < points.length; i++) {
+      final pt = points[i];
+      final score = scores[i];
+
+      // Dot color based on score
+      final dotColor = score >= 80
+          ? (isDark ? const Color(0xFF66BB6A) : const Color(0xFF4CAF50))
+          : score >= 60
+              ? (isDark ? const Color(0xFFFFB74D) : const Color(0xFFFF9800))
+              : (isDark ? const Color(0xFFEF5350) : const Color(0xFFF44336));
+
+      // Outer ring
+      canvas.drawCircle(
+          pt, 5, Paint()..color = dotColor.withValues(alpha: 0.25));
+      // Inner dot
+      canvas.drawCircle(pt, 3.5, Paint()..color = dotColor);
+
+      // Score label above dot
+      final scoreTp = TextPainter(
+        text: TextSpan(
+          text: '$score',
+          style: labelStyle.copyWith(
+            fontSize: 9,
+            fontWeight: FontWeight.w700,
+            color: dotColor,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      scoreTp.paint(
+          canvas, Offset(pt.dx - scoreTp.width / 2, pt.dy - 16));
+
+      // Day label below chart
+      if (i < dayLabels.length && dayLabels[i].isNotEmpty) {
+        final dayTp = TextPainter(
+          text: TextSpan(text: dayLabels[i], style: labelStyle),
+          textDirection: TextDirection.ltr,
+        )..layout();
+        dayTp.paint(canvas,
+            Offset(pt.dx - dayTp.width / 2, chartBottom + 4));
+      }
+    }
+
+    // Y-axis min / max labels
+    final yAxisStyle = labelStyle.copyWith(fontSize: 9);
+    final maxTp = TextPainter(
+      text: TextSpan(text: '$yMax', style: yAxisStyle),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    maxTp.paint(canvas,
+        Offset(chartLeft - maxTp.width - 4, chartTop - maxTp.height / 2));
+
+    final minTp = TextPainter(
+      text: TextSpan(text: '$yMin', style: yAxisStyle),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    minTp.paint(
+        canvas,
+        Offset(chartLeft - minTp.width - 4,
+            chartBottom - minTp.height / 2));
+  }
+
+  @override
+  bool shouldRepaint(ScoreTrendChartPainter oldDelegate) =>
+      scores != oldDelegate.scores ||
+      dayLabels != oldDelegate.dayLabels ||
+      lineColor != oldDelegate.lineColor ||
+      isDark != oldDelegate.isDark;
 }

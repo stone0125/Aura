@@ -13,6 +13,7 @@ class Habit {
   // Reminder settings
   final bool reminderEnabled;
   final TimeOfDay? reminderTime;
+  final DateTime? createdAt;
 
   const Habit({
     required this.id,
@@ -23,6 +24,7 @@ class Habit {
     this.lastCompletedDate,
     this.reminderEnabled = false,
     this.reminderTime,
+    this.createdAt,
   });
 
   /// Create a copy with updated fields
@@ -35,6 +37,8 @@ class Habit {
     DateTime? lastCompletedDate,
     bool? reminderEnabled,
     TimeOfDay? reminderTime,
+    bool clearLastCompletedDate = false,
+    DateTime? createdAt,
   }) {
     return Habit(
       id: id ?? this.id,
@@ -42,20 +46,54 @@ class Habit {
       category: category ?? this.category,
       streak: streak ?? this.streak,
       isCompleted: isCompleted ?? this.isCompleted,
-      lastCompletedDate: lastCompletedDate ?? this.lastCompletedDate,
+      lastCompletedDate: clearLastCompletedDate
+          ? null
+          : (lastCompletedDate ?? this.lastCompletedDate),
       reminderEnabled: reminderEnabled ?? this.reminderEnabled,
       reminderTime: reminderTime ?? this.reminderTime,
+      createdAt: createdAt ?? this.createdAt,
     );
   }
 
   /// Toggle completion status
+  /// Note: lastCompletedDate is preserved on undo to maintain history context.
+  /// The actual completion history is managed by FirestoreService.
+  @Deprecated('Use FirestoreService.toggleHabitCompletion() instead - this method has incorrect streak logic')
   Habit toggleCompletion() {
     return copyWith(
       isCompleted: !isCompleted,
-      streak: !isCompleted ? streak + 1 : streak,
+      streak: !isCompleted ? streak + 1 : (streak > 0 ? streak - 1 : 0),
       lastCompletedDate: !isCompleted ? DateTime.now() : lastCompletedDate,
     );
   }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is Habit &&
+        other.id == id &&
+        other.name == name &&
+        other.category == category &&
+        other.streak == streak &&
+        other.isCompleted == isCompleted &&
+        other.lastCompletedDate == lastCompletedDate &&
+        other.reminderEnabled == reminderEnabled &&
+        other.reminderTime == reminderTime &&
+        other.createdAt == createdAt;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+        id,
+        name,
+        category,
+        streak,
+        isCompleted,
+        lastCompletedDate,
+        reminderEnabled,
+        reminderTime,
+        createdAt,
+      );
 
   @override
   String toString() {

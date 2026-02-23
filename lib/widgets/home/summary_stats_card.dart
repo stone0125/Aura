@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/habit_provider.dart';
 import '../../config/theme/app_colors.dart';
+import '../../config/theme/ui_constants.dart';
 import 'dart:math' as math;
 
 /// Summary Stats Card with circular progress
@@ -10,20 +11,27 @@ class SummaryStatsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final habitProvider = Provider.of<HabitProvider>(context);
+    // Use Selector to only rebuild when specific stats change
+    final completedCount = context.select<HabitProvider, int>(
+      (provider) => provider.completedCount,
+    );
+    final totalCount = context.select<HabitProvider, int>(
+      (provider) => provider.totalCount,
+    );
+    final completionRate = context.select<HabitProvider, double>(
+      (provider) => provider.completionRate,
+    );
+    final bestStreak = context.select<HabitProvider, int>(
+      (provider) => provider.bestStreak,
+    );
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    final completedCount = habitProvider.completedCount;
-    final totalCount = habitProvider.totalCount;
-    final completionRate = habitProvider.completionRate;
-    final bestStreak = habitProvider.bestStreak;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: UIConstants.borderRadiusLarge,
         border: Border.all(
           color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
           width: 1,
@@ -40,16 +48,17 @@ class SummaryStatsCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // Circular Progress Chart
+          // Circular Progress Chart - wrapped in RepaintBoundary to isolate repaints
           SizedBox(
             width: 120,
             height: 120,
-            child: CustomPaint(
-              painter: CircularProgressPainter(
-                progress: completionRate,
-                isDark: isDark,
-              ),
-              child: Center(
+            child: RepaintBoundary(
+              child: CustomPaint(
+                painter: CircularProgressPainter(
+                  progress: completionRate,
+                  isDark: isDark,
+                ),
+                child: Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -77,6 +86,7 @@ class SummaryStatsCard extends StatelessWidget {
                 ),
               ),
             ),
+          ),
           ),
           const SizedBox(height: 20),
 
@@ -183,7 +193,8 @@ class CircularProgressPainter extends CustomPainter {
     canvas.drawCircle(center, radius - strokeWidth / 2, backgroundPaint);
 
     // Progress ring with gradient effect
-    if (progress > 0) {
+    final clampedProgress = progress.clamp(0.0, 1.0);
+    if (clampedProgress > 0) {
       final progressPaint = Paint()
         ..shader = LinearGradient(
           colors: isDark
@@ -196,7 +207,7 @@ class CircularProgressPainter extends CustomPainter {
         ..strokeWidth = strokeWidth
         ..strokeCap = StrokeCap.round;
 
-      final progressAngle = 2 * math.pi * progress;
+      final progressAngle = 2 * math.pi * clampedProgress;
       canvas.drawArc(
         Rect.fromCircle(center: center, radius: radius - strokeWidth / 2),
         -math.pi / 2, // Start from top

@@ -14,9 +14,10 @@ class HomeHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
-    final settingsProvider = Provider.of<SettingsProvider>(context);
-    final profile = settingsProvider.userProfile;
+    // Use read() for themeProvider since we only call methods, don't depend on state
+    final themeProvider = context.read<ThemeProvider>();
+    // Use Selector to only rebuild when profile changes
+    final profile = context.select<SettingsProvider, UserProfile>((s) => s.userProfile);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final now = DateTime.now();
     final greeting = _getGreeting(now.hour);
@@ -118,8 +119,8 @@ class HomeHeader extends StatelessWidget {
             child: InkWell(
               onTap: () {
                 themeProvider.toggleTheme();
-                // Sync with SettingsProvider
-                final newIsDark = !isDark;
+                // Sync with SettingsProvider — read actual state after toggle
+                final newIsDark = themeProvider.isDarkMode;
                 context.read<SettingsProvider>().setThemePreference(
                   newIsDark ? ThemePreference.dark : ThemePreference.light,
                 );
@@ -161,11 +162,17 @@ class HomeHeader extends StatelessWidget {
   /// Get user initials from name
   String _getInitials(String name) {
     if (name.isEmpty) return 'U';
-    final parts = name.trim().split(' ');
+    final parts = name.trim().split(' ').where((p) => p.isNotEmpty).toList();
+    if (parts.isEmpty) return 'U';
     if (parts.length == 1) {
-      return parts[0][0].toUpperCase();
+      // Ensure the first part has at least one character
+      return parts[0].isNotEmpty ? parts[0][0].toUpperCase() : 'U';
     } else {
-      return '${parts[0][0]}${parts[parts.length - 1][0]}'.toUpperCase();
+      // Ensure both parts have at least one character
+      final firstChar = parts[0].isNotEmpty ? parts[0][0] : '';
+      final lastChar = parts[parts.length - 1].isNotEmpty ? parts[parts.length - 1][0] : '';
+      final initials = '$firstChar$lastChar'.toUpperCase();
+      return initials.isNotEmpty ? initials : 'U';
     }
   }
 }

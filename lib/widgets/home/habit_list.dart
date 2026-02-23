@@ -4,7 +4,9 @@ import 'package:provider/provider.dart';
 import '../../models/habit.dart';
 import '../../models/habit_category.dart';
 import '../../providers/habit_provider.dart';
+import '../../providers/ai_coach_provider.dart';
 import '../../config/theme/app_colors.dart';
+import '../../config/theme/ui_constants.dart';
 import '../../screens/habit_creation_screen.dart';
 import '../../screens/habit_detail_screen.dart';
 
@@ -14,8 +16,10 @@ class HabitList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final habitProvider = Provider.of<HabitProvider>(context);
-    final habits = habitProvider.todaysHabits;
+    // Use Selector to only rebuild when todaysHabits changes, not on every provider update
+    final habits = context.select<HabitProvider, List<Habit>>(
+      (provider) => provider.todaysHabits,
+    );
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Column(
@@ -47,14 +51,36 @@ class HabitList extends StatelessWidget {
             padding: EdgeInsets.zero,
             itemCount: habits.length,
             itemBuilder: (context, index) {
+              // Store habit reference to prevent race condition if list changes
+              final habit = habits[index];
+              // Use ValueKey with habit.id for proper list reconciliation
               return HabitCard(
-                habit: habits[index],
-                onToggle: () {
+                key: ValueKey(habit.id),
+                habit: habit,
+                onToggle: () async {
                   HapticFeedback.lightImpact();
-                  habitProvider.toggleHabitCompletion(habits[index].id);
+                  try {
+                    // Use context.read for one-time access
+                    await context.read<HabitProvider>().toggleHabitCompletion(habit.id);
+                  } catch (e, stackTrace) {
+                    debugPrint('Error toggling habit: $e\n$stackTrace');
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Error: $e'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  }
                 },
                 onDelete: () {
-                  habitProvider.removeHabit(habits[index].id);
+                  // Use context.read for one-time access without listening
+                  context.read<HabitProvider>().removeHabit(habit.id);
+
+                  // Clear AI suggestions cache
+                  context.read<AICoachProvider>().clearSuggestionsCache();
+
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Habit removed'),
@@ -136,21 +162,20 @@ class HabitList extends StatelessWidget {
                     );
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor:
-                        isDark ? AppColors.darkCoral : AppColors.lightCoral,
-                    foregroundColor:
-                        isDark ? AppColors.darkBackground : Colors.white,
+                    backgroundColor: isDark
+                        ? AppColors.darkCoral
+                        : AppColors.lightCoral,
+                    foregroundColor: isDark
+                        ? AppColors.darkBackground
+                        : Colors.white,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: UIConstants.borderRadiusMedium,
                     ),
                     elevation: 0,
                   ),
                   child: const Text(
                     'Create Your First Habit',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                   ),
                 ),
               ),
@@ -175,6 +200,13 @@ class HabitCard extends StatelessWidget {
     required this.onDelete,
   });
 
+  String _formatTimeOfDay(TimeOfDay time) {
+    final hour = time.hourOfPeriod == 0 ? 12 : time.hourOfPeriod;
+    final minute = time.minute.toString().padLeft(2, '0');
+    final period = time.period == DayPeriod.am ? 'AM' : 'PM';
+    return '$hour:$minute $period';
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -186,22 +218,14 @@ class HabitCard extends StatelessWidget {
       key: Key(habit.id),
       direction: DismissDirection.endToStart,
       background: Container(
-        margin: const EdgeInsets.only(
-          left: 20,
-          right: 20,
-          bottom: 12,
-        ),
+        margin: const EdgeInsets.only(left: 20, right: 20, bottom: 12),
         padding: const EdgeInsets.only(right: 20),
         decoration: BoxDecoration(
           color: isDark ? AppColors.darkRed : AppColors.red,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: UIConstants.borderRadiusMedium,
         ),
         alignment: Alignment.centerRight,
-        child: const Icon(
-          Icons.delete_rounded,
-          color: Colors.white,
-          size: 28,
-        ),
+        child: const Icon(Icons.delete_rounded, color: Colors.white, size: 28),
       ),
       confirmDismiss: (direction) async {
         return await showDialog(
@@ -236,138 +260,157 @@ class HabitCard extends StatelessWidget {
           );
         },
         child: Container(
-          margin: const EdgeInsets.only(
-            left: 20,
-            right: 20,
-            bottom: 12,
-          ),
-          height: 80,
+          margin: const EdgeInsets.only(left: 20, right: 20, bottom: 12),
+          padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
-          color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
-            width: 1,
+            color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+            borderRadius: UIConstants.borderRadiusMedium,
+            border: Border.all(
+              color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: isDark
+                    ? Colors.black.withValues(alpha: 0.25)
+                    : Colors.black.withValues(alpha: 0.04),
+                blurRadius: isDark ? 8 : 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
-          boxShadow: [
-            BoxShadow(
-              color: isDark
-                  ? Colors.black.withValues(alpha: 0.25)
-                  : Colors.black.withValues(alpha: 0.04),
-              blurRadius: isDark ? 8 : 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            const SizedBox(width: 16),
+          child: Row(
+            children: [
+              const SizedBox(width: 16),
 
-            // Category Icon
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  colors: gradientColors,
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-              ),
-              child: Icon(
-                habit.category.icon,
-                color: Colors.white,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 12),
-
-            // Habit Info
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    habit.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: isDark
-                          ? AppColors.darkPrimaryText
-                          : AppColors.lightPrimaryText,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
+              // Category Icon
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: gradientColors,
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.local_fire_department_rounded,
-                        color: isDark ? AppColors.darkOrange : AppColors.orange,
-                        size: 14,
+                ),
+                child: Icon(habit.category.icon, color: Colors.white, size: 24),
+              ),
+              const SizedBox(width: 12),
+
+              // Habit Info
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      habit.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: isDark
+                            ? AppColors.darkPrimaryText
+                            : AppColors.lightPrimaryText,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        height: 1.2,
                       ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${habit.streak} day streak',
-                        style: TextStyle(
-                          color:
-                              isDark ? AppColors.darkOrange : AppColors.orange,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.local_fire_department_rounded,
+                          color: isDark
+                              ? AppColors.darkOrange
+                              : AppColors.orange,
+                          size: 14,
                         ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            // Completion Button
-            Padding(
-              padding: const EdgeInsets.only(right: 16),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: onToggle,
-                  borderRadius: BorderRadius.circular(24),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: habit.isCompleted
-                          ? (isDark
-                              ? AppColors.darkCoral
-                              : AppColors.lightCoral)
-                          : Colors.transparent,
-                      border: habit.isCompleted
-                          ? null
-                          : Border.all(
-                              color: isDark
-                                  ? AppColors.darkCoral
-                                  : AppColors.lightCoral,
-                              width: 2,
-                            ),
-                    ),
-                    child: habit.isCompleted
-                        ? Icon(
-                            Icons.check_rounded,
+                        const SizedBox(width: 4),
+                        Text(
+                          habit.streak == 0
+                              ? 'Start a streak!'
+                              : '${habit.streak} day${habit.streak == 1 ? '' : 's'} streak',
+                          style: TextStyle(
                             color: isDark
-                                ? AppColors.darkBackground
-                                : Colors.white,
-                            size: 24,
-                          )
-                        : null,
+                                ? AppColors.darkOrange
+                                : AppColors.orange,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        if (habit.reminderEnabled && habit.reminderTime != null) ...[
+                          const SizedBox(width: 8),
+                          Icon(
+                            Icons.alarm_rounded,
+                            color: isDark
+                                ? AppColors.darkSecondaryText
+                                : AppColors.lightSecondaryText,
+                            size: 12,
+                          ),
+                          const SizedBox(width: 2),
+                          Text(
+                            _formatTimeOfDay(habit.reminderTime!),
+                            style: TextStyle(
+                              color: isDark
+                                  ? AppColors.darkSecondaryText
+                                  : AppColors.lightSecondaryText,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              // Completion Button
+              Padding(
+                padding: const EdgeInsets.only(right: 16),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: onToggle,
+                    borderRadius: BorderRadius.circular(UIConstants.radiusXLarge),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: habit.isCompleted
+                            ? (isDark
+                                  ? AppColors.darkCoral
+                                  : AppColors.lightCoral)
+                            : Colors.transparent,
+                        border: habit.isCompleted
+                            ? null
+                            : Border.all(
+                                color: isDark
+                                    ? AppColors.darkCoral
+                                    : AppColors.lightCoral,
+                                width: 2,
+                              ),
+                      ),
+                      child: habit.isCompleted
+                          ? Icon(
+                              Icons.check_rounded,
+                              color: isDark
+                                  ? AppColors.darkBackground
+                                  : Colors.white,
+                              size: 24,
+                            )
+                          : null,
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
         ),
       ),
     );

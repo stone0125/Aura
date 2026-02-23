@@ -95,6 +95,8 @@ app.*.map.json
 
 # Local Environment & Secrets
 .env
+.env.*
+.env.json
 .env.development
 .env.production
 .env.staging
@@ -107,3 +109,9 @@ functions/.env
 npm-debug.log
 yarn-error.log
 firebase-debug.log
+
+# Java heap dumps
+*.hprof
+
+# Windows null device artifact
+nul

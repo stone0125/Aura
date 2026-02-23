@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -6,7 +7,9 @@ import '../models/habit_category.dart';
 import '../models/habit_form_data.dart';
 import '../models/ai_coach_models.dart';
 import '../providers/habit_provider.dart';
+import '../providers/ai_coach_provider.dart';
 import '../config/theme/app_colors.dart';
+import '../config/theme/ui_constants.dart';
 import '../config/habit_icons.dart';
 import '../services/notification_service.dart';
 
@@ -15,7 +18,12 @@ class HabitCreationScreen extends StatefulWidget {
   /// Live AI Coach suggestion from Cloud Functions
   final AICoachSuggestion? aiCoachSuggestion;
 
-  const HabitCreationScreen({super.key, this.aiCoachSuggestion});
+  /// Existing habit to edit (null = create mode)
+  final Habit? habitToEdit;
+
+  const HabitCreationScreen({super.key, this.aiCoachSuggestion, this.habitToEdit});
+
+  bool get isEditing => habitToEdit != null;
 
   @override
   State<HabitCreationScreen> createState() => _HabitCreationScreenState();
@@ -41,8 +49,22 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
   void _initializeForm() {
     _formData = HabitFormData();
 
-    // Pre-fill from AI suggestion if provided
-    if (widget.aiCoachSuggestion != null) {
+    // Pre-fill from existing habit when editing
+    if (widget.habitToEdit != null) {
+      final habit = widget.habitToEdit!;
+      _formData.name = habit.name;
+      _formData.category = habit.category;
+      _formData.selectedIcon = HabitIcons.getDefaultIconForCategory(
+        habit.category.name,
+      );
+      _formData.reminderEnabled = habit.reminderEnabled;
+      if (habit.reminderTime != null) {
+        _formData.reminderTime = habit.reminderTime!;
+      }
+
+      _nameController.text = habit.name;
+    } else if (widget.aiCoachSuggestion != null) {
+      // Pre-fill from AI suggestion if provided
       final suggestion = widget.aiCoachSuggestion!;
       _formData.name = suggestion.title;
       _formData.description = suggestion.description;
@@ -125,51 +147,98 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
 
     setState(() => _isSaving = true);
 
+    // Store provider references BEFORE any async operations
+    final habitProvider = Provider.of<HabitProvider>(context, listen: false);
+    final aiCoachProvider = Provider.of<AICoachProvider>(context, listen: false);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    final isEditing = widget.isEditing;
+
     // Simulate save delay
     await Future.delayed(const Duration(milliseconds: 500));
+    if (!mounted) return;
 
-    // Create habit with reminder settings
-    final habit = Habit(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      name: _formData.name,
-      category: _formData.category!,
-      streak: 0,
-      isCompleted: false,
-      reminderEnabled: _formData.reminderEnabled,
-      reminderTime: _formData.reminderEnabled ? _formData.reminderTime : null,
-    );
-
-    if (mounted) {
-      final habitProvider = Provider.of<HabitProvider>(context, listen: false);
-      habitProvider.addHabit(habit);
-
-      // Schedule notification if reminder is enabled
-      if (_formData.reminderEnabled) {
-        await NotificationService().scheduleHabitReminder(
-          habitId: habit.id,
-          habitName: habit.name,
-          hour: _formData.reminderTime.hour,
-          minute: _formData.reminderTime.minute,
+    try {
+      if (isEditing) {
+        // Update existing habit, preserving streak and completion state
+        final existingHabit = widget.habitToEdit!;
+        final updatedHabit = existingHabit.copyWith(
+          name: _formData.name,
+          category: _formData.category!,
+          reminderEnabled: _formData.reminderEnabled,
+          reminderTime: _formData.reminderEnabled ? _formData.reminderTime : null,
         );
-      }
 
-      if (!mounted) return;
+        await habitProvider.updateHabit(updatedHabit);
+        if (!mounted) return;
+
+        // Handle notification rescheduling
+        if (_formData.reminderEnabled) {
+          await NotificationService().scheduleHabitReminder(
+            habitId: updatedHabit.id,
+            habitName: updatedHabit.name,
+            hour: _formData.reminderTime.hour,
+            minute: _formData.reminderTime.minute,
+          );
+        } else {
+          await NotificationService().cancelHabitReminder(updatedHabit.id);
+        }
+        if (!mounted) return;
+      } else {
+        // Create new habit with reminder settings
+        // Use timestamp + random component to avoid ID collision
+        final habit = Habit(
+          id: '${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(999999)}',
+          name: _formData.name,
+          category: _formData.category!,
+          streak: 0,
+          isCompleted: false,
+          reminderEnabled: _formData.reminderEnabled,
+          reminderTime: _formData.reminderEnabled ? _formData.reminderTime : null,
+        );
+
+        await habitProvider.addHabit(habit);
+        if (!mounted) return;
+
+        // Clear AI suggestions cache so new suggestions are personalized
+        aiCoachProvider.clearSuggestionsCache();
+
+        // Schedule notification if reminder is enabled
+        if (_formData.reminderEnabled) {
+          await NotificationService().scheduleHabitReminder(
+            habitId: habit.id,
+            habitName: habit.name,
+            hour: _formData.reminderTime.hour,
+            minute: _formData.reminderTime.minute,
+          );
+          if (!mounted) return;
+        }
+      }
 
       // Success feedback
       HapticFeedback.mediumImpact();
 
       // Close screen
-      Navigator.of(context).pop();
+      navigator.pop();
 
       // Show success message
-      ScaffoldMessenger.of(context).showSnackBar(
+      final message = isEditing
+          ? 'Habit updated!'
+          : (_formData.reminderEnabled ? 'Habit created with reminder!' : 'Habit created!');
+      scaffoldMessenger.showSnackBar(
         SnackBar(
-          content: Text(
-            _formData.reminderEnabled
-                ? 'Habit created with reminder!'
-                : 'Habit created!',
-          ),
+          content: Text(message),
           duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isSaving = false);
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text('Failed to ${isEditing ? 'update' : 'create'} habit: $e'),
+          backgroundColor: AppColors.red,
+          duration: const Duration(seconds: 3),
         ),
       );
     }
@@ -181,7 +250,7 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
       final result = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Discard habit?'),
+          title: Text(widget.isEditing ? 'Discard changes?' : 'Discard habit?'),
           content: const Text('Your changes will be lost'),
           actions: [
             TextButton(
@@ -298,13 +367,15 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
         },
       ),
       title: Text(
-        _formData.isAISuggested ? 'Add AI Suggestion' : 'Create Habit',
+        widget.isEditing
+            ? 'Edit Habit'
+            : (_formData.isAISuggested ? 'Add AI Suggestion' : 'Create Habit'),
         style: TextStyle(
           color: isDark
               ? AppColors.darkPrimaryText
               : AppColors.lightPrimaryText,
-          fontSize: 18,
-          fontWeight: FontWeight.w600,
+          fontSize: UIConstants.appBarTitleSize,
+          fontWeight: UIConstants.appBarTitleWeight,
         ),
       ),
       actions: [
@@ -447,14 +518,14 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
                   ? AppColors.darkSurfaceVariant
                   : AppColors.lightSurface,
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: UIConstants.borderRadiusMedium,
                 borderSide: BorderSide(
                   color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
                   width: 1.5,
                 ),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: UIConstants.borderRadiusMedium,
                 borderSide: BorderSide(
                   color: _nameError != null
                       ? (isDark ? AppColors.darkRed : AppColors.red)
@@ -463,7 +534,7 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
                 ),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: UIConstants.borderRadiusMedium,
                 borderSide: BorderSide(
                   color: _nameError != null
                       ? (isDark ? AppColors.darkRed : AppColors.red)
@@ -541,21 +612,21 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
                   ? AppColors.darkSurfaceVariant
                   : AppColors.lightSurface,
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: UIConstants.borderRadiusMedium,
                 borderSide: BorderSide(
                   color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
                   width: 1.5,
                 ),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: UIConstants.borderRadiusMedium,
                 borderSide: BorderSide(
                   color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
                   width: 1.5,
                 ),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: UIConstants.borderRadiusMedium,
                 borderSide: BorderSide(
                   color: isDark ? AppColors.darkCoral : AppColors.lightCoral,
                   width: 2,
@@ -640,7 +711,7 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
                           _categoryError = null;
                         });
                       },
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(UIConstants.radiusXLarge),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
                         height: 40,
@@ -649,7 +720,7 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
                           color: isSelected
                               ? gradientColors[0]
                               : Colors.transparent,
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(UIConstants.radiusXLarge),
                           border: Border.all(
                             color: isSelected
                                 ? Colors.transparent
@@ -753,7 +824,7 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
                     HapticFeedback.mediumImpact();
                     setState(() => _formData.selectedIcon = iconData.icon);
                   },
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: BorderRadius.circular(UIConstants.radiusXLarge),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
                     width: 48,
@@ -815,7 +886,7 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
               color: isDark
                   ? AppColors.darkSurfaceVariant
                   : AppColors.lightBorder.withValues(alpha: 0.3),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: UIConstants.borderRadiusMedium,
               border: isDark
                   ? Border.all(color: AppColors.darkBorder, width: 1)
                   : null,
@@ -841,7 +912,7 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
                                   ? AppColors.darkBorder
                                   : AppColors.lightSurface)
                             : Colors.transparent,
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: UIConstants.borderRadiusMedium,
                         boxShadow: isSelected
                             ? [
                                 BoxShadow(
@@ -1071,14 +1142,14 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
             const SizedBox(height: 16),
             InkWell(
               onTap: () => _showReminderTimePicker(isDark),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: UIConstants.borderRadiusMedium,
               child: Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: isDark
                       ? AppColors.darkBackground
                       : AppColors.lightBackground,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: UIConstants.borderRadiusMedium,
                   border: Border.all(
                     color: isDark
                         ? AppColors.darkBorder
@@ -1205,7 +1276,7 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
                       ? AppColors.darkSecondaryText
                       : AppColors.lightSecondaryText),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: UIConstants.borderRadiusLarge,
             ),
             elevation: _formData.isValid ? 4 : 0,
             disabledBackgroundColor: isDark
@@ -1227,7 +1298,9 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
                   ),
                 )
               : Text(
-                  _formData.isAISuggested ? 'Add Habit' : 'Create Habit',
+                  widget.isEditing
+                      ? 'Save Changes'
+                      : (_formData.isAISuggested ? 'Add Habit' : 'Create Habit'),
                   style: const TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.w600,
