@@ -925,14 +925,17 @@ class _AICoachScreenState extends State<AICoachScreen>
                           ),
                           const SizedBox(width: 8),
                           // Frequency/goal badge
-                          Text(
-                            _buildSuggestionBadgeText(suggestion),
-                            style: TextStyle(
-                              color: isDark
-                                  ? AppColors.darkSecondaryText
-                                  : AppColors.lightSecondaryText,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500,
+                          Flexible(
+                            child: Text(
+                              _buildSuggestionBadgeText(suggestion),
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: isDark
+                                    ? AppColors.darkSecondaryText
+                                    : AppColors.lightSecondaryText,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ),
                         ],
@@ -3765,6 +3768,8 @@ class _AICoachScreenState extends State<AICoachScreen>
             .toSet()
             .toList(),
         currentHabits: habitProvider.habits.map((h) => h.name).toList(),
+        completionRate: habitProvider.completionRate * 100,
+        bestStreak: habitProvider.bestStreak,
       );
     } else if (tab == AICoachTab.insights &&
         coachProvider.weeklySummary == null &&

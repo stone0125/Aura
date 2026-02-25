@@ -184,7 +184,10 @@ class AICoachProvider with ChangeNotifier {
     int bestStreak = 0,
     bool forceRefresh = false,
   }) async {
-    if (_inProgressOps.contains('suggestions')) return false;
+    if (_inProgressOps.contains('suggestions')) {
+      debugPrint('loadSuggestions: already in progress, skipping');
+      return false;
+    }
     _inProgressOps.add('suggestions');
     _isLoadingSuggestions = true;
     notifyListeners();
@@ -220,8 +223,10 @@ class AICoachProvider with ChangeNotifier {
       }
 
       // 2. Check subscription limits before making API call
+      debugPrint('loadSuggestions: checking subscription (tier=${_subscriptionService.currentTier.displayName}, remaining=${_subscriptionService.getRemainingAISuggestions()})');
       if (!_subscriptionService.canUseAISuggestion()) {
         final tier = _subscriptionService.currentTier;
+        debugPrint('loadSuggestions: subscription limit reached (${tier.displayName}, ${tier.maxAISuggestionsPerDay}/day)');
         _suggestionsError =
             'Daily AI suggestion limit reached (${tier.maxAISuggestionsPerDay} per day on ${tier.displayName}). '
             'Upgrade for more suggestions.';
@@ -233,6 +238,7 @@ class AICoachProvider with ChangeNotifier {
       }
 
       // 3. Fetch from API with user stats for personalization
+      debugPrint('loadSuggestions: calling Cloud Function (categories=${categories.length}, habits=${currentHabits.length})');
       final functions = _firebaseFunctions ?? FirebaseFunctions.instance;
       final callable = functions.httpsCallable('generateHabitSuggestions');
       final result = await callable.call({
@@ -252,11 +258,12 @@ class AICoachProvider with ChangeNotifier {
       }
       final List<dynamic> data = responseData;
 
-      _suggestions = data.asMap().entries.map((entry) {
+      final parsed = data.asMap().entries.map((entry) {
         final item = entry.value;
         final index = entry.key;
         // Validate each item is a Map
         if (item == null || item is! Map) {
+          debugPrint('Suggestion item $index is not a Map, skipping');
           return null;
         }
         final map = Map<String, dynamic>.from(item);
@@ -289,12 +296,24 @@ class AICoachProvider with ChangeNotifier {
         );
       }).whereType<AICoachSuggestion>().toList();
 
+      // Guard: if API returned empty results, fall back to defaults
+      if (parsed.isEmpty) {
+        debugPrint('Cloud Function returned empty suggestions array — using defaults');
+        _suggestions = _getDefaultSuggestions();
+        _suggestionsError = 'AI returned no suggestions. Showing defaults.';
+        _usedFallback = true;
+        return false;
+      }
+
+      _suggestions = parsed;
+
       // 4. Record usage and save to cache
       await _subscriptionService.recordAISuggestionUsage();
       final cacheData = _suggestions.map((s) => s.toJson()).toList();
       await _cacheData(_suggestionsCacheKey, cacheData);
       _suggestionsError = null;
       _usedFallback = false;
+      debugPrint('Loaded ${_suggestions.length} AI suggestions successfully');
       return true;
     } catch (e) {
       debugPrint('Error loading suggestions (${e.runtimeType}): $e');

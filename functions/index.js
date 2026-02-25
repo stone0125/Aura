@@ -283,10 +283,20 @@ exports.generateHabitSuggestions = onCall({ secrets: [revenueCatApiKey, geminiAp
     const response = await result.response;
     const text = response.text();
 
+    if (!text || text.trim().length === 0) {
+      console.error("Gemini returned empty text for suggestions");
+      throw new Error('Gemini returned empty response');
+    }
+
     const jsonStr = text.replace(/```json/g, "").replace(/```/g, "").trim();
     const parsed = JSON.parse(jsonStr);
 
-    if (!Array.isArray(parsed)) throw new Error('Expected array');
+    if (!Array.isArray(parsed)) throw new Error('Expected array, got: ' + typeof parsed);
+    if (parsed.length === 0) {
+      console.warn("Gemini returned empty suggestions array");
+      throw new Error('Gemini returned 0 suggestions');
+    }
+
     const VALID_FREQUENCY_TYPES = ['daily', 'weekly'];
     const VALID_GOAL_TYPES = ['none', 'time', 'count'];
     const VALID_IMPACTS = ['High', 'Medium', 'Low'];
@@ -316,8 +326,8 @@ exports.generateHabitSuggestions = onCall({ secrets: [revenueCatApiKey, geminiAp
         : null,
     }));
   } catch (error) {
-    console.error("Error generating suggestions:", error);
-    throw new HttpsError("internal", "Failed to generate suggestions.");
+    console.error("Error generating suggestions:", error.message || error);
+    throw new HttpsError("internal", `Failed to generate suggestions: ${error.message || 'Unknown error'}`);
   }
 });
 
