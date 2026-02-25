@@ -106,12 +106,9 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
     if (!mounted) return;
     _transitioned = true;
 
-    Navigator.of(context).pushReplacement(
-      PageRouteBuilder(
-        pageBuilder: (_, a, b) => widget.destinationBuilder(),
-        transitionDuration: Duration.zero,
-      ),
-    );
+    _fadeController.stop();
+    _pulseController.stop();
+    setState(() {});
   }
 
   @override
@@ -123,6 +120,10 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
 
   @override
   Widget build(BuildContext context) {
+    if (_transitioned) {
+      return widget.destinationBuilder();
+    }
+
     final isDark =
         MediaQuery.platformBrightnessOf(context) == Brightness.dark;
 

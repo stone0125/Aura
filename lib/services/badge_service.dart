@@ -18,7 +18,7 @@ class BadgeService {
   Future<void> initialize() async {
     final prefs = await SharedPreferences.getInstance();
     _badgeEnabled = prefs.getBool(_badgeEnabledKey) ?? true;
-    _isSupported = Platform.isIOS;
+    _isSupported = !kIsWeb && Platform.isIOS;
   }
 
   /// Get badge enabled state
@@ -45,7 +45,7 @@ class BadgeService {
     final safeCount = incompleteCount < 0 ? 0 : incompleteCount;
     _lastBadgeCount = _badgeEnabled ? safeCount : 0;
 
-    if (_badgeEnabled && Platform.isIOS) {
+    if (_badgeEnabled && !kIsWeb && Platform.isIOS) {
       // Delegate to NotificationService for iOS badges
       await NotificationService().setBadgeCount(_lastBadgeCount);
     }
@@ -54,7 +54,7 @@ class BadgeService {
   /// Clear the badge
   Future<void> clearBadge() async {
     _lastBadgeCount = 0;
-    if (Platform.isIOS) {
+    if (!kIsWeb && Platform.isIOS) {
       await NotificationService().setBadgeCount(0);
     }
   }

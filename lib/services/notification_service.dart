@@ -200,7 +200,7 @@ class NotificationService {
       );
 
       // 2. Request Android Local Notifications Permission (Android 13+)
-      if (Platform.isAndroid) {
+      if (!kIsWeb && Platform.isAndroid) {
         final androidImplementation = _localNotifications
             .resolvePlatformSpecificImplementation<
               fln.AndroidFlutterLocalNotificationsPlugin
@@ -224,7 +224,7 @@ class NotificationService {
   Future<void> setBadgeCount(int count) async {
     _currentBadgeCount = count;
 
-    if (Platform.isIOS) {
+    if (!kIsWeb && Platform.isIOS) {
       try {
         // On iOS, we update the badge by showing a silent notification with the badge number
         // or by using the notification plugin's iOS-specific badge setting
@@ -264,7 +264,7 @@ class NotificationService {
   Future<void> clearBadge() async {
     _currentBadgeCount = 0;
 
-    if (Platform.isIOS) {
+    if (!kIsWeb && Platform.isIOS) {
       try {
         // Only cancel the badge notification (ID 0), not all scheduled reminders
         await _localNotifications.cancel(0);

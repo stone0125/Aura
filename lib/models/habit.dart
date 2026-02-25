@@ -10,6 +10,11 @@ class Habit {
   final bool isCompleted;
   final DateTime? lastCompletedDate;
 
+  // Goal settings
+  final String goalType; // 'none', 'time', 'count'
+  final int? goalValue;
+  final String? goalUnit; // 'minutes', 'hours', 'times', 'pages', etc.
+
   // Reminder settings
   final bool reminderEnabled;
   final TimeOfDay? reminderTime;
@@ -22,6 +27,9 @@ class Habit {
     this.streak = 0,
     this.isCompleted = false,
     this.lastCompletedDate,
+    this.goalType = 'none',
+    this.goalValue,
+    this.goalUnit,
     this.reminderEnabled = false,
     this.reminderTime,
     this.createdAt,
@@ -35,6 +43,10 @@ class Habit {
     int? streak,
     bool? isCompleted,
     DateTime? lastCompletedDate,
+    String? goalType,
+    int? goalValue,
+    String? goalUnit,
+    bool clearGoal = false,
     bool? reminderEnabled,
     TimeOfDay? reminderTime,
     bool clearLastCompletedDate = false,
@@ -49,6 +61,9 @@ class Habit {
       lastCompletedDate: clearLastCompletedDate
           ? null
           : (lastCompletedDate ?? this.lastCompletedDate),
+      goalType: goalType ?? this.goalType,
+      goalValue: clearGoal ? null : (goalValue ?? this.goalValue),
+      goalUnit: clearGoal ? null : (goalUnit ?? this.goalUnit),
       reminderEnabled: reminderEnabled ?? this.reminderEnabled,
       reminderTime: reminderTime ?? this.reminderTime,
       createdAt: createdAt ?? this.createdAt,
@@ -77,6 +92,9 @@ class Habit {
         other.streak == streak &&
         other.isCompleted == isCompleted &&
         other.lastCompletedDate == lastCompletedDate &&
+        other.goalType == goalType &&
+        other.goalValue == goalValue &&
+        other.goalUnit == goalUnit &&
         other.reminderEnabled == reminderEnabled &&
         other.reminderTime == reminderTime &&
         other.createdAt == createdAt;
@@ -90,6 +108,9 @@ class Habit {
         streak,
         isCompleted,
         lastCompletedDate,
+        goalType,
+        goalValue,
+        goalUnit,
         reminderEnabled,
         reminderTime,
         createdAt,
@@ -97,6 +118,6 @@ class Habit {
 
   @override
   String toString() {
-    return 'Habit(id: $id, name: $name, category: $category, streak: $streak, isCompleted: $isCompleted, reminder: $reminderEnabled at $reminderTime)';
+    return 'Habit(id: $id, name: $name, category: $category, streak: $streak, isCompleted: $isCompleted, goal: $goalType $goalValue $goalUnit, reminder: $reminderEnabled at $reminderTime)';
   }
 }

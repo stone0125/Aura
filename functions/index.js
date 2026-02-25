@@ -260,7 +260,21 @@ exports.generateHabitSuggestions = onCall({ secrets: [revenueCatApiKey, geminiAp
     - Build on existing habits when possible
     - Match the user's demonstrated capacity level
 
-    Format as JSON array with keys: "habitName", "category", "explanation", "reason".
+    Format as JSON array with keys:
+    - "habitName": string (the habit name)
+    - "category": one of "health", "learning", "productivity", "mindfulness", "fitness"
+    - "explanation": string (what the habit is and how to do it)
+    - "reason": string (why this helps the user)
+    - "frequencyType": "daily" or "weekly"
+    - "weeklyDays": array of day numbers [0-6] (0=Sunday) if weekly, null if daily
+    - "goalType": "none", "time", or "count"
+    - "goalValue": numeric target (e.g. 10 for 10 minutes), null if goalType is "none"
+    - "goalUnit": string unit (e.g. "minutes", "pages", "glasses"), null if goalType is "none"
+    - "estimatedMinutes": realistic daily time commitment in minutes (1-120)
+    - "estimatedImpact": "High", "Medium", or "Low" based on expected life impact
+    - "suggestedReminderHour": 0-23 hour for best time to do this habit, null if no recommendation
+    - "suggestedReminderMinute": 0-59 minute, null if no recommendation
+
     Do not include markdown formatting.
   `;
 
@@ -273,11 +287,33 @@ exports.generateHabitSuggestions = onCall({ secrets: [revenueCatApiKey, geminiAp
     const parsed = JSON.parse(jsonStr);
 
     if (!Array.isArray(parsed)) throw new Error('Expected array');
+    const VALID_FREQUENCY_TYPES = ['daily', 'weekly'];
+    const VALID_GOAL_TYPES = ['none', 'time', 'count'];
+    const VALID_IMPACTS = ['High', 'Medium', 'Low'];
     return parsed.slice(0, 5).map(item => ({
       habitName: String(item.habitName || '').substring(0, 100),
       category: VALID_CATEGORIES.includes(item.category) ? item.category : 'health',
       explanation: String(item.explanation || '').substring(0, 500),
       reason: String(item.reason || '').substring(0, 500),
+      frequencyType: VALID_FREQUENCY_TYPES.includes(item.frequencyType) ? item.frequencyType : 'daily',
+      weeklyDays: item.frequencyType === 'weekly' && Array.isArray(item.weeklyDays)
+        ? item.weeklyDays.filter(d => Number.isInteger(d) && d >= 0 && d <= 6).slice(0, 7)
+        : null,
+      goalType: VALID_GOAL_TYPES.includes(item.goalType) ? item.goalType : 'none',
+      goalValue: item.goalType && item.goalType !== 'none' && Number.isFinite(Number(item.goalValue))
+        ? Math.min(10000, Math.max(1, Number(item.goalValue)))
+        : null,
+      goalUnit: item.goalType && item.goalType !== 'none' && item.goalUnit
+        ? String(item.goalUnit).substring(0, 50)
+        : null,
+      estimatedMinutes: Math.min(120, Math.max(1, Number(item.estimatedMinutes) || 15)),
+      estimatedImpact: VALID_IMPACTS.includes(item.estimatedImpact) ? item.estimatedImpact : 'Medium',
+      suggestedReminderHour: Number.isInteger(item.suggestedReminderHour) && item.suggestedReminderHour >= 0 && item.suggestedReminderHour <= 23
+        ? item.suggestedReminderHour
+        : null,
+      suggestedReminderMinute: Number.isInteger(item.suggestedReminderMinute) && item.suggestedReminderMinute >= 0 && item.suggestedReminderMinute <= 59
+        ? item.suggestedReminderMinute
+        : null,
     }));
   } catch (error) {
     console.error("Error generating suggestions:", error);
@@ -333,9 +369,13 @@ exports.generateWeeklyInsights = onCall({ secrets: [revenueCatApiKey, geminiApiK
     - "summary": A professional analysis of overall weekly performance (2-3 sentences, include specific percentages or metrics)
     - "pattern": One positive behavioral pattern identified with supporting evidence from the data
     - "improvement": One specific area for optimization with a concrete implementation strategy
+    - "nextSteps": An array of 2-4 specific, actionable next steps. Each step should have:
+      - "action": A specific, measurable action the user should take
+      - "timeframe": "today", "this week", or "next week"
+      - "priority": "high", "medium", or "low"
 
     Use evidence-based language (e.g., "Data shows...", "Your pattern indicates...", "Research suggests...").
-    Format as JSON with keys: "summary", "pattern", "improvement".
+    Format as JSON with keys: "summary", "pattern", "improvement", "nextSteps".
     Do not include markdown formatting.
   `;
 
@@ -347,10 +387,21 @@ exports.generateWeeklyInsights = onCall({ secrets: [revenueCatApiKey, geminiApiK
     const jsonStr = text.replace(/```json/g, "").replace(/```/g, "").trim();
     const parsed = JSON.parse(jsonStr);
 
+    const VALID_NEXT_STEP_TIMEFRAMES = ['today', 'this week', 'next week'];
+    const VALID_NEXT_STEP_PRIORITIES = ['high', 'medium', 'low'];
+    const nextSteps = Array.isArray(parsed.nextSteps)
+      ? parsed.nextSteps.slice(0, 4).map(step => ({
+          action: String(step.action || '').substring(0, 300),
+          timeframe: VALID_NEXT_STEP_TIMEFRAMES.includes(step.timeframe) ? step.timeframe : 'this week',
+          priority: VALID_NEXT_STEP_PRIORITIES.includes(step.priority) ? step.priority : 'medium',
+        }))
+      : [];
+
     return {
       summary: String(parsed.summary || '').substring(0, 1000),
       pattern: String(parsed.pattern || '').substring(0, 500),
       improvement: String(parsed.improvement || '').substring(0, 500),
+      nextSteps,
     };
   } catch (error) {
     console.error("Error generating insights:", error);
@@ -554,8 +605,11 @@ exports.generateActionItems = onCall({ secrets: [revenueCatApiKey, geminiApiKey]
   const model = getGenAI().getGenerativeModel({ model: "gemini-3-flash-preview" });
 
   const habitsDetail = validatedHabits.filter(h => h && typeof h === 'object').map(h =>
-    `- ${sanitizeForPrompt(h.name || '')} (${VALID_CATEGORIES.includes(h.category) ? h.category : 'general'}): streak ${Number(h.streak) || 0}, ${h.completed ? 'completed' : 'incomplete'}`
+    `- [ID:${sanitizeForPrompt(h.id || '')}] ${sanitizeForPrompt(h.name || '')} (${VALID_CATEGORIES.includes(h.category) ? h.category : 'general'}): streak ${Number(h.streak) || 0}, ${h.completed ? 'completed' : 'incomplete'}`
   ).join('\n');
+
+  // Build a lookup map for validating relatedHabitId in response
+  const habitIdSet = new Set(validatedHabits.filter(h => h && h.id).map(h => h.id));
 
   const performanceTier = rate >= 80 ? 'High Performer' : rate >= 50 ? 'Developing' : 'Foundation Building';
 
@@ -591,6 +645,7 @@ exports.generateActionItems = onCall({ secrets: [revenueCatApiKey, geminiApiKey]
         "type": "daily" | "weekly" | "challenge",
         "priority": "high" | "medium" | "low",
         "relatedHabit": "<name of related habit or null>",
+        "relatedHabitId": "<ID from the habit data [ID:xxx] or null>",
         "metric": "<specific measurable target>"
       }
     ]
@@ -615,6 +670,9 @@ exports.generateActionItems = onCall({ secrets: [revenueCatApiKey, geminiApiKey]
       type: VALID_ACTION_TYPES.includes(item.type) ? item.type : 'daily',
       priority: VALID_PRIORITIES.includes(item.priority) ? item.priority : 'medium',
       relatedHabit: item.relatedHabit ? String(item.relatedHabit).substring(0, 100) : null,
+      relatedHabitId: item.relatedHabitId && habitIdSet.has(item.relatedHabitId)
+        ? String(item.relatedHabitId).substring(0, 100)
+        : null,
       metric: String(item.metric || '').substring(0, 200),
     }));
   } catch (error) {
@@ -643,22 +701,52 @@ exports.generatePatternDiscovery = onCall({ secrets: [revenueCatApiKey, geminiAp
   const { habits } = request.data || {};
   const validatedHabits = validateArray(habits || [], 'habits', 50);
 
-  // Minimum threshold gate — avoid calling Gemini with insufficient data
-  if (validatedHabits.length < 2) {
-    return { patterns: [], reason: 'insufficient_data' };
-  }
-
+  // Collect all completion dates for threshold checks
   let totalCompletions = 0;
+  const allDates = [];
   const habitsDetail = validatedHabits.map(h => {
     const dates = Array.isArray(h.completionDates)
       ? h.completionDates.filter(d => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d))
       : [];
     totalCompletions += dates.length;
+    allDates.push(...dates);
     return `- ${sanitizeForPrompt(h.name || '')} (${VALID_CATEGORIES.includes(h.category) ? h.category : 'general'}): streak ${Number(h.streak) || 0}, reminder ${sanitizeForPrompt(h.reminderTime || 'none')}, completions: [${dates.slice(0, 60).join(', ')}]`;
   }).join('\n');
 
-  if (totalCompletions < 5) {
+  // Hard minimum: need at least 1 habit with some completions
+  if (validatedHabits.length < 1 || totalCompletions < 3) {
     return { patterns: [], reason: 'insufficient_data' };
+  }
+
+  // Lite path: 1 habit + 3 completions OR <2 habits + <5 completions
+  // Return a simple day-of-week pattern without calling Gemini
+  if (validatedHabits.length < 2 || totalCompletions < 5) {
+    // Count weekday vs weekend completions
+    let weekdayCount = 0;
+    let weekendCount = 0;
+    for (const dateStr of allDates) {
+      const date = new Date(dateStr + 'T00:00:00');
+      const day = date.getDay(); // 0=Sun, 6=Sat
+      if (day === 0 || day === 6) {
+        weekendCount++;
+      } else {
+        weekdayCount++;
+      }
+    }
+    const isWeekdayStronger = weekdayCount >= weekendCount;
+    const patterns = [{
+      title: isWeekdayStronger ? 'Weekday Momentum' : 'Weekend Warrior',
+      description: isWeekdayStronger
+        ? `You completed ${weekdayCount} of ${totalCompletions} habits on weekdays.`
+        : `You completed ${weekendCount} of ${totalCompletions} habits on weekends.`,
+      insight: isWeekdayStronger
+        ? 'Try maintaining your weekday routine through the weekend too.'
+        : 'Build on your weekend energy by adding a small weekday habit.',
+      type: 'dayOfWeek',
+      confidence: 0.5,
+      iconName: isWeekdayStronger ? 'calendar_today' : 'weekend',
+    }];
+    return { patterns };
   }
 
   const model = getGenAI().getGenerativeModel({ model: "gemini-3-flash-preview" });
@@ -753,6 +841,9 @@ exports.generateHabitScore = onCall({ secrets: [revenueCatApiKey, geminiApiKey] 
   const totalCompletions = validateNumber(data.totalCompletions ?? 0, 'totalCompletions', 0, 100000);
   const completionHistory = validateArray(data.completionHistory || [], 'completionHistory', 30);
   const healthData = data.healthData || null;
+  const goalType = data.goalType || null;
+  const goalValue = data.goalValue ? Number(data.goalValue) : null;
+  const goalUnit = data.goalUnit ? sanitizeForPrompt(String(data.goalUnit)).substring(0, 50) : null;
 
   const model = getGenAI().getGenerativeModel({ model: "gemini-3-flash-preview" });
 
@@ -776,12 +867,19 @@ exports.generateHabitScore = onCall({ secrets: [revenueCatApiKey, geminiApiKey] 
     `;
   }
 
+  let goalContext = '';
+  if (goalType && goalType !== 'none' && goalValue) {
+    goalContext = `
+    - Goal: ${goalValue} ${goalUnit || ''} (${goalType})
+    Consider whether the user's completion patterns suggest they are meeting their goal target.`;
+  }
+
   const prompt = `
     You are a behavioral analytics expert. Generate a comprehensive performance score for this habit.
 
     HABIT DATA:
     - Name: "${habitName}"
-    - Category: ${category}
+    - Category: ${category}${goalContext}
     - Current streak: ${currentStreak} days
     - Longest streak ever: ${longestStreak} days
     - Total completions: ${totalCompletions}
@@ -929,9 +1027,13 @@ exports.generateDailyReview = onCall({ secrets: [revenueCatApiKey, geminiApiKey]
     `;
   }
 
-  const habitsDetail = habits.map(h =>
-    `- ${sanitizeForPrompt(h.name || '')} (${VALID_CATEGORIES.includes(h.category) ? h.category : 'general'}): ${h.completed ? 'Completed' : 'Incomplete'}, Streak: ${Number(h.streak) || 0}`
-  ).join('\n');
+  const habitsDetail = habits.map(h => {
+    let detail = `- ${sanitizeForPrompt(h.name || '')} (${VALID_CATEGORIES.includes(h.category) ? h.category : 'general'}): ${h.completed ? 'Completed' : 'Incomplete'}, Streak: ${Number(h.streak) || 0}`;
+    if (h.goalType && h.goalType !== 'none') {
+      detail += `, Goal: ${Number(h.goalValue) || 0} ${sanitizeForPrompt(h.goalUnit || '')} (${h.goalType})`;
+    }
+    return detail;
+  }).join('\n');
 
   const prompt = `
     You are an elite behavioral coach providing a personalized daily performance review.

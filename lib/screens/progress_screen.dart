@@ -975,7 +975,7 @@ class _ProgressScreenState extends State<ProgressScreen>
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: ['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day) {
                   return SizedBox(
-                    width: 40,
+                    width: 36,
                     child: Text(
                       day,
                       textAlign: TextAlign.center,
@@ -1052,7 +1052,7 @@ class _ProgressScreenState extends State<ProgressScreen>
         _showDayDetailSheet(context, isDark, day);
       },
       child: Container(
-        width: 40,
+        width: 36,
         height: 80,
         decoration: BoxDecoration(
           color: cellColor,
@@ -1938,155 +1938,165 @@ class _ProgressScreenState extends State<ProgressScreen>
                 ),
               ),
 
-              // Badge icon
-              Icon(
-                achievement.icon,
-                size: 96,
-                color: achievement.category.getColor(isDark),
-              ),
-              const SizedBox(height: 20),
-
-              // Badge name
-              Text(
-                achievement.name,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: isDark
-                      ? AppColors.darkPrimaryText
-                      : AppColors.lightPrimaryText,
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 8),
-
-              // Status
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    achievement.isUnlocked
-                        ? Icons.check_circle_rounded
-                        : Icons.lock_rounded,
-                    size: 16,
-                    color: achievement.isUnlocked
-                        ? (isDark
-                              ? const Color(0xFF69F0AE)
-                              : const Color(0xFF27AE60))
-                        : (isDark
-                              ? const Color(0xFFFFB74D)
-                              : const Color(0xFFF39C12)),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    achievement.isUnlocked
-                        ? 'Unlocked ${achievement.unlockedDateText}'
-                        : 'Not yet unlocked',
-                    style: TextStyle(
-                      color: achievement.isUnlocked
-                          ? (isDark
-                                ? const Color(0xFF69F0AE)
-                                : const Color(0xFF27AE60))
-                          : (isDark
-                                ? const Color(0xFFFFB74D)
-                                : const Color(0xFFF39C12)),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-
-              // Description
-              Text(
-                achievement.description,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: isDark
-                      ? AppColors.darkSecondaryText
-                      : AppColors.lightSecondaryText,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w400,
-                  height: 1.6,
-                ),
-              ),
-
-              // Progress (if locked)
-              if (!achievement.isUnlocked) ...[
-                const SizedBox(height: 20),
-                Text(
-                  'Your progress',
-                  style: TextStyle(
-                    color: isDark
-                        ? AppColors.darkPrimaryText
-                        : AppColors.lightPrimaryText,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  height: 12,
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? const Color(0xFF3A3A3A)
-                        : const Color(0xFFE8E8E8),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: FractionallySizedBox(
-                    alignment: Alignment.centerLeft,
-                    widthFactor: achievement.progress,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: isDark
-                            ? AppColors.darkCoral
-                            : AppColors.lightCoral,
-                        borderRadius: BorderRadius.circular(6),
+              // Scrollable content
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Badge icon
+                      Icon(
+                        achievement.icon,
+                        size: 96,
+                        color: achievement.category.getColor(isDark),
                       ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  achievement.progressText,
-                  style: TextStyle(
-                    color: isDark
-                        ? AppColors.darkSecondaryText
-                        : AppColors.lightSecondaryText,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w400,
-                  ),
-                ),
-              ],
+                      const SizedBox(height: 20),
 
-              // Share button
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    HapticFeedback.lightImpact();
-                    _shareAchievement(achievement);
-                    Navigator.of(context).pop();
-                  },
-                  icon: const Icon(Icons.share_rounded, size: 18),
-                  label: Text(
-                    achievement.isUnlocked
-                        ? 'Share Achievement'
-                        : 'Share Progress',
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: isDark
-                        ? AppColors.darkCoral
-                        : AppColors.lightCoral,
-                    foregroundColor: isDark
-                        ? AppColors.darkBackground
-                        : Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: UIConstants.borderRadiusMedium,
-                    ),
+                      // Badge name
+                      Text(
+                        achievement.name,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: isDark
+                              ? AppColors.darkPrimaryText
+                              : AppColors.lightPrimaryText,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+
+                      // Status
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            achievement.isUnlocked
+                                ? Icons.check_circle_rounded
+                                : Icons.lock_rounded,
+                            size: 16,
+                            color: achievement.isUnlocked
+                                ? (isDark
+                                      ? const Color(0xFF69F0AE)
+                                      : const Color(0xFF27AE60))
+                                : (isDark
+                                      ? const Color(0xFFFFB74D)
+                                      : const Color(0xFFF39C12)),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            achievement.isUnlocked
+                                ? 'Unlocked ${achievement.unlockedDateText}'
+                                : 'Not yet unlocked',
+                            style: TextStyle(
+                              color: achievement.isUnlocked
+                                  ? (isDark
+                                        ? const Color(0xFF69F0AE)
+                                        : const Color(0xFF27AE60))
+                                  : (isDark
+                                        ? const Color(0xFFFFB74D)
+                                        : const Color(0xFFF39C12)),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Description
+                      Text(
+                        achievement.description,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: isDark
+                              ? AppColors.darkSecondaryText
+                              : AppColors.lightSecondaryText,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w400,
+                          height: 1.6,
+                        ),
+                      ),
+
+                      // Progress (if locked)
+                      if (!achievement.isUnlocked) ...[
+                        const SizedBox(height: 20),
+                        Text(
+                          'Your progress',
+                          style: TextStyle(
+                            color: isDark
+                                ? AppColors.darkPrimaryText
+                                : AppColors.lightPrimaryText,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          height: 12,
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? const Color(0xFF3A3A3A)
+                                : const Color(0xFFE8E8E8),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: FractionallySizedBox(
+                            alignment: Alignment.centerLeft,
+                            widthFactor: achievement.progress,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: isDark
+                                    ? AppColors.darkCoral
+                                    : AppColors.lightCoral,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          achievement.progressText,
+                          style: TextStyle(
+                            color: isDark
+                                ? AppColors.darkSecondaryText
+                                : AppColors.lightSecondaryText,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                      ],
+
+                      // Share button
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            HapticFeedback.lightImpact();
+                            _shareAchievement(achievement);
+                            Navigator.of(context).pop();
+                          },
+                          icon: const Icon(Icons.share_rounded, size: 18),
+                          label: Text(
+                            achievement.isUnlocked
+                                ? 'Share Achievement'
+                                : 'Share Progress',
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: isDark
+                                ? AppColors.darkCoral
+                                : AppColors.lightCoral,
+                            foregroundColor: isDark
+                                ? AppColors.darkBackground
+                                : Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: UIConstants.borderRadiusMedium,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),

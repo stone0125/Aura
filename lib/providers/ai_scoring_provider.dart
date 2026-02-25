@@ -179,6 +179,9 @@ class AIScoringProvider extends ChangeNotifier {
         'totalCompletions': history.where((h) => h).length,
         'completionHistory': history,
         'healthData': healthData,
+        'goalType': habit.goalType,
+        'goalValue': habit.goalValue,
+        'goalUnit': habit.goalUnit,
       });
 
       // Validate response data type before casting
@@ -250,6 +253,9 @@ class AIScoringProvider extends ChangeNotifier {
                 'category': h.category.name,
                 'completed': h.isCompleted,
                 'streak': h.streak,
+                'goalType': h.goalType,
+                'goalValue': h.goalValue,
+                'goalUnit': h.goalUnit,
               })
           .toList();
 
@@ -381,6 +387,16 @@ class AIScoringProvider extends ChangeNotifier {
       final historyFutures = habits.map((h) => _firestoreService.getHabitHistory(h.id)).toList();
       final allHistories = await Future.wait(historyFutures);
 
+      // Build date -> completion count map for day-aligned health data
+      final dateCompletionCount = <String, int>{};
+      for (int i = 0; i < habits.length; i++) {
+        final history = allHistories[i];
+        for (final d in history) {
+          final dateStr = '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+          dateCompletionCount[dateStr] = (dateCompletionCount[dateStr] ?? 0) + 1;
+        }
+      }
+
       // Prepare habit data with completion dates
       final habitData = <Map<String, dynamic>>[];
       for (int i = 0; i < habits.length; i++) {
@@ -402,12 +418,24 @@ class AIScoringProvider extends ChangeNotifier {
         });
       }
 
+      // Enrich health data with daily habit completion rate
+      final totalHabits = habits.length;
+      final enrichedHealthData = healthData.map((entry) {
+        final map = Map<String, dynamic>.from(entry as Map);
+        final dateStr = map['date']?.toString();
+        if (dateStr != null && totalHabits > 0) {
+          final completed = dateCompletionCount[dateStr] ?? 0;
+          map['dailyCompletionRate'] = ((completed / totalHabits) * 100).round();
+        }
+        return map;
+      }).toList();
+
       // Call Cloud Function
       final callable = _functions.httpsCallable('generateHealthCorrelations');
       final result = await callable.call({
         'timeRange': timeRange,
         'habitData': habitData,
-        'healthData': healthData,
+        'healthData': enrichedHealthData,
       });
 
       // Validate response data type before casting

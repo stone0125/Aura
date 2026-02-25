@@ -37,10 +37,12 @@ class AuthService {
         // Mobile Google Sign In (v7 API)
         await _ensureGoogleSignInInitialized();
 
-        // Force account selection by disconnecting first
-        await GoogleSignIn.instance.disconnect();
+        if (!GoogleSignIn.instance.supportsAuthenticate()) {
+          throw UnsupportedError(
+              'Google Sign-In not supported on this platform');
+        }
 
-        // Authenticate - returns GoogleSignInAccount
+        // Credential Manager handles account selection — no disconnect() needed
         final account = await GoogleSignIn.instance.authenticate();
 
         // Get authentication tokens from the account
@@ -90,10 +92,59 @@ class AuthService {
     }
   }
 
+  // Sign up with Email & Password
+  Future<UserCredential> signUpWithEmailPassword(
+      String email, String password) async {
+    try {
+      return await _auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'email-already-in-use') {
+        throw Exception(
+          'An account already exists with this email. Try signing in with Google instead.',
+        );
+      }
+      rethrow;
+    }
+  }
+
+  // Sign in with Email & Password
+  Future<UserCredential> signInWithEmailPassword(
+      String email, String password) async {
+    try {
+      return await _auth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+    } on FirebaseAuthException catch (e) {
+      switch (e.code) {
+        case 'user-not-found':
+        case 'wrong-password':
+        case 'invalid-credential':
+          throw Exception('Invalid email or password. Please try again.');
+        default:
+          rethrow;
+      }
+    }
+  }
+
+  // Send password reset email
+  Future<void> sendPasswordReset(String email) async {
+    try {
+      await _auth.sendPasswordResetEmail(email: email);
+    } on FirebaseAuthException catch (_) {
+      // Always succeed silently to avoid leaking whether an email is registered
+    }
+  }
+
   // Sign Out
   Future<void> signOut() async {
     if (_googleSignInInitialized) {
-      await GoogleSignIn.instance.disconnect();
+      try {
+        await GoogleSignIn.instance.disconnect();
+      } catch (_) {}
     }
     await _auth.signOut();
   }

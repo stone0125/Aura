@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -82,7 +83,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(height: 24),
 
                   // Health Integration (only show on iOS/Android)
-                  if (Platform.isIOS || Platform.isAndroid) ...[
+                  if (!kIsWeb && (Platform.isIOS || Platform.isAndroid)) ...[
                     _buildSectionHeader(context, 'Health Integration', isDark),
                     _buildHealthIntegrationSection(context, isDark),
                     const SizedBox(height: 24),
@@ -649,7 +650,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           icon: Icons.favorite_rounded,
           title: 'Connect Health Data',
           subtitle: isEnabled
-              ? 'Connected to ${Platform.isIOS ? 'Apple Health' : 'Health Connect'}'
+              ? 'Connected to ${!kIsWeb && Platform.isIOS ? 'Apple Health' : 'Health Connect'}'
               : 'Sync steps, sleep & activity',
           value: isEnabled,
           isDark: isDark,
@@ -1792,9 +1793,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   ) {
     final firstNameController = TextEditingController(text: profile.firstName);
     final lastNameController = TextEditingController(text: profile.lastName);
-    final displayNameController = TextEditingController(
-      text: profile.displayName ?? '',
-    );
     final bioController = TextEditingController(text: profile.bio ?? '');
 
     showModalBottomSheet(
@@ -1806,116 +1804,108 @@ class _SettingsScreenState extends State<SettingsScreen> {
           bottom: MediaQuery.of(context).viewInsets.bottom,
         ),
         child: Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.85,
+          ),
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
             color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(UIConstants.radiusXLarge)),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Edit Profile',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
-                        color: isDark
-                            ? Colors.white
-                            : AppColors.lightPrimaryText,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Edit Profile',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                          color: isDark
+                              ? Colors.white
+                              : AppColors.lightPrimaryText,
+                        ),
                       ),
                     ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: Icon(
-                      Icons.close_rounded,
-                      color: isDark
-                          ? AppColors.darkSecondaryText
-                          : AppColors.lightSecondaryText,
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: Icon(
+                        Icons.close_rounded,
+                        color: isDark
+                            ? AppColors.darkSecondaryText
+                            : AppColors.lightSecondaryText,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                TextField(
+                  controller: firstNameController,
+                  decoration: InputDecoration(
+                    labelText: 'First Name',
+                    border: OutlineInputBorder(
+                      borderRadius: UIConstants.borderRadiusMedium,
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              TextField(
-                controller: firstNameController,
-                decoration: InputDecoration(
-                  labelText: 'First Name',
-                  border: OutlineInputBorder(
-                    borderRadius: UIConstants.borderRadiusMedium,
-                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: lastNameController,
-                decoration: InputDecoration(
-                  labelText: 'Last Name',
-                  border: OutlineInputBorder(
-                    borderRadius: UIConstants.borderRadiusMedium,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: displayNameController,
-                decoration: InputDecoration(
-                  labelText: 'Display Name (Optional)',
-                  border: OutlineInputBorder(
-                    borderRadius: UIConstants.borderRadiusMedium,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: bioController,
-                maxLines: 3,
-                decoration: InputDecoration(
-                  labelText: 'Bio (Optional)',
-                  border: OutlineInputBorder(
-                    borderRadius: UIConstants.borderRadiusMedium,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: ElevatedButton(
-                  onPressed: () {
-                    HapticFeedback.lightImpact();
-                    context.read<SettingsProvider>().updateProfile(
-                      firstName: firstNameController.text,
-                      lastName: lastNameController.text,
-                      displayName: displayNameController.text.isEmpty
-                          ? null
-                          : displayNameController.text,
-                      bio: bioController.text.isEmpty
-                          ? null
-                          : bioController.text,
-                    );
-                    Navigator.pop(context);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: isDark
-                        ? AppColors.darkCoral
-                        : AppColors.lightCoral,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: UIConstants.borderRadiusLarge,
+                const SizedBox(height: 16),
+                TextField(
+                  controller: lastNameController,
+                  decoration: InputDecoration(
+                    labelText: 'Last Name',
+                    border: OutlineInputBorder(
+                      borderRadius: UIConstants.borderRadiusMedium,
                     ),
                   ),
-                  child: const Text(
-                    'Save Changes',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: bioController,
+                  maxLines: 3,
+                  decoration: InputDecoration(
+                    labelText: 'Bio (Optional)',
+                    border: OutlineInputBorder(
+                      borderRadius: UIConstants.borderRadiusMedium,
+                    ),
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      context.read<SettingsProvider>().updateProfile(
+                        firstName: firstNameController.text,
+                        lastName: lastNameController.text,
+                        bio: bioController.text.isEmpty
+                            ? null
+                            : bioController.text,
+                      );
+                      Navigator.pop(context);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isDark
+                          ? AppColors.darkCoral
+                          : AppColors.lightCoral,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: UIConstants.borderRadiusLarge,
+                      ),
+                    ),
+                    child: const Text(
+                      'Save Changes',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

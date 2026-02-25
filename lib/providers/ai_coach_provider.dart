@@ -6,6 +6,7 @@ import '../models/habit.dart';
 import '../models/habit_category.dart';
 import '../models/subscription_models.dart';
 import '../services/subscription_service.dart';
+import '../config/habit_icons.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -259,22 +260,32 @@ class AICoachProvider with ChangeNotifier {
           return null;
         }
         final map = Map<String, dynamic>.from(item);
+        final category = HabitCategory.values.firstWhere(
+          (e) => e.name == map['category']?.toString().toLowerCase(),
+          orElse: () {
+            debugPrint('Unknown category "${map['category']}", defaulting to health');
+            return HabitCategory.health;
+          },
+        );
         return AICoachSuggestion(
           id: '${DateTime.now().millisecondsSinceEpoch}_$index', // Unique ID per item
           title: map['habitName']?.toString() ?? 'New Habit',
           description: map['explanation']?.toString() ?? '',
           whyThisHelps: map['reason']?.toString() ?? '',
-          category: HabitCategory.values.firstWhere(
-            (e) => e.name == map['category']?.toString().toLowerCase(),
-            orElse: () {
-              debugPrint('Unknown category "${map['category']}", defaulting to health');
-              return HabitCategory.health;
-            },
-          ),
-          icon: Icons.lightbulb_outline, // Default icon
-          estimatedImpact: 'Medium', // Default
-          estimatedMinutes: 15, // Default
+          category: category,
+          icon: HabitIcons.getDefaultIconForCategory(category.name),
+          estimatedImpact: map['estimatedImpact']?.toString() ?? 'Medium',
+          estimatedMinutes: (map['estimatedMinutes'] as num?)?.toInt() ?? 15,
           suggestedAt: DateTime.now(),
+          frequencyType: map['frequencyType']?.toString() ?? 'daily',
+          weeklyDays: map['weeklyDays'] is List
+              ? List<int>.from((map['weeklyDays'] as List).map((e) => (e as num?)?.toInt() ?? 0))
+              : null,
+          goalType: map['goalType']?.toString() ?? 'none',
+          goalValue: (map['goalValue'] as num?)?.toInt(),
+          goalUnit: map['goalUnit']?.toString(),
+          suggestedReminderHour: (map['suggestedReminderHour'] as num?)?.toInt(),
+          suggestedReminderMinute: (map['suggestedReminderMinute'] as num?)?.toInt(),
         );
       }).whereType<AICoachSuggestion>().toList();
 
@@ -318,6 +329,12 @@ class AICoachProvider with ChangeNotifier {
         estimatedImpact: 'High',
         estimatedMinutes: 5,
         suggestedAt: DateTime.now(),
+        frequencyType: 'daily',
+        goalType: 'time',
+        goalValue: 5,
+        goalUnit: 'minutes',
+        suggestedReminderHour: 7,
+        suggestedReminderMinute: 0,
       ),
       AICoachSuggestion(
         id: 'default_2',
@@ -330,6 +347,12 @@ class AICoachProvider with ChangeNotifier {
         estimatedImpact: 'Medium',
         estimatedMinutes: 15,
         suggestedAt: DateTime.now(),
+        frequencyType: 'daily',
+        goalType: 'time',
+        goalValue: 15,
+        goalUnit: 'minutes',
+        suggestedReminderHour: 21,
+        suggestedReminderMinute: 0,
       ),
       AICoachSuggestion(
         id: 'default_3',
@@ -342,6 +365,12 @@ class AICoachProvider with ChangeNotifier {
         estimatedImpact: 'High',
         estimatedMinutes: 20,
         suggestedAt: DateTime.now(),
+        frequencyType: 'daily',
+        goalType: 'time',
+        goalValue: 20,
+        goalUnit: 'minutes',
+        suggestedReminderHour: 18,
+        suggestedReminderMinute: 30,
       ),
     ];
   }
@@ -399,6 +428,15 @@ class AICoachProvider with ChangeNotifier {
       final snapshot = data['completionSnapshot'] is List
           ? List<String>.from(data['completionSnapshot'])
           : buildCompletionSnapshot(habits);
+      // Parse nextSteps from AI response
+      List<AINextStep> nextSteps = [];
+      if (data['nextSteps'] is List) {
+        nextSteps = (data['nextSteps'] as List)
+            .whereType<Map>()
+            .map((e) => AINextStep.fromJson(Map<String, dynamic>.from(e)))
+            .toList();
+      }
+
       _weeklySummary = WeeklyAISummary(
         weekRange: 'Current Week',
         totalCompletions: weekData['totalCompletions'] ?? 0,
@@ -412,6 +450,7 @@ class AICoachProvider with ChangeNotifier {
             ? [data['pattern']]
             : ['Consistent effort'],
         completionSnapshot: snapshot,
+        nextSteps: nextSteps,
       );
     } catch (e) {
       debugPrint('Error loading insights: $e');
@@ -716,6 +755,7 @@ class AICoachProvider with ChangeNotifier {
           type: _parseActionType(map['type']?.toString()),
           priority: _parseActionPriority(map['priority']?.toString()),
           relatedHabit: map['relatedHabit']?.toString(),
+          relatedHabitId: map['relatedHabitId']?.toString(),
           metric: map['metric']?.toString(),
           createdAt: DateTime.now(),
         );

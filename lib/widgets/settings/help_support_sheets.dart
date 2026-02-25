@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:device_info_plus/device_info_plus.dart';
@@ -1221,17 +1222,17 @@ class _ReportBugSheetState extends State<_ReportBugSheet> {
       String deviceModel;
       String osVersion;
 
-      if (Platform.isAndroid) {
+      if (!kIsWeb && Platform.isAndroid) {
         final androidInfo = await deviceInfoPlugin.androidInfo;
         deviceModel = '${androidInfo.brand} ${androidInfo.model}';
         osVersion = 'Android ${androidInfo.version.release}';
-      } else if (Platform.isIOS) {
+      } else if (!kIsWeb && Platform.isIOS) {
         final iosInfo = await deviceInfoPlugin.iosInfo;
         deviceModel = iosInfo.utsname.machine;
         osVersion = '${iosInfo.systemName} ${iosInfo.systemVersion}';
       } else {
         deviceModel = 'Unknown';
-        osVersion = Platform.operatingSystem;
+        osVersion = kIsWeb ? 'Web' : Platform.operatingSystem;
       }
 
       if (mounted) {

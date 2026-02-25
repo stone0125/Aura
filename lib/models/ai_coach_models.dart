@@ -12,6 +12,13 @@ class AICoachSuggestion {
   final String estimatedImpact; // e.g., "High", "Medium", "Low"
   final int estimatedMinutes; // Time commitment
   final DateTime suggestedAt;
+  final String frequencyType; // "daily" or "weekly"
+  final List<int>? weeklyDays; // [0-6] if weekly, null if daily
+  final String goalType; // "none", "time", or "count"
+  final int? goalValue; // numeric target, null if none
+  final String? goalUnit; // e.g. "minutes", "pages", null if none
+  final int? suggestedReminderHour; // 0-23, null if no recommendation
+  final int? suggestedReminderMinute; // 0-59
 
   const AICoachSuggestion({
     required this.id,
@@ -23,6 +30,13 @@ class AICoachSuggestion {
     required this.estimatedImpact,
     required this.estimatedMinutes,
     required this.suggestedAt,
+    this.frequencyType = 'daily',
+    this.weeklyDays,
+    this.goalType = 'none',
+    this.goalValue,
+    this.goalUnit,
+    this.suggestedReminderHour,
+    this.suggestedReminderMinute,
   });
 
   Map<String, dynamic> toJson() {
@@ -37,6 +51,13 @@ class AICoachSuggestion {
       'estimatedImpact': estimatedImpact,
       'estimatedMinutes': estimatedMinutes,
       'suggestedAt': suggestedAt.toIso8601String(),
+      'frequencyType': frequencyType,
+      'weeklyDays': weeklyDays,
+      'goalType': goalType,
+      'goalValue': goalValue,
+      'goalUnit': goalUnit,
+      'suggestedReminderHour': suggestedReminderHour,
+      'suggestedReminderMinute': suggestedReminderMinute,
     };
   }
 
@@ -72,6 +93,15 @@ class AICoachSuggestion {
       suggestedAt: json['suggestedAt'] != null
           ? DateTime.tryParse(json['suggestedAt'].toString()) ?? DateTime.now()
           : DateTime.now(),
+      frequencyType: json['frequencyType']?.toString() ?? 'daily',
+      weeklyDays: json['weeklyDays'] is List
+          ? List<int>.from((json['weeklyDays'] as List).map((e) => (e as num?)?.toInt() ?? 0))
+          : null,
+      goalType: json['goalType']?.toString() ?? 'none',
+      goalValue: (json['goalValue'] as num?)?.toInt(),
+      goalUnit: json['goalUnit']?.toString(),
+      suggestedReminderHour: (json['suggestedReminderHour'] as num?)?.toInt(),
+      suggestedReminderMinute: (json['suggestedReminderMinute'] as num?)?.toInt(),
     );
   }
 
@@ -90,6 +120,44 @@ class AICoachSuggestion {
   }
 }
 
+/// A structured next-step from AI weekly insights
+class AINextStep {
+  final String action;
+  final String timeframe; // "today", "this week", etc.
+  final String priority; // "high", "medium", "low"
+
+  const AINextStep({
+    required this.action,
+    required this.timeframe,
+    required this.priority,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'action': action,
+    'timeframe': timeframe,
+    'priority': priority,
+  };
+
+  factory AINextStep.fromJson(Map<String, dynamic> json) {
+    return AINextStep(
+      action: json['action']?.toString() ?? '',
+      timeframe: json['timeframe']?.toString() ?? 'this week',
+      priority: json['priority']?.toString() ?? 'medium',
+    );
+  }
+
+  Color getPriorityColor(bool isDark) {
+    switch (priority.toLowerCase()) {
+      case 'high':
+        return isDark ? const Color(0xFFEF5350) : const Color(0xFFF44336);
+      case 'low':
+        return isDark ? const Color(0xFF64B5F6) : const Color(0xFF2196F3);
+      default:
+        return isDark ? const Color(0xFFFFB74D) : const Color(0xFFFF9800);
+    }
+  }
+}
+
 /// Weekly AI summary
 class WeeklyAISummary {
   final String weekRange; // e.g., "Oct 28 - Nov 3"
@@ -102,6 +170,7 @@ class WeeklyAISummary {
   final String encouragement;
   final List<String> highlights; // Bullet points
   final List<String> completionSnapshot; // Sorted habit IDs completed at generation time
+  final List<AINextStep> nextSteps; // Structured next-steps from AI
 
   const WeeklyAISummary({
     required this.weekRange,
@@ -114,6 +183,7 @@ class WeeklyAISummary {
     required this.encouragement,
     required this.highlights,
     this.completionSnapshot = const [],
+    this.nextSteps = const [],
   });
 
   Map<String, dynamic> toJson() {
@@ -128,6 +198,7 @@ class WeeklyAISummary {
       'encouragement': encouragement,
       'highlights': highlights,
       'completionSnapshot': completionSnapshot,
+      'nextSteps': nextSteps.map((s) => s.toJson()).toList(),
     };
   }
 
@@ -146,6 +217,12 @@ class WeeklyAISummary {
           : const [],
       completionSnapshot: json['completionSnapshot'] is List
           ? List<String>.from((json['completionSnapshot'] as List).map((e) => e?.toString() ?? ''))
+          : const [],
+      nextSteps: json['nextSteps'] is List
+          ? (json['nextSteps'] as List)
+              .whereType<Map>()
+              .map((e) => AINextStep.fromJson(Map<String, dynamic>.from(e)))
+              .toList()
           : const [],
     );
   }
@@ -520,6 +597,7 @@ class AIActionItem {
   final ActionItemType type;
   final ActionPriority priority;
   final String? relatedHabit;
+  final String? relatedHabitId;
   final String? metric;
   final bool isCompleted;
   final DateTime createdAt;
@@ -531,6 +609,7 @@ class AIActionItem {
     required this.type,
     required this.priority,
     this.relatedHabit,
+    this.relatedHabitId,
     this.metric,
     this.isCompleted = false,
     required this.createdAt,
@@ -544,6 +623,7 @@ class AIActionItem {
       'type': type.name,
       'priority': priority.name,
       'relatedHabit': relatedHabit,
+      'relatedHabitId': relatedHabitId,
       'metric': metric,
       'isCompleted': isCompleted,
       'createdAt': createdAt.toIso8601String(),
@@ -577,6 +657,7 @@ class AIActionItem {
       type: type,
       priority: priority,
       relatedHabit: json['relatedHabit']?.toString(),
+      relatedHabitId: json['relatedHabitId']?.toString(),
       metric: json['metric']?.toString(),
       isCompleted: json['isCompleted'] == true,
       createdAt: json['createdAt'] != null
@@ -593,6 +674,7 @@ class AIActionItem {
       type: type,
       priority: priority,
       relatedHabit: relatedHabit,
+      relatedHabitId: relatedHabitId,
       metric: metric,
       isCompleted: isCompleted ?? this.isCompleted,
       createdAt: createdAt,

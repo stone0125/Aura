@@ -19,6 +19,7 @@ import '../models/settings_models.dart';
 import '../config/theme/ui_constants.dart';
 import '../models/habit_category.dart';
 import 'habit_creation_screen.dart';
+import 'habit_detail_screen.dart';
 import '../widgets/outdated_report_banner.dart';
 
 /// AI Coach Screen with personalized suggestions and insights
@@ -125,7 +126,7 @@ class _AICoachScreenState extends State<AICoachScreen>
     return FadeTransition(
       opacity: _fadeAnimation,
       child: Container(
-        height: 180,
+        constraints: const BoxConstraints(minHeight: 120),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
@@ -332,15 +333,17 @@ class _AICoachScreenState extends State<AICoachScreen>
           // Tab bar (centered)
           Expanded(
             child: Center(
-              child: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? AppColors.darkBorder.withValues(alpha: 0.3)
-                      : AppColors.lightBorder.withValues(alpha: 0.5),
-                  borderRadius: UIConstants.borderRadiusMedium,
-                ),
-                child: Row(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? AppColors.darkBorder.withValues(alpha: 0.3)
+                        : AppColors.lightBorder.withValues(alpha: 0.5),
+                    borderRadius: UIConstants.borderRadiusMedium,
+                  ),
+                  child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: AICoachTab.values.map((tab) {
                     final isSelected = coachProvider.currentTab == tab;
@@ -404,6 +407,7 @@ class _AICoachScreenState extends State<AICoachScreen>
                   }).toList(),
                 ),
               ),
+            ),
             ),
           ),
           // Usage icon (pulses when at limit)
@@ -919,6 +923,18 @@ class _AICoachScreenState extends State<AICoachScreen>
                               fontWeight: FontWeight.w500,
                             ),
                           ),
+                          const SizedBox(width: 8),
+                          // Frequency/goal badge
+                          Text(
+                            _buildSuggestionBadgeText(suggestion),
+                            style: TextStyle(
+                              color: isDark
+                                  ? AppColors.darkSecondaryText
+                                  : AppColors.lightSecondaryText,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
                         ],
                       ),
                     ],
@@ -1268,22 +1284,26 @@ class _AICoachScreenState extends State<AICoachScreen>
           // Stats Row
           Row(
             children: [
-              _buildWeeklyStat(
-                isDark,
-                '${summary.totalCompletions}/${summary.targetCompletions}',
-                'Completions',
+              Expanded(
+                child: _buildWeeklyStat(
+                  isDark,
+                  '${summary.totalCompletions}/${summary.targetCompletions}',
+                  'Completions',
+                ),
               ),
-              const SizedBox(width: 24),
-              _buildWeeklyStat(
-                isDark,
-                '${(summary.completionRate * 100).toInt()}%',
-                'Success Rate',
+              Expanded(
+                child: _buildWeeklyStat(
+                  isDark,
+                  '${(summary.completionRate * 100).toInt()}%',
+                  'Success Rate',
+                ),
               ),
-              const SizedBox(width: 24),
-              _buildWeeklyStat(
-                isDark,
-                '${summary.currentStreak}',
-                'Day Streak',
+              Expanded(
+                child: _buildWeeklyStat(
+                  isDark,
+                  '${summary.currentStreak}',
+                  'Day Streak',
+                ),
               ),
             ],
           ),
@@ -1359,6 +1379,81 @@ class _AICoachScreenState extends State<AICoachScreen>
               ),
             ),
           ),
+
+          // Next Steps
+          if (summary.nextSteps.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Icon(
+                  Icons.checklist_rounded,
+                  size: 16,
+                  color: isDark ? AppColors.darkCoral : AppColors.lightCoral,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'Next Steps',
+                  style: TextStyle(
+                    color: isDark
+                        ? AppColors.darkPrimaryText
+                        : AppColors.lightPrimaryText,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            ...summary.nextSteps.map(
+              (step) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      margin: const EdgeInsets.only(top: 4),
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: step.getPriorityColor(isDark),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            step.action,
+                            style: TextStyle(
+                              color: isDark
+                                  ? AppColors.darkPrimaryText
+                                  : AppColors.lightPrimaryText,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              height: 1.4,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${step.timeframe} · ${step.priority} priority',
+                            style: TextStyle(
+                              color: isDark
+                                  ? AppColors.darkSecondaryText
+                                  : AppColors.lightSecondaryText,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -3001,29 +3096,60 @@ class _AICoachScreenState extends State<AICoachScreen>
                   spacing: 8,
                   runSpacing: 4,
                   children: [
-                    // Related habit badge
+                    // Related habit badge (tappable if linked to a habit ID)
                     if (action.relatedHabit != null &&
                         action.relatedHabit!.isNotEmpty)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: (isDark
-                                  ? AppColors.darkCoral
-                                  : AppColors.lightCoral)
-                              .withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          action.relatedHabit!,
-                          style: TextStyle(
-                            color: isDark
-                                ? AppColors.darkCoral
-                                : AppColors.lightCoral,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
+                      GestureDetector(
+                        onTap: action.relatedHabitId != null
+                            ? () {
+                                final habitProvider = Provider.of<HabitProvider>(context, listen: false);
+                                final habit = habitProvider.habits.where((h) => h.id == action.relatedHabitId).firstOrNull;
+                                if (habit != null) {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => HabitDetailScreen(habit: habit),
+                                    ),
+                                  );
+                                }
+                              }
+                            : null,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: (isDark
+                                    ? AppColors.darkCoral
+                                    : AppColors.lightCoral)
+                                .withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                action.relatedHabit!,
+                                style: TextStyle(
+                                  color: isDark
+                                      ? AppColors.darkCoral
+                                      : AppColors.lightCoral,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              if (action.relatedHabitId != null) ...[
+                                const SizedBox(width: 3),
+                                Icon(
+                                  Icons.open_in_new_rounded,
+                                  size: 10,
+                                  color: isDark
+                                      ? AppColors.darkCoral
+                                      : AppColors.lightCoral,
+                                ),
+                              ],
+                            ],
                           ),
                         ),
                       ),
@@ -3526,6 +3652,22 @@ class _AICoachScreenState extends State<AICoachScreen>
     );
   }
 
+  String _buildSuggestionBadgeText(AICoachSuggestion suggestion) {
+    final parts = <String>[];
+    // Frequency
+    if (suggestion.frequencyType == 'weekly') {
+      final dayCount = suggestion.weeklyDays?.length ?? 0;
+      parts.add('${dayCount}x weekly');
+    } else {
+      parts.add('Daily');
+    }
+    // Goal
+    if (suggestion.goalType != 'none' && suggestion.goalValue != null) {
+      parts.add('${suggestion.goalValue} ${suggestion.goalUnit ?? ''}');
+    }
+    return parts.join(' | ');
+  }
+
   void _showCooldownTooltip(BuildContext context) {
     _cooldownTooltip?.remove();
     _cooldownTooltip = null;
@@ -3585,6 +3727,7 @@ class _AICoachScreenState extends State<AICoachScreen>
 
     final habitsData = habitProvider.habits
         .map((h) => {
+              'id': h.id,
               'name': h.name,
               'category': h.category.name,
               'streak': h.streak,

@@ -329,16 +329,20 @@ class HabitCard extends StatelessWidget {
                           size: 14,
                         ),
                         const SizedBox(width: 4),
-                        Text(
-                          habit.streak == 0
-                              ? 'Start a streak!'
-                              : '${habit.streak} day${habit.streak == 1 ? '' : 's'} streak',
-                          style: TextStyle(
-                            color: isDark
-                                ? AppColors.darkOrange
-                                : AppColors.orange,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
+                        Flexible(
+                          child: Text(
+                            habit.streak == 0
+                                ? 'Start a streak!'
+                                : '${habit.streak} day${habit.streak == 1 ? '' : 's'} streak',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: isDark
+                                  ? AppColors.darkOrange
+                                  : AppColors.orange,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ),
                         if (habit.reminderEnabled && habit.reminderTime != null) ...[

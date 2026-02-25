@@ -62,6 +62,18 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
         _formData.reminderTime = habit.reminderTime!;
       }
 
+      // Pre-fill goal fields
+      switch (habit.goalType) {
+        case 'time':
+          _formData.goalType = GoalType.time;
+        case 'count':
+          _formData.goalType = GoalType.count;
+        default:
+          _formData.goalType = GoalType.none;
+      }
+      _formData.goalValue = habit.goalValue;
+      _formData.goalUnit = habit.goalUnit;
+
       _nameController.text = habit.name;
     } else if (widget.aiCoachSuggestion != null) {
       // Pre-fill from AI suggestion if provided
@@ -74,6 +86,41 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
       );
       _formData.aiOptimizedTiming = true;
       _formData.isAISuggested = true;
+
+      // Prefill frequency
+      if (suggestion.frequencyType == 'weekly') {
+        _formData.frequencyType = FrequencyType.weekly;
+        if (suggestion.weeklyDays != null && suggestion.weeklyDays!.isNotEmpty) {
+          _formData.weeklyDays = List<int>.from(suggestion.weeklyDays!);
+        }
+      } else {
+        _formData.frequencyType = FrequencyType.daily;
+      }
+
+      // Prefill goal
+      switch (suggestion.goalType) {
+        case 'time':
+          _formData.goalType = GoalType.time;
+        case 'count':
+          _formData.goalType = GoalType.count;
+        default:
+          _formData.goalType = GoalType.none;
+      }
+      if (suggestion.goalValue != null) {
+        _formData.goalValue = suggestion.goalValue;
+      }
+      if (suggestion.goalUnit != null) {
+        _formData.goalUnit = suggestion.goalUnit;
+      }
+
+      // Prefill reminder if AI suggested one
+      if (suggestion.suggestedReminderHour != null) {
+        _formData.reminderEnabled = true;
+        _formData.reminderTime = TimeOfDay(
+          hour: suggestion.suggestedReminderHour!,
+          minute: suggestion.suggestedReminderMinute ?? 0,
+        );
+      }
 
       _nameController.text = suggestion.title;
       _descriptionController.text = suggestion.description;
@@ -165,6 +212,10 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
         final updatedHabit = existingHabit.copyWith(
           name: _formData.name,
           category: _formData.category!,
+          goalType: _formData.goalType.name,
+          goalValue: _formData.goalType != GoalType.none ? _formData.goalValue : null,
+          goalUnit: _formData.goalType != GoalType.none ? _formData.goalUnit : null,
+          clearGoal: _formData.goalType == GoalType.none,
           reminderEnabled: _formData.reminderEnabled,
           reminderTime: _formData.reminderEnabled ? _formData.reminderTime : null,
         );
@@ -193,6 +244,9 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
           category: _formData.category!,
           streak: 0,
           isCompleted: false,
+          goalType: _formData.goalType.name,
+          goalValue: _formData.goalType != GoalType.none ? _formData.goalValue : null,
+          goalUnit: _formData.goalType != GoalType.none ? _formData.goalUnit : null,
           reminderEnabled: _formData.reminderEnabled,
           reminderTime: _formData.reminderEnabled ? _formData.reminderTime : null,
         );
@@ -304,7 +358,7 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
               controller: _scrollController,
               padding: const EdgeInsets.only(bottom: 104), // Space for button
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   // AI Pre-fill Banner (if from AI)
                   if (_formData.isAISuggested) _buildAIBanner(isDark),
@@ -806,9 +860,13 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
+          GridView.count(
+            crossAxisCount: 6,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            padding: EdgeInsets.zero,
             children: HabitIcons.icons.map((iconData) {
               final isSelected = _formData.selectedIcon == iconData.icon;
               final categoryColor =
@@ -996,8 +1054,8 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
                   },
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 150),
-                    width: 44,
-                    height: 44,
+                    width: 40,
+                    height: 40,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: isSelected
@@ -1075,15 +1133,305 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          Text(
-            'Set goals for this habit to track progress',
-            style: TextStyle(
+          // Segmented control: None / Time / Count
+          Container(
+            height: 48,
+            decoration: BoxDecoration(
               color: isDark
-                  ? AppColors.darkSecondaryText
-                  : AppColors.lightSecondaryText,
-              fontSize: 14,
+                  ? AppColors.darkSurfaceVariant
+                  : AppColors.lightBorder.withValues(alpha: 0.3),
+              borderRadius: UIConstants.borderRadiusMedium,
+              border: isDark
+                  ? Border.all(color: AppColors.darkBorder, width: 1)
+                  : null,
+            ),
+            child: Row(
+              children: GoalType.values.map((type) {
+                final isSelected = _formData.goalType == type;
+                return Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      setState(() {
+                        _formData.goalType = type;
+                        if (type == GoalType.none) {
+                          _formData.goalValue = null;
+                          _formData.goalUnit = null;
+                        } else if (type == GoalType.time) {
+                          _formData.goalUnit ??= 'minutes';
+                        } else if (type == GoalType.count) {
+                          _formData.goalValue ??= 1;
+                        }
+                      });
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      margin: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? (isDark
+                                  ? AppColors.darkBorder
+                                  : AppColors.lightSurface)
+                            : Colors.transparent,
+                        borderRadius: UIConstants.borderRadiusMedium,
+                        boxShadow: isSelected
+                            ? [
+                                BoxShadow(
+                                  color: isDark
+                                      ? Colors.black.withValues(alpha: 0.3)
+                                      : Colors.black.withValues(alpha: 0.08),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ]
+                            : null,
+                      ),
+                      child: Center(
+                        child: Text(
+                          type == GoalType.none
+                              ? 'None'
+                              : type == GoalType.time
+                                  ? 'Time'
+                                  : 'Count',
+                          style: TextStyle(
+                            color: isSelected
+                                ? (isDark
+                                      ? AppColors.darkCoral
+                                      : AppColors.lightCoral)
+                                : (isDark
+                                      ? AppColors.darkSecondaryText
+                                      : AppColors.lightPrimaryText),
+                            fontSize: 14,
+                            fontWeight: isSelected
+                                ? FontWeight.w600
+                                : FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
             ),
           ),
+
+          // Time goal inputs
+          if (_formData.goalType == GoalType.time) ...[
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                // Value field
+                Expanded(
+                  flex: 2,
+                  child: TextField(
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    controller: TextEditingController(
+                      text: _formData.goalValue?.toString() ?? '',
+                    )..selection = TextSelection.collapsed(
+                        offset: (_formData.goalValue?.toString() ?? '').length,
+                      ),
+                    onChanged: (val) {
+                      setState(() {
+                        _formData.goalValue = int.tryParse(val);
+                      });
+                    },
+                    style: TextStyle(
+                      color: isDark
+                          ? AppColors.darkPrimaryText
+                          : AppColors.lightPrimaryText,
+                      fontSize: 16,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'Value',
+                      hintStyle: TextStyle(
+                        color: isDark
+                            ? AppColors.darkSecondaryText
+                            : AppColors.lightSecondaryText,
+                      ),
+                      filled: true,
+                      fillColor: isDark
+                          ? AppColors.darkSurfaceVariant
+                          : AppColors.lightBorder.withValues(alpha: 0.3),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Unit dropdown
+                Expanded(
+                  flex: 3,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? AppColors.darkSurfaceVariant
+                          : AppColors.lightBorder.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: _formData.goalUnit ?? 'minutes',
+                        isExpanded: true,
+                        dropdownColor: isDark
+                            ? AppColors.darkSurface
+                            : AppColors.lightSurface,
+                        style: TextStyle(
+                          color: isDark
+                              ? AppColors.darkPrimaryText
+                              : AppColors.lightPrimaryText,
+                          fontSize: 16,
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'minutes',
+                            child: Text('minutes'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'hours',
+                            child: Text('hours'),
+                          ),
+                        ],
+                        onChanged: (val) {
+                          setState(() {
+                            _formData.goalUnit = val;
+                          });
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+
+          // Count goal inputs
+          if (_formData.goalType == GoalType.count) ...[
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                // Value stepper
+                Expanded(
+                  flex: 2,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? AppColors.darkSurfaceVariant
+                          : AppColors.lightBorder.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        SizedBox(
+                          width: 36,
+                          height: 36,
+                          child: IconButton(
+                            padding: EdgeInsets.zero,
+                            icon: Icon(
+                              Icons.remove,
+                              color: isDark
+                                  ? AppColors.darkCoral
+                                  : AppColors.lightCoral,
+                              size: 20,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                final current = _formData.goalValue ?? 1;
+                                _formData.goalValue =
+                                    current > 1 ? current - 1 : 1;
+                              });
+                            },
+                          ),
+                        ),
+                        Text(
+                          '${_formData.goalValue ?? 1}',
+                          style: TextStyle(
+                            color: isDark
+                                ? AppColors.darkPrimaryText
+                                : AppColors.lightPrimaryText,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        SizedBox(
+                          width: 36,
+                          height: 36,
+                          child: IconButton(
+                            padding: EdgeInsets.zero,
+                            icon: Icon(
+                              Icons.add,
+                              color: isDark
+                                  ? AppColors.darkCoral
+                                  : AppColors.lightCoral,
+                              size: 20,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                final current = _formData.goalValue ?? 1;
+                                _formData.goalValue = current + 1;
+                              });
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Unit text field (freeform: "glasses", "pages", "times", etc.)
+                Expanded(
+                  flex: 3,
+                  child: TextField(
+                    controller: TextEditingController(
+                      text: _formData.goalUnit ?? '',
+                    )..selection = TextSelection.collapsed(
+                        offset: (_formData.goalUnit ?? '').length,
+                      ),
+                    onChanged: (val) {
+                      setState(() {
+                        _formData.goalUnit = val.isEmpty ? null : val;
+                      });
+                    },
+                    style: TextStyle(
+                      color: isDark
+                          ? AppColors.darkPrimaryText
+                          : AppColors.lightPrimaryText,
+                      fontSize: 16,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'Unit (e.g. glasses, pages)',
+                      hintStyle: TextStyle(
+                        color: isDark
+                            ? AppColors.darkSecondaryText
+                            : AppColors.lightSecondaryText,
+                      ),
+                      filled: true,
+                      fillColor: isDark
+                          ? AppColors.darkSurfaceVariant
+                          : AppColors.lightBorder.withValues(alpha: 0.3),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );

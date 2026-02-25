@@ -24,7 +24,7 @@ class HealthService {
   ];
 
   /// Check if health integration is available on this platform
-  bool get isAvailable => Platform.isIOS || Platform.isAndroid;
+  bool get isAvailable => !kIsWeb && (Platform.isIOS || Platform.isAndroid);
 
   /// Check if we have permissions
   bool get hasPermissions => _hasPermissions;

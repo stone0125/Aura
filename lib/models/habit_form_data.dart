@@ -49,6 +49,10 @@ class HabitFormData {
     if (frequencyType == FrequencyType.custom && customInterval <= 0) {
       return false;
     }
+    // Validate goal: if a goal type is set, value must be positive
+    if (goalType != GoalType.none && (goalValue == null || goalValue! <= 0)) {
+      return false;
+    }
     // Validate reminder time bounds if reminders are enabled
     if (reminderEnabled) {
       if (reminderTime.hour < 0 || reminderTime.hour > 23) return false;

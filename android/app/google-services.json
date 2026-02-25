@@ -22,6 +22,14 @@
           }
         },
         {
+          "client_id": "314464093764-k2s7vq31sb6rtjvrhd4bbc48h9uja0jo.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.aura.habittracker",
+            "certificate_hash": "354e582c93d7da91b21f687e166e472ee0162b91"
+          }
+        },
+        {
           "client_id": "314464093764-squts7kosrc0s0kn9nsp1nshk1strk3i.apps.googleusercontent.com",
           "client_type": 3
         }

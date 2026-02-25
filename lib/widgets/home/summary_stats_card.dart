@@ -92,25 +92,30 @@ class SummaryStatsCard extends StatelessWidget {
 
           // Stats Row
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _buildStatItem(
-                icon: Icons.grid_view_rounded,
-                number: totalCount.toString(),
-                label: 'Total Habits',
-                isDark: isDark,
+              Expanded(
+                child: _buildStatItem(
+                  icon: Icons.grid_view_rounded,
+                  number: totalCount.toString(),
+                  label: 'Total Habits',
+                  isDark: isDark,
+                ),
               ),
-              _buildStatItem(
-                icon: Icons.check_circle_rounded,
-                number: completedCount.toString(),
-                label: 'Done Today',
-                isDark: isDark,
+              Expanded(
+                child: _buildStatItem(
+                  icon: Icons.check_circle_rounded,
+                  number: completedCount.toString(),
+                  label: 'Done Today',
+                  isDark: isDark,
+                ),
               ),
-              _buildStatItem(
-                icon: Icons.local_fire_department_rounded,
-                number: '$bestStreak days',
-                label: 'Best Streak',
-                isDark: isDark,
+              Expanded(
+                child: _buildStatItem(
+                  icon: Icons.local_fire_department_rounded,
+                  number: '$bestStreak days',
+                  label: 'Best Streak',
+                  isDark: isDark,
+                ),
               ),
             ],
           ),
@@ -145,6 +150,8 @@ class SummaryStatsCard extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
           number,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: TextStyle(
             color: isDark ? AppColors.darkPrimaryText : AppColors.lightPrimaryText,
             fontSize: 18,

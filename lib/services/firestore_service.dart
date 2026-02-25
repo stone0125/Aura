@@ -198,6 +198,9 @@ class FirestoreService {
           streak: effectiveStreak,
           isCompleted: isCompletedToday,
           lastCompletedDate: lastCompletedDate,
+          goalType: data['goalType'] as String? ?? 'none',
+          goalValue: (data['goalValue'] as num?)?.toInt(),
+          goalUnit: data['goalUnit'] as String?,
           reminderEnabled: data['reminderEnabled'] ?? false,
           reminderTime: reminderTime,
           createdAt: createdAt,
@@ -228,6 +231,9 @@ class FirestoreService {
       'lastCompletedDate': habit.lastCompletedDate != null
           ? Timestamp.fromDate(habit.lastCompletedDate!)
           : null,
+      'goalType': habit.goalType,
+      'goalValue': habit.goalValue,
+      'goalUnit': habit.goalUnit,
       'reminderEnabled': habit.reminderEnabled,
       'reminderHour': habit.reminderTime?.hour,
       'reminderMinute': habit.reminderTime?.minute,
@@ -247,6 +253,9 @@ class FirestoreService {
       'lastCompletedDate': habit.lastCompletedDate != null
           ? Timestamp.fromDate(habit.lastCompletedDate!)
           : null,
+      'goalType': habit.goalType,
+      'goalValue': habit.goalValue,
+      'goalUnit': habit.goalUnit,
       'reminderEnabled': habit.reminderEnabled,
       'reminderHour': habit.reminderTime?.hour,
       'reminderMinute': habit.reminderTime?.minute,

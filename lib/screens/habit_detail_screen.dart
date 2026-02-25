@@ -307,24 +307,62 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
             ],
             const SizedBox(height: 12),
 
-            // Category Badge
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: isDark ? 0.15 : 0.2),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: isDark ? 0.2 : 0.3),
+            // Category & Goal Badges
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: isDark ? 0.15 : 0.2),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: isDark ? 0.2 : 0.3),
+                    ),
+                    borderRadius: UIConstants.borderRadiusMedium,
+                  ),
+                  child: Text(
+                    widget.habit.category.displayName,
+                    style: TextStyle(
+                      color: isDark ? AppColors.darkPrimaryText : Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
-                borderRadius: UIConstants.borderRadiusMedium,
-              ),
-              child: Text(
-                widget.habit.category.displayName,
-                style: TextStyle(
-                  color: isDark ? AppColors.darkPrimaryText : Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+                if (widget.habit.goalType != 'none' && widget.habit.goalValue != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: isDark ? 0.15 : 0.2),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: isDark ? 0.2 : 0.3),
+                      ),
+                      borderRadius: UIConstants.borderRadiusMedium,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          widget.habit.goalType == 'time'
+                              ? Icons.timer_outlined
+                              : Icons.flag_outlined,
+                          size: 14,
+                          color: isDark ? AppColors.darkPrimaryText : Colors.white,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '${widget.habit.goalValue} ${widget.habit.goalUnit ?? ''}',
+                          style: TextStyle(
+                            color: isDark ? AppColors.darkPrimaryText : Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 16),
           ],
@@ -742,6 +780,8 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
           const Spacer(),
           Text(
             number,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: isDark
                   ? AppColors.darkPrimaryText
