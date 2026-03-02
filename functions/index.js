@@ -87,7 +87,7 @@ function sanitizeEmailInput(str) {
 // --- Subscription Tier Helpers ---
 
 const TIER_LIMITS = {
-  starter: { maxAISuggestionsPerDay: 1, maxAIReportsPerMonth: 10 },
+  starter: { maxAISuggestionsPerDay: 3, maxAIReportsPerMonth: 20 },
   growth:  { maxAISuggestionsPerDay: 5, maxAIReportsPerMonth: 30 },
   mastery: { maxAISuggestionsPerDay: -1, maxAIReportsPerMonth: -1 }, // unlimited
 };
@@ -96,11 +96,21 @@ async function getUserTier(userId) {
   const db = admin.firestore();
   const cacheRef = db.collection('users').doc(userId);
 
-  // Check for cached tier (5-minute TTL)
+  // Read user doc once
   const cached = await cacheRef.get();
   const cachedData = cached.data();
+
+  // Check for Firestore-based tier override (for dev/testing accounts)
+  const VALID_TIERS = ['starter', 'growth', 'mastery'];
+  if (cachedData?.tierOverride && VALID_TIERS.includes(cachedData.tierOverride)) {
+    console.log(`getUserTier(${userId}): using Firestore override → ${cachedData.tierOverride}`);
+    return cachedData.tierOverride;
+  }
+
+  // Check for cached tier (5-minute TTL)
   if (cachedData?.tierCache?.tier &&
       cachedData?.tierCache?.expiresAt?.toDate() > new Date()) {
+    console.log(`getUserTier(${userId}): using cache → ${cachedData.tierCache.tier}`);
     return cachedData.tierCache.tier;
   }
 
@@ -128,8 +138,9 @@ async function getUserTier(userId) {
     }
   }
 
-  const VALID_TIERS = ['starter', 'growth', 'mastery'];
   if (!VALID_TIERS.includes(tier)) tier = 'starter';
+
+  console.log(`getUserTier(${userId}): resolved from RevenueCat → ${tier}`);
 
   // Cache the result with 5-minute TTL
   await cacheRef.set({
@@ -199,7 +210,7 @@ async function checkBurstLimit(userId, functionName, cooldownMs = 5000) {
 
 // --- Cloud Functions ---
 
-exports.generateHabitSuggestions = onCall({ secrets: [revenueCatApiKey, geminiApiKey] }, async (request) => {
+exports.generateHabitSuggestions = onCall({ secrets: [revenueCatApiKey, geminiApiKey], timeoutSeconds: 300 }, async (request) => {
   if (!request.auth) {
     throw new HttpsError(
       "unauthenticated",
@@ -331,7 +342,7 @@ exports.generateHabitSuggestions = onCall({ secrets: [revenueCatApiKey, geminiAp
   }
 });
 
-exports.generateWeeklyInsights = onCall({ secrets: [revenueCatApiKey, geminiApiKey] }, async (request) => {
+exports.generateWeeklyInsights = onCall({ secrets: [revenueCatApiKey, geminiApiKey], timeoutSeconds: 300 }, async (request) => {
   if (!request.auth) {
     throw new HttpsError(
       "unauthenticated",
@@ -414,12 +425,12 @@ exports.generateWeeklyInsights = onCall({ secrets: [revenueCatApiKey, geminiApiK
       nextSteps,
     };
   } catch (error) {
-    console.error("Error generating insights:", error);
-    throw new HttpsError("internal", "Failed to generate insights.");
+    console.error("Error generating insights:", error.message || error);
+    throw new HttpsError("internal", `Failed to generate insights: ${error.message || 'Unknown error'}`);
   }
 });
 
-exports.generateHabitTips = onCall({ secrets: [revenueCatApiKey, geminiApiKey] }, async (request) => {
+exports.generateHabitTips = onCall({ secrets: [revenueCatApiKey, geminiApiKey], timeoutSeconds: 300 }, async (request) => {
   if (!request.auth) {
     throw new HttpsError(
       "unauthenticated",
@@ -508,12 +519,12 @@ exports.generateHabitTips = onCall({ secrets: [revenueCatApiKey, geminiApiKey] }
       actionable: String(item.actionable || '').substring(0, 300),
     }));
   } catch (error) {
-    console.error("Error generating tips:", error);
-    throw new HttpsError("internal", "Failed to generate tips.");
+    console.error("Error generating tips:", error.message || error);
+    throw new HttpsError("internal", `Failed to generate tips: ${error.message || 'Unknown error'}`);
   }
 });
 
-exports.generateHabitInsight = onCall({ secrets: [revenueCatApiKey, geminiApiKey] }, async (request) => {
+exports.generateHabitInsight = onCall({ secrets: [revenueCatApiKey, geminiApiKey], timeoutSeconds: 300 }, async (request) => {
   if (!request.auth) {
     throw new HttpsError(
       "unauthenticated",
@@ -587,14 +598,14 @@ exports.generateHabitInsight = onCall({ secrets: [revenueCatApiKey, geminiApiKey
       confidence: ['high', 'medium'].includes(parsed.confidence) ? parsed.confidence : 'medium',
     };
   } catch (error) {
-    console.error("Error generating habit insight:", error);
-    throw new HttpsError("internal", "Failed to generate habit insight.");
+    console.error("Error generating habit insight:", error.message || error);
+    throw new HttpsError("internal", `Failed to generate habit insight: ${error.message || 'Unknown error'}`);
   }
 });
 
 // ==================== Action Items ====================
 
-exports.generateActionItems = onCall({ secrets: [revenueCatApiKey, geminiApiKey] }, async (request) => {
+exports.generateActionItems = onCall({ secrets: [revenueCatApiKey, geminiApiKey], timeoutSeconds: 300 }, async (request) => {
   if (!request.auth) {
     throw new HttpsError(
       "unauthenticated",
@@ -686,8 +697,8 @@ exports.generateActionItems = onCall({ secrets: [revenueCatApiKey, geminiApiKey]
       metric: String(item.metric || '').substring(0, 200),
     }));
   } catch (error) {
-    console.error("Error generating action items:", error);
-    throw new HttpsError("internal", "Failed to generate action items.");
+    console.error("Error generating action items:", error.message || error);
+    throw new HttpsError("internal", `Failed to generate action items: ${error.message || 'Unknown error'}`);
   }
 });
 
@@ -696,7 +707,7 @@ exports.generateActionItems = onCall({ secrets: [revenueCatApiKey, geminiApiKey]
 const VALID_PATTERN_TYPES = ['timeOfDay', 'dayOfWeek', 'sequence', 'trigger'];
 const VALID_ICON_NAMES = ['schedule', 'wb_sunny', 'nightlight', 'calendar_today', 'weekend', 'link', 'repeat', 'bolt', 'insights'];
 
-exports.generatePatternDiscovery = onCall({ secrets: [revenueCatApiKey, geminiApiKey] }, async (request) => {
+exports.generatePatternDiscovery = onCall({ secrets: [revenueCatApiKey, geminiApiKey], timeoutSeconds: 300 }, async (request) => {
   if (!request.auth) {
     throw new HttpsError(
       "unauthenticated",
@@ -818,8 +829,8 @@ exports.generatePatternDiscovery = onCall({ secrets: [revenueCatApiKey, geminiAp
 
     return { patterns };
   } catch (error) {
-    console.error("Error generating pattern discovery:", error);
-    throw new HttpsError("internal", "Failed to generate pattern discovery.");
+    console.error("Error generating pattern discovery:", error.message || error);
+    throw new HttpsError("internal", `Failed to generate pattern discovery: ${error.message || 'Unknown error'}`);
   }
 });
 
@@ -829,7 +840,7 @@ exports.generatePatternDiscovery = onCall({ secrets: [revenueCatApiKey, geminiAp
  * Generate a comprehensive score (1-100) for an individual habit
  * Analyzes consistency, momentum, resilience, and engagement
  */
-exports.generateHabitScore = onCall({ secrets: [revenueCatApiKey, geminiApiKey] }, async (request) => {
+exports.generateHabitScore = onCall({ secrets: [revenueCatApiKey, geminiApiKey], timeoutSeconds: 300 }, async (request) => {
   if (!request.auth) {
     throw new HttpsError(
       "unauthenticated",
@@ -977,15 +988,15 @@ exports.generateHabitScore = onCall({ secrets: [revenueCatApiKey, geminiApiKey] 
       healthCorrelation: parsed.healthCorrelation ? String(parsed.healthCorrelation).substring(0, 500) : null,
     };
   } catch (error) {
-    console.error("Error generating habit score:", error);
-    throw new HttpsError("internal", "Failed to generate habit score.");
+    console.error("Error generating habit score:", error.message || error);
+    throw new HttpsError("internal", `Failed to generate habit score: ${error.message || 'Unknown error'}`);
   }
 });
 
 /**
  * Generate a comprehensive daily review with AI coach commentary
  */
-exports.generateDailyReview = onCall({ secrets: [revenueCatApiKey, geminiApiKey] }, async (request) => {
+exports.generateDailyReview = onCall({ secrets: [revenueCatApiKey, geminiApiKey], timeoutSeconds: 300 }, async (request) => {
   if (!request.auth) {
     throw new HttpsError(
       "unauthenticated",
@@ -1137,15 +1148,15 @@ exports.generateDailyReview = onCall({ secrets: [revenueCatApiKey, geminiApiKey]
       tomorrowFocus: String(parsed.tomorrowFocus || '').substring(0, 300),
     };
   } catch (error) {
-    console.error("Error generating daily review:", error);
-    throw new HttpsError("internal", "Failed to generate daily review.");
+    console.error("Error generating daily review:", error.message || error);
+    throw new HttpsError("internal", `Failed to generate daily review: ${error.message || 'Unknown error'}`);
   }
 });
 
 /**
  * Analyze correlations between health metrics and habit completion
  */
-exports.generateHealthCorrelations = onCall({ secrets: [revenueCatApiKey, geminiApiKey] }, async (request) => {
+exports.generateHealthCorrelations = onCall({ secrets: [revenueCatApiKey, geminiApiKey], timeoutSeconds: 300 }, async (request) => {
   if (!request.auth) {
     throw new HttpsError(
       "unauthenticated",
@@ -1288,8 +1299,8 @@ exports.generateHealthCorrelations = onCall({ secrets: [revenueCatApiKey, gemini
       actionPlan: String(parsed.actionPlan || '').substring(0, 1000),
     };
   } catch (error) {
-    console.error("Error generating health correlations:", error);
-    throw new HttpsError("internal", "Failed to generate health correlations.");
+    console.error("Error generating health correlations:", error.message || error);
+    throw new HttpsError("internal", `Failed to generate health correlations: ${error.message || 'Unknown error'}`);
   }
 });
 

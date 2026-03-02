@@ -658,7 +658,7 @@ class _ProgressScreenState extends State<ProgressScreen>
     final coral = isDark ? AppColors.darkCoral : AppColors.lightCoral;
     final pink = isDark ? AppColors.darkPink : AppColors.lightPink;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16),
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -680,12 +680,15 @@ class _ProgressScreenState extends State<ProgressScreen>
             ),
           ),
           const SizedBox(width: 12),
-          Text(
-            'AI is analyzing your progress...',
-            style: TextStyle(
-              color: coral,
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
+          Flexible(
+            child: Text(
+              'AI is analyzing your progress...',
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: coral,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
           const SizedBox(width: 12),
@@ -972,10 +975,8 @@ class _ProgressScreenState extends State<ProgressScreen>
             children: [
               // Day headers
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: ['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day) {
-                  return SizedBox(
-                    width: 36,
+                  return Expanded(
                     child: Text(
                       day,
                       textAlign: TextAlign.center,
@@ -994,9 +995,10 @@ class _ProgressScreenState extends State<ProgressScreen>
 
               // Day cells
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: heatmap.map((day) {
-                  return _buildHeatmapCell(isDark, day);
+                  return Expanded(
+                    child: _buildHeatmapCell(isDark, day),
+                  );
                 }).toList(),
               ),
             ],
@@ -1052,8 +1054,8 @@ class _ProgressScreenState extends State<ProgressScreen>
         _showDayDetailSheet(context, isDark, day);
       },
       child: Container(
-        width: 36,
         height: 80,
+        margin: const EdgeInsets.symmetric(horizontal: 2),
         decoration: BoxDecoration(
           color: cellColor,
           borderRadius: UIConstants.borderRadiusMedium,
@@ -1066,24 +1068,31 @@ class _ProgressScreenState extends State<ProgressScreen>
                 )
               : null,
         ),
-        padding: const EdgeInsets.all(8),
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
               day.dayNumber,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: textColor,
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
               ),
             ),
-            Text(
-              day.completionText,
-              style: TextStyle(
-                color: textColor,
-                fontSize: 11,
-                fontWeight: FontWeight.w400,
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                day.completionText,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: textColor,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w400,
+                ),
               ),
             ),
           ],

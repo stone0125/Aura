@@ -61,11 +61,13 @@ class SubscriptionService {
 
   /// Check if user can use AI suggestions
   bool canUseAISuggestion() {
+    if (kDebugMode) return true;
     return getLimits(0).canUseAISuggestion;
   }
 
   /// Record usage of an AI suggestion
   Future<void> recordAISuggestionUsage() async {
+    if (kDebugMode) return;
     final now = DateTime.now();
 
     // Check if it's a new day
@@ -86,16 +88,19 @@ class SubscriptionService {
 
   /// Get remaining AI suggestions for today
   int getRemainingAISuggestions() {
+    if (kDebugMode) return 999;
     return getLimits(0).remainingAISuggestions;
   }
 
   /// Check if user can use AI reports this month
   bool canUseAIReport() {
+    if (kDebugMode) return true;
     return getLimits(0).canUseAIReport;
   }
 
   /// Record usage of an AI report
   Future<void> recordAIReportUsage() async {
+    if (kDebugMode) return;
     final now = DateTime.now();
 
     // Check if it's a new month
@@ -115,6 +120,7 @@ class SubscriptionService {
 
   /// Get remaining AI reports for this month
   int getRemainingAIReports() {
+    if (kDebugMode) return 999;
     return getLimits(0).remainingAIReports;
   }
 

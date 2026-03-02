@@ -9,8 +9,8 @@ class AuthService {
 
   bool _googleSignInInitialized = false;
 
-  // Stream of auth changes
-  Stream<User?> get authStateChanges => _auth.authStateChanges();
+  // Stream of auth changes (idTokenChanges fires on verification status updates)
+  Stream<User?> get idTokenChanges => _auth.idTokenChanges();
 
   // Current user
   User? get currentUser => _auth.currentUser;
@@ -92,14 +92,28 @@ class AuthService {
     }
   }
 
+  // Send email verification to current user
+  Future<void> sendEmailVerification() async {
+    await _auth.currentUser?.sendEmailVerification();
+  }
+
+  // Reload current user and return fresh instance
+  Future<User?> reloadCurrentUser() async {
+    await _auth.currentUser?.reload();
+    return _auth.currentUser;
+  }
+
   // Sign up with Email & Password
   Future<UserCredential> signUpWithEmailPassword(
       String email, String password) async {
     try {
-      return await _auth.createUserWithEmailAndPassword(
+      final credential = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
+      // Auto-send verification email after account creation
+      await credential.user?.sendEmailVerification();
+      return credential;
     } on FirebaseAuthException catch (e) {
       if (e.code == 'email-already-in-use') {
         throw Exception(

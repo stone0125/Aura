@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../models/habit.dart';
 import '../models/habit_category.dart';
@@ -33,9 +34,14 @@ class FirestoreService {
         'email': _auth.currentUser?.email,
         'createdAt': FieldValue.serverTimestamp(),
         'lastLogin': FieldValue.serverTimestamp(),
+        if (kDebugMode) 'tierOverride': 'mastery',
       });
     } else {
-      await userDoc.update({'lastLogin': FieldValue.serverTimestamp()});
+      await userDoc.update({
+        'lastLogin': FieldValue.serverTimestamp(),
+        'tierOverride':
+            kDebugMode ? 'mastery' : FieldValue.delete(),
+      });
     }
   }
 

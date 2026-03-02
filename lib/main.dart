@@ -16,6 +16,7 @@ import 'screens/splash_screen.dart';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'screens/login_screen.dart';
+import 'screens/email_verification_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -93,10 +94,15 @@ class _AuthWrapperState extends State<AuthWrapper> {
   @override
   void initState() {
     super.initState();
-    _authSubscription = FirebaseAuth.instance.authStateChanges().listen((user) {
+    _authSubscription = FirebaseAuth.instance.idTokenChanges().listen((user) {
       if (user == null) {
         // User logged out — clear all provider data to prevent cross-user leaks
         _clearAllProviderData();
+      } else {
+        // User logged in — re-subscribe to Firestore for the new user
+        if (mounted) {
+          context.read<HabitProvider>().reinitialize();
+        }
       }
     });
   }
@@ -124,7 +130,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<User?>(
-      stream: FirebaseAuth.instance.authStateChanges(),
+      stream: FirebaseAuth.instance.idTokenChanges(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           final isDark =
@@ -137,7 +143,14 @@ class _AuthWrapperState extends State<AuthWrapper> {
           );
         }
 
-        if (snapshot.hasData) {
+        final user = snapshot.data;
+        if (user != null) {
+          // Gate email/password users behind email verification
+          final needsVerification = !user.emailVerified &&
+              user.providerData.any((p) => p.providerId == 'password');
+          if (needsVerification) {
+            return const EmailVerificationScreen();
+          }
           return HomeScreen(key: HomeScreen.homeKey);
         }
 

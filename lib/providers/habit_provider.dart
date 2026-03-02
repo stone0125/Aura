@@ -46,11 +46,24 @@ class HabitProvider with ChangeNotifier {
 
   /// Clear all user-specific data on logout to prevent cross-user leaks
   void clearUserData() {
+    _habitsSubscription?.cancel();
+    _habitsSubscription = null;
     _habits = [];
     _isLoadingHabits = true;
     _togglingHabits.clear();
     _cachedBestStreak = null;
     notifyListeners();
+  }
+
+  /// Re-subscribe to Firestore for the newly logged-in user
+  void reinitialize() {
+    _habitsSubscription?.cancel();
+    _habitsSubscription = null;
+    _habits = [];
+    _isLoadingHabits = true;
+    _cachedBestStreak = null;
+    notifyListeners();
+    _init();
   }
 
   @override

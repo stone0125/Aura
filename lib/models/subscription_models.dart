@@ -35,7 +35,7 @@ extension SubscriptionTierExtension on SubscriptionTier {
   int get maxAISuggestionsPerDay {
     switch (this) {
       case SubscriptionTier.starter:
-        return 1;
+        return 3;
       case SubscriptionTier.growth:
         return 5;
       case SubscriptionTier.mastery:
@@ -68,7 +68,7 @@ extension SubscriptionTierExtension on SubscriptionTier {
   int get maxAIReportsPerMonth {
     switch (this) {
       case SubscriptionTier.starter:
-        return 10;
+        return 20;
       case SubscriptionTier.growth:
         return 30;
       case SubscriptionTier.mastery:

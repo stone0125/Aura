@@ -13,11 +13,10 @@ Version 1.0.1 | February 2026
 3. [Getting Started](#3-getting-started)
 4. [Home Screen](#4-home-screen)
 5. [Creating & Managing Habits](#5-creating--managing-habits)
-6. [Habit Detail Screen](#6-habit-detail-screen)
-7. [Progress & Analytics](#7-progress--analytics)
-8. [AI Coach](#8-ai-coach)
-9. [Settings](#9-settings)
-10. [Troubleshooting & FAQ](#10-troubleshooting--faq)
+6. [Progress & Analytics](#6-progress--analytics)
+7. [AI Coach](#7-ai-coach)
+8. [Settings](#8-settings)
+9. [Troubleshooting & FAQ](#9-troubleshooting--faq)
 
 ---
 
@@ -107,10 +106,10 @@ Aura uses a bottom navigation bar with four main tabs:
 │  └──┬─────┘ └──────────┘ └────┬─────┘ │ About     │   │
 │     │                         │        └───────────┘   │
 │     ▼                         ▼                         │
-│  ┌──────────────┐   ┌──────────────────┐               │
-│  │ Habit Detail │   │ Habit Creation   │               │
-│  │   Screen     │   │ (from AI or FAB) │               │
-│  └──────────────┘   └──────────────────┘               │
+│  ┌──────────────────────────────────────┐               │
+│  │       Habit Creation Screen          │               │
+│  │       (from AI or FAB (+))           │               │
+│  └──────────────────────────────────────┘               │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -138,7 +137,7 @@ Aura offers three sign-up methods:
 5. Tap the **Sign Up** button.
 6. You will be taken to the Home screen upon successful registration.
 
-`[Screenshot: Login Screen — Sign Up mode]`
+![Login Screen — Sign Up mode](../screenshots/login-sign-up.png)
 
 #### Option B: Google Sign-In
 
@@ -154,7 +153,7 @@ Aura offers three sign-up methods:
 3. Choose whether to share or hide your email address.
 4. You will be signed in automatically.
 
-`[Screenshot: Login Screen — Social login buttons]`
+![Login Screen — Social login buttons](../screenshots/login-social-buttons.png)
 
 ### Signing In to an Existing Account
 
@@ -177,7 +176,7 @@ Aura offers three sign-up methods:
 
 The Home screen is your daily dashboard — the first thing you see when opening the app. It provides a quick overview of your habits, stats, and AI recommendations.
 
-`[Screenshot: Home Screen — Full view]`
+![Home Screen — Full view](../screenshots/home-full-view.png)
 
 ### Home Header
 
@@ -187,7 +186,7 @@ At the top of the screen, you will see a personalised greeting based on the time
 
 Below the header is a **Daily Wisdom** card that displays a rotating motivational quote to keep you inspired. A new quote appears each day.
 
-`[Screenshot: Home Screen — Motivational Quote Card]`
+![Home Screen — Motivational Quote Card](../screenshots/home-motivational-quote.png)
 
 ### Summary Stats Card
 
@@ -199,7 +198,7 @@ The **Summary Stats Card** shows at-a-glance metrics for your habit performance:
 | **Current Streak** | Your longest active daily streak |
 | **Total Habits** | Number of active habits you are tracking |
 
-`[Screenshot: Home Screen — Summary Stats Card]`
+![Home Screen — Summary Stats Card](../screenshots/home-summary-stats.png)
 
 ### Today's Habits List
 
@@ -220,7 +219,7 @@ The core of the Home screen is your **habit list**, showing all habits scheduled
 1. Tap the checkbox again on a completed habit.
 2. The completion will be undone for today.
 
-`[Screenshot: Home Screen — Habit List with completed and pending habits]`
+![Home Screen — Habit List with completed and pending habits](../screenshots/home-habit-list.png)
 
 ### AI Suggestion Card
 
@@ -230,7 +229,7 @@ At the bottom of the Home screen, an **AI Suggestion Card** may appear with a pe
 - The **category** and **estimated time commitment**
 - An **"Add Habit"** button to create the suggested habit with one tap
 
-`[Screenshot: Home Screen — AI Suggestion Card]`
+![Home Screen — AI Suggestion Card](../screenshots/home-ai-suggestion.png)
 
 ### Creating a New Habit (FAB)
 
@@ -244,7 +243,7 @@ On the Home tab, a **floating action button (+)** appears in the bottom-right co
 
 Tap the **+** button on the Home screen to open the Habit Creation screen.
 
-`[Screenshot: Habit Creation Screen — Empty form]`
+![Habit Creation Screen — Empty form](../screenshots/habit-creation-empty.png)
 
 #### Step 1: Habit Name
 
@@ -269,7 +268,7 @@ Choose one of the five categories:
 
 Each category has its own colour theme applied throughout the app.
 
-`[Screenshot: Habit Creation Screen — Category selection]`
+![Habit Creation Screen — Category selection](../screenshots/habit-creation-category.png)
 
 #### Step 4: Icon Selection
 
@@ -286,7 +285,7 @@ Select how often you want to perform the habit:
 | **Weekly** | Select specific days of the week (Mon, Tue, etc.) |
 | **Custom** | Every X days / weeks / months |
 
-`[Screenshot: Habit Creation Screen — Frequency selection]`
+![Habit Creation Screen — Frequency selection](../screenshots/habit-creation-frequency.png)
 
 #### Step 6: Goal Setting (Optional)
 
@@ -300,7 +299,7 @@ Set a measurable target:
 
 - Enter the **goal value** and **unit** (minutes, hours, times, pages, etc.).
 
-`[Screenshot: Habit Creation Screen — Goal setting]`
+![Habit Creation Screen — Goal setting](../screenshots/habit-creation-goal.png)
 
 #### Step 7: Reminders (Optional)
 
@@ -311,7 +310,7 @@ Set a measurable target:
    - **Motivational** — An AI-generated motivational message
    - **Silent** — Badge only, no sound
 
-`[Screenshot: Habit Creation Screen — Reminder setup]`
+![Habit Creation Screen — Reminder setup](../screenshots/habit-creation-reminder.png)
 
 #### Step 8: Save
 
@@ -341,58 +340,11 @@ Tap the **Save** button (or **"Create Habit"**) to add the habit to your daily t
 
 ---
 
-## 6. Habit Detail Screen
-
-Tap on any habit from the Home screen to open its **Detail Screen**. This screen provides comprehensive statistics and management options for that specific habit.
-
-`[Screenshot: Habit Detail Screen — Full view]`
-
-### Habit Statistics
-
-At the top of the detail screen, you will see key performance metrics:
-
-| Metric | Description |
-|--------|-------------|
-| **Completion Rate** | Percentage of scheduled days the habit was completed |
-| **Current Streak** | Number of consecutive days completed |
-| **Best Streak** | Longest streak ever achieved for this habit |
-
-### Calendar View
-
-A **calendar heatmap** shows your completion history, with colour-coded days indicating whether the habit was completed (filled) or missed (empty). This provides a visual overview of your consistency over time.
-
-`[Screenshot: Habit Detail Screen — Calendar view]`
-
-### Performance Chart
-
-An interactive **line chart** displays your completion trend over time. You can switch between time ranges:
-
-| Range | Description |
-|-------|-------------|
-| **Week** | Last 7 days |
-| **Month** | Last 30 days |
-| **All Time** | Entire habit history |
-
-`[Screenshot: Habit Detail Screen — Performance chart]`
-
-### AI Insight
-
-An expandable **AI Insight** section provides personalised analysis for this specific habit, including patterns and recommendations for improvement. Tap to expand or collapse.
-
-### Edit & Delete
-
-From the detail screen's app bar, you can:
-
-- **Edit** — Opens the habit in edit mode (see [Editing an Existing Habit](#editing-an-existing-habit))
-- **Delete** — Permanently removes the habit after confirmation
-
----
-
-## 7. Progress & Analytics
+## 6. Progress & Analytics
 
 The **Progress** tab is your analytics dashboard, providing a comprehensive view of your overall habit performance.
 
-`[Screenshot: Progress Screen — Full view]`
+![Progress Screen — Full view](../screenshots/progress-full-view.png)
 
 ### AI Weekly Summary
 
@@ -409,13 +361,9 @@ At the top of the Progress screen, the **AI Weekly Summary** card provides:
 
 If the summary is outdated (older than 24 hours), a banner appears prompting you to refresh.
 
-`[Screenshot: Progress Screen — AI Weekly Summary card]`
-
 ### Category Breakdown
 
 A **pie/donut chart** visualises how your habits are distributed across categories (Health, Fitness, Learning, Mindfulness, Productivity). Each category shows the number of habits and its percentage share.
-
-`[Screenshot: Progress Screen — Category breakdown chart]`
 
 ### Weekly Heatmap
 
@@ -424,8 +372,6 @@ A **7-day heatmap** displays daily completion rates for the current week. Each d
 - The **date number**
 - A **colour intensity** reflecting the completion rate (darker = higher)
 - A **completed/total** count (e.g., "5/7")
-
-`[Screenshot: Progress Screen — Weekly heatmap]`
 
 ### Trend Charts
 
@@ -436,8 +382,6 @@ Interactive **line charts** show your completion rate trends. Toggle between:
 | **Week** | Current week (Mon–Sun) |
 | **Month** | Current month |
 | **All Time** | Full history since first habit |
-
-`[Screenshot: Progress Screen — Trend chart]`
 
 ### Best & Worst Performing Habits
 
@@ -469,8 +413,6 @@ Each achievement shows:
 - **Unlock date** (for earned achievements)
 - **Tips** for working towards the achievement
 
-`[Screenshot: Progress Screen — Achievement gallery]`
-
 ### Quick Actions
 
 At the bottom of the Progress screen, quick action buttons are available:
@@ -480,11 +422,9 @@ At the bottom of the Progress screen, quick action buttons are available:
 
 ---
 
-## 8. AI Coach
+## 7. AI Coach
 
 The **AI Coach** tab provides personalised, AI-powered guidance to help you build better habits. It features a gradient hero section with the title "Your AI Coach" and the subtitle "Personalized insights to help you succeed."
-
-`[Screenshot: AI Coach Screen — Hero section and tabs]`
 
 ### Tab Navigation
 
@@ -523,7 +463,7 @@ Each suggestion card includes:
 | **Goal** | Suggested goal type and target |
 | **Add Habit** button | One-tap to create the habit (pre-filled form) |
 
-`[Screenshot: AI Coach — Suggestions tab with suggestion cards]`
+![AI Coach — Suggestions tab with suggestion cards](../screenshots/ai-coach-suggestions.png)
 
 ### Insights Tab
 
@@ -542,13 +482,13 @@ The Insights tab provides a **weekly AI analysis** of your habit performance. It
 
 Each pattern shows a **confidence score** (High, Medium, Low).
 
-`[Screenshot: AI Coach — Insights tab with patterns]`
+![AI Coach — Insights tab with patterns](../screenshots/ai-coach-insights.png)
 
 ### Scores Tab
 
 The Scores tab provides **AI-powered scoring** of your habit performance, evaluating consistency, effort, and progress across dimensions.
 
-`[Screenshot: AI Coach — Scores tab]`
+![AI Coach — Scores tab](../screenshots/ai-coach-scores.png)
 
 ### Actions Tab
 
@@ -566,7 +506,7 @@ The Actions tab shows **personalised, actionable items** generated by the AI to 
 
 Actions are sorted by priority and can be completed by tapping the checkbox.
 
-`[Screenshot: AI Coach — Actions tab with action items]`
+![AI Coach — Actions tab with action items](../screenshots/ai-coach-actions.png)
 
 ### Refreshing AI Content
 
@@ -594,11 +534,11 @@ Each tip includes:
 
 ---
 
-## 9. Settings
+## 8. Settings
 
 The **Settings** tab provides comprehensive configuration options. It opens with a floating app bar and scrollable content.
 
-`[Screenshot: Settings Screen — Full view]`
+![Settings Screen — Full view](../screenshots/settings-full-view.png)
 
 ### Profile Section
 
@@ -620,7 +560,7 @@ At the top of Settings, your **profile card** displays:
    - **Avatar URL** (profile image link)
 3. Tap **Save** to apply changes.
 
-`[Screenshot: Settings — Profile edit modal]`
+![Settings — Profile edit modal](../screenshots/settings-profile-edit.png)
 
 ### Appearance
 
@@ -649,8 +589,6 @@ At the top of Settings, your **profile card** displays:
 4. Choose a time using the time picker.
 5. A confirmation snackbar will appear (e.g., "Daily summary set for 9:00 AM").
 
-`[Screenshot: Settings — Notifications section]`
-
 ### Health Integration
 
 > Available on **iOS** and **Android** only.
@@ -671,8 +609,6 @@ Connect Aura to your device's health platform to enhance AI insights with physic
    - **7-Day Summary** — Average steps and sleep hours
    - **Key Findings** — AI-discovered correlations between health metrics and habit completion
    - **Recommendations** — Action plans based on health-habit patterns
-
-`[Screenshot: Settings — Health Integration section]`
 
 ### Account
 
@@ -719,7 +655,7 @@ Connect Aura to your device's health platform to enhance AI insights with physic
 | **Request Feature** | Suggest new features |
 | **AI Transparency** | Learn how AI works in Aura |
 
-`[Screenshot: Settings — Help & Support section]`
+![Settings — Help & Support section](../screenshots/settings-help-support.png)
 
 ### About
 
@@ -733,11 +669,9 @@ Connect Aura to your device's health platform to enhance AI insights with physic
 | **Rate App** | Leave a review on the app store |
 | **Credits** | Made by Stone |
 
-`[Screenshot: Settings — About section]`
-
 ---
 
-## 10. Troubleshooting & FAQ
+## 9. Troubleshooting & FAQ
 
 ### Login Issues
 

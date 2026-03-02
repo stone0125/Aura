@@ -682,6 +682,11 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
 
     final stats = provider.stats!;
 
+    final screenWidth = MediaQuery.of(context).size.width;
+    final cardWidth = (screenWidth - 32 - 16) / 2; // horizontal padding + gap
+    // Fixed content height: 48 icon + 32 padding + ~38 number + 4 gap + 16 label + 16 sublabel = ~154
+    final cardHeight = cardWidth.clamp(154.0, double.infinity);
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: GridView.count(
@@ -692,8 +697,7 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
         physics: const NeverScrollableScrollPhysics(),
         mainAxisSpacing: 16,
         crossAxisSpacing: 16,
-        childAspectRatio:
-            1.0, // Increased vertical space (square) to prevent text overflow
+        childAspectRatio: cardWidth / cardHeight,
         children: [
           _buildStatCard(
             isDark: isDark,
