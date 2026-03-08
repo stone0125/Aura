@@ -315,12 +315,18 @@ class HabitDetailProvider with ChangeNotifier {
           .where((c) => c.date.isAfter(weekAgo))
           .length;
 
+      // Days since habit was created (+1 to include creation day)
+      final daysSinceCreation = _habit!.createdAt != null
+          ? now.difference(_habit!.createdAt!).inDays + 1
+          : 7;
+
       final result = await callable.call({
         'habitName': _habit!.name,
         'category': _habit!.category.name,
         'currentStreak': _stats?.currentStreak ?? _habit!.streak,
         'totalCompletions': _stats?.totalCompletions ?? _completions.length,
         'recentDays': recentCompletions,
+        'daysSinceCreation': daysSinceCreation,
       });
 
       // Validate response data

@@ -44,11 +44,13 @@ async function generateHabitInsight(request) {
   const currentStreak = validateNumber(data.currentStreak ?? 0, 'currentStreak', 0, 10000);
   const totalCompletions = validateNumber(data.totalCompletions ?? 0, 'totalCompletions', 0, 100000);
   const recentDays = validateNumber(data.recentDays ?? 0, 'recentDays', 0, 7);
+  const daysSinceCreation = validateNumber(data.daysSinceCreation ?? 7, 'daysSinceCreation', 1, 10000);
 
   const model = getGenAI().getGenerativeModel({ model: "gemini-3-flash-preview" });
 
-  // Calculate performance metrics
-  const recentCompletionRate = recentDays > 0 ? ((recentDays / 7) * 100).toFixed(0) : 0;
+  // Calculate performance metrics using actual active days (not hardcoded 7)
+  const activeDays = Math.min(7, daysSinceCreation);
+  const recentCompletionRate = recentDays > 0 ? ((recentDays / activeDays) * 100).toFixed(0) : 0;
 
   const prompt = `
     You are a behavioral analytics specialist. Analyze this habit's performance data and provide a data-driven insight.
@@ -58,7 +60,7 @@ async function generateHabitInsight(request) {
     - Category: ${category}
     - Current streak: ${currentStreak} days
     - Total completions: ${totalCompletions}
-    - 7-day completion rate: ${recentCompletionRate}% (${recentDays}/7 days)
+    - Completion rate: ${recentCompletionRate}% (${recentDays}/${activeDays} days)
 
     ANALYSIS REQUIREMENTS:
     Generate a concise, professional insight (1-2 sentences) that:
