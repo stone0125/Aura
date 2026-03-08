@@ -28,13 +28,16 @@ class AuthService {
 
   bool _googleSignInInitialized = false;
 
-  // Stream of auth changes (idTokenChanges fires on verification status updates)
+  /// Stream of auth state changes (fires on verification status updates)
+  /// 认证状态变化的流（在验证状态更新时触发）
   Stream<User?> get idTokenChanges => _auth.idTokenChanges();
 
-  // Current user
+  /// Get the currently authenticated user
+  /// 获取当前已认证的用户
   User? get currentUser => _auth.currentUser;
 
-  // Initialize Google Sign In (v7 requires async initialization)
+  /// Initialize Google Sign In (v7 requires async initialization)
+  /// 初始化 Google 登录（v7 版本需要异步初始化）
   Future<void> _ensureGoogleSignInInitialized() async {
     if (_googleSignInInitialized) return;
 
@@ -45,7 +48,8 @@ class AuthService {
     _googleSignInInitialized = true;
   }
 
-  // Sign in with Google
+  /// Sign in with Google (OAuth2, supports web and mobile)
+  /// 使用 Google 登录（OAuth2，支持 Web 和移动端）
   Future<UserCredential?> signInWithGoogle() async {
     try {
       if (kIsWeb) {
@@ -82,7 +86,8 @@ class AuthService {
     }
   }
 
-  // Sign in with Apple
+  /// Sign in with Apple (iOS/macOS only)
+  /// 使用 Apple 登录（仅限 iOS/macOS）
   Future<UserCredential?> signInWithApple() async {
     try {
       if (Platform.isIOS || Platform.isMacOS) {
@@ -111,18 +116,21 @@ class AuthService {
     }
   }
 
-  // Send email verification to current user
+  /// Send email verification to the current user
+  /// 向当前用户发送邮箱验证邮件
   Future<void> sendEmailVerification() async {
     await _auth.currentUser?.sendEmailVerification();
   }
 
-  // Reload current user and return fresh instance
+  /// Reload current user data and return the refreshed instance
+  /// 重新加载当前用户数据并返回刷新后的实例
   Future<User?> reloadCurrentUser() async {
     await _auth.currentUser?.reload();
     return _auth.currentUser;
   }
 
-  // Sign up with Email & Password
+  /// Sign up with email and password, then send verification email
+  /// 使用邮箱和密码注册，然后发送验证邮件
   Future<UserCredential> signUpWithEmailPassword(
       String email, String password) async {
     try {
@@ -143,7 +151,8 @@ class AuthService {
     }
   }
 
-  // Sign in with Email & Password
+  /// Sign in with email and password
+  /// 使用邮箱和密码登录
   Future<UserCredential> signInWithEmailPassword(
       String email, String password) async {
     try {
@@ -163,7 +172,8 @@ class AuthService {
     }
   }
 
-  // Send password reset email
+  /// Send password reset email (silently succeeds to avoid leaking info)
+  /// 发送密码重置邮件（静默成功以避免泄露信息）
   Future<void> sendPasswordReset(String email) async {
     try {
       await _auth.sendPasswordResetEmail(email: email);
@@ -172,7 +182,8 @@ class AuthService {
     }
   }
 
-  // Sign Out
+  /// Sign out the current user and disconnect Google Sign-In
+  /// 登出当前用户并断开 Google 登录连接
   Future<void> signOut() async {
     if (_googleSignInInitialized) {
       try {

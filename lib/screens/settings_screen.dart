@@ -22,14 +22,21 @@ import 'package:url_launcher/url_launcher.dart';
 import '../widgets/settings/help_support_sheets.dart';
 
 /// Comprehensive settings and profile management screen
+/// 综合设置和个人资料管理屏幕
 class SettingsScreen extends StatefulWidget {
+  /// Creates the settings screen
+  /// 创建设置屏幕
   const SettingsScreen({super.key});
 
+  /// Creates the mutable state for the settings screen
+  /// 创建设置屏幕的可变状态
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  /// Builds the settings screen with all sections in a scrollable layout
+  /// 构建包含所有部分的可滚动设置屏幕布局
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -117,6 +124,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // ==================== Profile Section ====================
 
+  /// Builds the profile section with avatar, info, stats, and upgrade banner
+  /// 构建包含头像、信息、统计和升级横幅的个人资料部分
   Widget _buildProfileSection(
     BuildContext context,
     UserProfile profile,
@@ -410,6 +419,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  /// Builds a single stat item with value, label, and optional tooltip
+  /// 构建带有数值、标签和可选提示的单个统计项
   Widget _buildStatItem(
     BuildContext context,
     String value,
@@ -464,6 +475,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Expanded(child: content);
   }
 
+  /// Builds a vertical divider between stat items
+  /// 构建统计项之间的垂直分隔线
   Widget _buildStatDivider(bool isDark) {
     return Container(
       width: 1,
@@ -476,6 +489,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // ==================== Section Headers ====================
 
+  /// Builds an uppercase section header label
+  /// 构建大写的部分标题标签
   Widget _buildSectionHeader(BuildContext context, String title, bool isDark) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
@@ -495,6 +510,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // ==================== Appearance Section ====================
 
+  /// Builds the appearance settings section with theme selection
+  /// 构建包含主题选择的外观设置部分
   Widget _buildAppearanceSection(
     BuildContext context,
     AppSettings settings,
@@ -519,6 +536,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // ==================== Notifications Section ====================
 
+  /// Builds the notifications settings section with toggle and time picker
+  /// 构建包含开关和时间选择器的通知设置部分
   Widget _buildNotificationsSection(
     BuildContext context,
     AppSettings settings,
@@ -637,6 +656,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // ==================== Health Integration Section ====================
 
+  /// Builds the health integration section with connect toggle and insights
+  /// 构建包含连接开关和健康洞察的健康整合部分
   Widget _buildHealthIntegrationSection(BuildContext context, bool isDark) {
     final scoringProvider = context.watch<AIScoringProvider>();
     final isEnabled = scoringProvider.healthIntegrationEnabled;
@@ -759,6 +780,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  /// Shows a confirmation dialog for health data permissions
+  /// 显示健康数据权限的确认对话框
   Future<bool?> _showHealthPermissionDialog(BuildContext context, bool isDark) {
     return showDialog<bool>(
       context: context,
@@ -822,6 +845,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  /// Builds a single permission item row with check icon and description
+  /// 构建带有勾选图标和描述的单个权限项行
   Widget _buildPermissionItem(bool isDark, String title, String subtitle) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -863,6 +888,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  /// Shows a bottom sheet with health correlations and key findings
+  /// 显示包含健康相关性和关键发现的底部弹出窗口
   void _showHealthCorrelationsInfo(
     BuildContext context,
     bool isDark,
@@ -1082,6 +1109,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  /// Builds a health statistic card with icon, value, and label
+  /// 构建带有图标、数值和标签的健康统计卡片
   Widget _buildHealthStat(
     bool isDark,
     String value,
@@ -1127,6 +1156,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // ==================== Account Section ====================
 
+  /// Builds the account section with subscription, usage, export, and sign out
+  /// 构建包含订阅、用量、导出和退出登录的账户部分
   Widget _buildAccountSection(
     BuildContext context,
     UserProfile profile,
@@ -1194,6 +1225,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // ==================== Help & Support Section ====================
 
+  /// Builds the help and support section with FAQ, tutorials, and contact
+  /// 构建包含常见问题、教程和联系方式的帮助与支持部分
   Widget _buildHelpSection(BuildContext context, bool isDark) {
     return _buildSettingsCard(
       context,
@@ -1258,6 +1291,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // ==================== About Section ====================
 
+  /// Builds the about section with version, changelog, privacy, and terms
+  /// 构建包含版本、更新日志、隐私政策和服务条款的关于部分
   Widget _buildAboutSection(BuildContext context, bool isDark) {
     return _buildSettingsCard(
       context,
@@ -1339,6 +1374,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // ==================== Helper Widgets ====================
 
+  /// Builds a styled settings card container with shadow and rounded corners
+  /// 构建带有阴影和圆角的样式设置卡片容器
   Widget _buildSettingsCard(
     BuildContext context,
     bool isDark, {
@@ -1361,6 +1398,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  /// Builds a tappable settings row with icon, title, subtitle, and arrow
+  /// 构建带有图标、标题、副标题和箭头的可点击设置行
   Widget _buildSettingRow(
     BuildContext context, {
     required IconData icon,
@@ -1441,6 +1480,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  /// Builds a settings row with a toggle switch control
+  /// 构建带有切换开关控件的设置行
   Widget _buildSwitchRow(
     BuildContext context, {
     required IconData icon,
@@ -1517,6 +1558,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // ==================== AI Usage Section ====================
 
+  /// Builds the AI usage summary row with habit, suggestion, and report counts
+  /// 构建包含习惯、建议和报告数量的AI用量摘要行
   Widget _buildUsageSection(BuildContext context, bool isDark) {
     final subService = SubscriptionService();
     final tier = subService.currentTier;
@@ -1559,6 +1602,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  /// Builds a single usage row with progress bar and limit info
+  /// 构建带有进度条和限制信息的单个用量行
   Widget _buildUsageRow({
     required bool isDark,
     required IconData icon,
@@ -1645,6 +1690,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  /// Builds a horizontal divider indented to align with setting content
+  /// 构建与设置内容对齐的缩进水平分隔线
   Widget _buildDivider(bool isDark) {
     return Padding(
       padding: const EdgeInsets.only(left: 68),
@@ -1660,6 +1707,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // ==================== Modals and Dialogs ====================
 
+  /// Shows a bottom sheet with detailed usage breakdown for all limits
+  /// 显示包含所有限制详细用量分析的底部弹出窗口
   void _showUsageDetailsSheet(BuildContext context, bool isDark) {
     final subService = SubscriptionService();
     final tier = subService.currentTier;
@@ -1786,6 +1835,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  /// Shows a modal to edit user profile name and bio
+  /// 显示编辑用户个人资料名称和简介的弹窗
   void _showEditProfileModal(
     BuildContext context,
     UserProfile profile,
@@ -1912,6 +1963,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  /// Shows a bottom sheet for selecting light, dark, or system theme
+  /// 显示用于选择浅色、深色或系统主题的底部弹出窗口
   void _showThemeSelector(
     BuildContext context,
     ThemePreference current,
@@ -1962,6 +2015,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  /// Builds a single selectable theme option with icon and highlight
+  /// 构建带有图标和高亮的单个可选主题选项
   Widget _buildThemeOption(
     BuildContext context,
     ThemePreference theme,
@@ -2051,6 +2106,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  /// Shows a time picker dialog and returns the selected time
+  /// 显示时间选择器对话框并返回所选时间
   Future<TimeOfDay?> _showTimePicker(
     BuildContext context,
     TimeOfDay current,
@@ -2063,6 +2120,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return picked;
   }
 
+  /// Formats a TimeOfDay into a 12-hour AM/PM string
+  /// 将TimeOfDay格式化为12小时制AM/PM字符串
   String _formatTime(TimeOfDay time) {
     final hour = time.hourOfPeriod == 0 ? 12 : time.hourOfPeriod;
     final minute = time.minute.toString().padLeft(2, '0');
@@ -2070,6 +2129,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return '$hour:$minute $period';
   }
 
+  /// Shows a bottom sheet with the app changelog and version history
+  /// 显示包含应用更新日志和版本历史的底部弹出窗口
   void _showChangelog(BuildContext context, bool isDark) {
     showModalBottomSheet(
       context: context,
@@ -2134,6 +2195,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  /// Builds a changelog version entry with version badge, date, and changes
+  /// 构建包含版本徽章、日期和更改列表的更新日志条目
   Widget _buildChangelogVersion(
     bool isDark, {
     required String version,
@@ -2190,6 +2253,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  /// Shows a bottom sheet with the full privacy policy content
+  /// 显示包含完整隐私政策内容的底部弹出窗口
   void _showPrivacyPolicy(BuildContext context, bool isDark) {
     showModalBottomSheet(
       context: context,
@@ -2284,6 +2349,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  /// Shows a bottom sheet with the terms of service content
+  /// 显示包含服务条款内容的底部弹出窗口
   void _showTermsOfService(BuildContext context, bool isDark) {
     showModalBottomSheet(
       context: context,
@@ -2390,6 +2457,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  /// Builds a policy section with title and content text block
+  /// 构建包含标题和内容文本块的政策部分
   Widget _buildPolicySection(
     bool isDark, {
     required String title,
@@ -2428,6 +2497,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // ==================== Confirmation Dialogs ====================
 
+  /// Shows a confirmation dialog for signing out of the account
+  /// 显示退出账户的确认对话框
   void _showSignOutConfirmation(BuildContext context, bool isDark) {
     showDialog(
       context: context,
@@ -2453,6 +2524,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  /// Shows a confirmation dialog for permanently deleting the account
+  /// 显示永久删除账户的确认对话框
   void _showDeleteAccountConfirmation(BuildContext context, bool isDark) {
     showDialog(
       context: context,
@@ -2498,6 +2571,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // ==================== URL Launcher Helper ====================
 
+  /// Launches an external URL in the default browser
+  /// 在默认浏览器中打开外部URL
   Future<void> _launchUrl(String url) async {
     final uri = Uri.parse(url);
     if (await canLaunchUrl(uri)) {
@@ -2513,6 +2588,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // ==================== Export Options ====================
 
+  /// Shows a bottom sheet with CSV and JSON export format options
+  /// 显示包含CSV和JSON导出格式选项的底部弹出窗口
   void _showExportOptions(BuildContext context, bool isDark) {
     HapticFeedback.lightImpact();
     showModalBottomSheet(
@@ -2581,6 +2658,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  /// Builds a single export option row with icon, title, and description
+  /// 构建带有图标、标题和描述的单个导出选项行
   Widget _buildExportOption(
     BuildContext context, {
     required bool isDark,
@@ -2656,6 +2735,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // ==================== Upgrade Bottom Sheet ====================
 
+  /// Shows the upgrade bottom sheet with subscription tier options
+  /// 显示包含订阅等级选项的升级底部弹出窗口
   void _showUpgradeBottomSheet(BuildContext context, bool isDark) {
     showModalBottomSheet(
       context: context,
@@ -2667,10 +2748,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
 }
 
 /// Stateful bottom sheet for upgrade flow (needs to manage loading/purchase state)
+/// 升级流程的有状态底部弹出窗口（需要管理加载/购买状态）
 class _UpgradeBottomSheet extends StatefulWidget {
   final bool isDark;
+  /// Creates the upgrade bottom sheet with theme mode
+  /// 创建带有主题模式的升级底部弹出窗口
   const _UpgradeBottomSheet({required this.isDark});
 
+  /// Creates the mutable state for the upgrade bottom sheet
+  /// 创建升级底部弹出窗口的可变状态
   @override
   State<_UpgradeBottomSheet> createState() => _UpgradeBottomSheetState();
 }
@@ -2682,14 +2768,20 @@ class _UpgradeBottomSheetState extends State<_UpgradeBottomSheet> {
   // RevenueCat offerings mapped by tier
   Map<SubscriptionTier, dynamic> _packages = {};
 
+  /// Returns whether the current theme is dark mode
+  /// 返回当前主题是否为深色模式
   bool get isDark => widget.isDark;
 
+  /// Initializes state and loads subscription offerings
+  /// 初始化状态并加载订阅产品
   @override
   void initState() {
     super.initState();
     _loadOfferings();
   }
 
+  /// Loads available subscription offerings from RevenueCat
+  /// 从RevenueCat加载可用的订阅产品
   Future<void> _loadOfferings() async {
     try {
       final offerings = await SubscriptionService().getOfferings();
@@ -2721,6 +2813,8 @@ class _UpgradeBottomSheetState extends State<_UpgradeBottomSheet> {
     }
   }
 
+  /// Initiates a subscription purchase for the selected package
+  /// 为所选套餐发起订阅购买
   Future<void> _purchase(dynamic package) async {
     setState(() => _isPurchasing = true);
 
@@ -2744,6 +2838,8 @@ class _UpgradeBottomSheetState extends State<_UpgradeBottomSheet> {
     }
   }
 
+  /// Restores previously purchased subscriptions
+  /// 恢复之前购买的订阅
   Future<void> _restorePurchases() async {
     setState(() => _isPurchasing = true);
     try {
@@ -2768,6 +2864,8 @@ class _UpgradeBottomSheetState extends State<_UpgradeBottomSheet> {
     }
   }
 
+  /// Returns the localized price string for a subscription tier
+  /// 返回订阅等级的本地化价格字符串
   String _getPriceString(SubscriptionTier tier) {
     final pkg = _packages[tier];
     if (pkg != null) {
@@ -2776,6 +2874,8 @@ class _UpgradeBottomSheetState extends State<_UpgradeBottomSheet> {
     return tier == SubscriptionTier.growth ? '\$4.99/mo' : '\$9.99/mo';
   }
 
+  /// Builds the upgrade bottom sheet with plan cards and restore button
+  /// 构建包含计划卡片和恢复购买按钮的升级底部弹出窗口
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -2887,6 +2987,8 @@ class _UpgradeBottomSheetState extends State<_UpgradeBottomSheet> {
     );
   }
 
+  /// Builds the error state view with retry button when offerings fail to load
+  /// 构建产品加载失败时带有重试按钮的错误状态视图
   Widget _buildErrorState() {
     return Padding(
       padding: const EdgeInsets.all(24),
@@ -2928,6 +3030,8 @@ class _UpgradeBottomSheetState extends State<_UpgradeBottomSheet> {
     );
   }
 
+  /// Builds a subscription tier card with features and subscribe button
+  /// 构建包含功能列表和订阅按钮的订阅等级卡片
   Widget _buildTierCard({
     required SubscriptionTier tier,
     required String price,
@@ -3109,6 +3213,8 @@ class _UpgradeBottomSheetState extends State<_UpgradeBottomSheet> {
     );
   }
 
+  /// Returns the list of feature descriptions for a subscription tier
+  /// 返回订阅等级的功能描述列表
   List<String> _getFeaturesForTier(SubscriptionTier tier) {
     switch (tier) {
       case SubscriptionTier.starter:

@@ -12,6 +12,7 @@
 // =============================================================================
 
 /// Habit statistics model
+/// 习惯统计数据模型
 class HabitStats {
   final int currentStreak;
   final int longestStreak;
@@ -20,6 +21,8 @@ class HabitStats {
   final String? bestDay;
   final String? bestTime;
 
+  /// Creates a HabitStats instance with the given statistics
+  /// 使用给定统计数据创建 HabitStats 实例
   const HabitStats({
     required this.currentStreak,
     required this.longestStreak,
@@ -30,13 +33,16 @@ class HabitStats {
   });
 
   /// Calculate if current streak equals longest (record)
+  /// 计算当前连续天数是否等于最长记录
   bool get isRecord => currentStreak > 0 && currentStreak == longestStreak;
 
   /// Format completion rate as percentage string
+  /// 将完成率格式化为百分比字符串
   String get completionRateFormatted => '${completionRate.toStringAsFixed(0)}%';
 }
 
 /// Habit completion entry
+/// 习惯完成记录条目
 class HabitCompletion {
   final String id;
   final DateTime date;
@@ -44,6 +50,8 @@ class HabitCompletion {
   final CompletionMethod method;
   final String? notes;
 
+  /// Creates a HabitCompletion instance with the given data
+  /// 使用给定数据创建 HabitCompletion 实例
   const HabitCompletion({
     required this.id,
     required this.date,
@@ -53,6 +61,7 @@ class HabitCompletion {
   });
 
   /// Check if this completion is for today
+  /// 检查此完成记录是否是今天的
   bool get isToday {
     final now = DateTime.now();
     return date.year == now.year &&
@@ -61,6 +70,7 @@ class HabitCompletion {
   }
 
   /// Get formatted date string
+  /// 获取格式化的日期字符串
   String get formattedDate {
     final now = DateTime.now();
     final yesterday = now.subtract(const Duration(days: 1));
@@ -98,6 +108,7 @@ class HabitCompletion {
 }
 
 /// How the habit was completed
+/// 习惯的完成方式
 enum CompletionMethod {
   manual,
   reminder,
@@ -105,12 +116,15 @@ enum CompletionMethod {
 }
 
 /// AI insight for a habit
+/// 习惯的 AI 洞察
 class AIInsight {
   final String text;
   final String confidence;
   final DateTime generatedAt;
   final String? supportingIcon;
 
+  /// Creates an AIInsight instance with the given data
+  /// 使用给定数据创建 AIInsight 实例
   const AIInsight({
     required this.text,
     required this.confidence,
@@ -119,6 +133,7 @@ class AIInsight {
   });
 
   /// Check if insight is stale (>24 hours old)
+  /// 检查洞察是否过期（超过24小时）
   bool get isStale {
     final now = DateTime.now();
     final age = now.difference(generatedAt);
@@ -127,11 +142,14 @@ class AIInsight {
 }
 
 /// Chart data point
+/// 图表数据点
 class ChartDataPoint {
   final DateTime date;
   final double value;
   final bool isCompleted;
 
+  /// Creates a ChartDataPoint with date, value, and completion status
+  /// 使用日期、数值和完成状态创建 ChartDataPoint
   const ChartDataPoint({
     required this.date,
     required this.value,
@@ -140,6 +158,7 @@ class ChartDataPoint {
 }
 
 /// Time range for charts
+/// 图表的时间范围
 enum TimeRange {
   week, // 7 days
   month, // 30 days
@@ -148,6 +167,8 @@ enum TimeRange {
 }
 
 extension TimeRangeExtension on TimeRange {
+  /// Get display name for the time range
+  /// 获取时间范围的显示名称
   String get displayName {
     switch (this) {
       case TimeRange.week:
@@ -161,6 +182,8 @@ extension TimeRangeExtension on TimeRange {
     }
   }
 
+  /// Get number of days for the time range
+  /// 获取时间范围对应的天数
   int? get days {
     switch (this) {
       case TimeRange.week:

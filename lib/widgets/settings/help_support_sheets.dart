@@ -10,6 +10,8 @@ import '../../config/app_constants.dart';
 
 // ==================== Public API ====================
 
+/// Shows the FAQ bottom sheet with expandable question-answer items
+/// 显示常见问题底部弹出窗口，包含可展开的问答项
 void showFAQSheet(BuildContext context, bool isDark) {
   showModalBottomSheet(
     context: context,
@@ -41,6 +43,8 @@ void showFAQSheet(BuildContext context, bool isDark) {
   );
 }
 
+/// Shows the tutorials bottom sheet with guided walkthroughs
+/// 显示教程底部弹出窗口，包含引导式教学
 void showTutorialsSheet(BuildContext context, bool isDark) {
   showModalBottomSheet(
     context: context,
@@ -82,6 +86,8 @@ void showTutorialsSheet(BuildContext context, bool isDark) {
   );
 }
 
+/// Shows the contact support form bottom sheet
+/// 显示联系支持表单底部弹出窗口
 void showContactSupportSheet(BuildContext context, bool isDark) {
   showModalBottomSheet(
     context: context,
@@ -91,6 +97,8 @@ void showContactSupportSheet(BuildContext context, bool isDark) {
   );
 }
 
+/// Shows the bug report form bottom sheet
+/// 显示错误报告表单底部弹出窗口
 void showReportBugSheet(BuildContext context, bool isDark) {
   showModalBottomSheet(
     context: context,
@@ -100,6 +108,8 @@ void showReportBugSheet(BuildContext context, bool isDark) {
   );
 }
 
+/// Shows the feature request form bottom sheet
+/// 显示功能请求表单底部弹出窗口
 void showRequestFeatureSheet(BuildContext context, bool isDark) {
   showModalBottomSheet(
     context: context,
@@ -109,6 +119,8 @@ void showRequestFeatureSheet(BuildContext context, bool isDark) {
   );
 }
 
+/// Shows the AI transparency information bottom sheet
+/// 显示 AI 透明度信息底部弹出窗口
 void showAITransparencySheet(BuildContext context, bool isDark) {
   showModalBottomSheet(
     context: context,
@@ -200,6 +212,8 @@ void showAITransparencySheet(BuildContext context, bool isDark) {
 
 // ==================== Shared Helpers ====================
 
+/// Builds a styled bottom sheet container with rounded top corners
+/// 构建带圆角顶部的样式化底部弹窗容器
 Widget _buildSheetContainer(
   BuildContext context,
   bool isDark, {
@@ -221,6 +235,8 @@ Widget _buildSheetContainer(
   );
 }
 
+/// Builds the sheet header row with title and close button
+/// 构建弹窗头部行，包含标题和关闭按钮
 Widget _buildSheetHeader(BuildContext context, bool isDark, String title) {
   return Row(
     children: [
@@ -247,6 +263,8 @@ Widget _buildSheetHeader(BuildContext context, bool isDark, String title) {
   );
 }
 
+/// Builds a titled content section with heading and body text
+/// 构建带标题和正文的内容区块
 Widget _buildSection(
   bool isDark, {
   required String title,
@@ -283,6 +301,8 @@ Widget _buildSection(
   );
 }
 
+/// Builds a labeled text form field with optional error and hint text
+/// 构建带标签的文本表单字段，可选错误提示和占位文本
 Widget _buildFormField(
   bool isDark, {
   required String label,
@@ -363,6 +383,8 @@ Widget _buildFormField(
   );
 }
 
+/// Builds a labeled dropdown selection field
+/// 构建带标签的下拉选择字段
 Widget _buildDropdownField(
   bool isDark, {
   required String label,
@@ -430,6 +452,8 @@ Widget _buildDropdownField(
   );
 }
 
+/// Builds a full-width submit button with optional loading spinner
+/// 构建全宽提交按钮，可选加载旋转指示器
 Widget _buildSubmitButton(
   bool isDark, {
   required String label,
@@ -471,9 +495,14 @@ Widget _buildSubmitButton(
 
 // ==================== FAQ Data & Widgets ====================
 
+/// Data model for a single FAQ entry
+/// 单个常见问题条目的数据模型
 class _FAQItem {
   final String question;
   final String answer;
+
+  /// Creates an FAQ item with a question and answer
+  /// 创建包含问题和答案的常见问题条目
   const _FAQItem(this.question, this.answer);
 }
 
@@ -540,6 +569,8 @@ const List<_FAQItem> _faqItems = [
   ),
 ];
 
+/// Builds an expandable FAQ tile with question as title and answer as content
+/// 构建可展开的常见问题卡片，问题为标题，答案为内容
 Widget _buildFAQTile(bool isDark, _FAQItem item) {
   return Theme(
     data: ThemeData(
@@ -577,6 +608,8 @@ Widget _buildFAQTile(bool isDark, _FAQItem item) {
   );
 }
 
+/// Builds the "Still need help?" section with a contact support button
+/// 构建"仍需帮助？"区块，包含联系支持按钮
 Widget _buildStillNeedHelp(BuildContext context, bool isDark) {
   return Container(
     padding: const EdgeInsets.all(16),
@@ -641,17 +674,27 @@ Widget _buildStillNeedHelp(BuildContext context, bool isDark) {
 
 // ==================== Tutorials Data & Widgets ====================
 
+/// Data model for a tutorial with icon, title, subtitle, and steps
+/// 教程数据模型，包含图标、标题、副标题和步骤
 class _Tutorial {
   final IconData icon;
   final String title;
   final String subtitle;
   final List<_TutorialStep> steps;
+
+  /// Creates a tutorial with the given icon, title, subtitle, and steps
+  /// 使用给定的图标、标题、副标题和步骤创建教程
   const _Tutorial(this.icon, this.title, this.subtitle, this.steps);
 }
 
+/// Data model for a single step within a tutorial
+/// 教程中单个步骤的数据模型
 class _TutorialStep {
   final String title;
   final String description;
+
+  /// Creates a tutorial step with a title and description
+  /// 创建包含标题和描述的教程步骤
   const _TutorialStep(this.title, this.description);
 }
 
@@ -811,6 +854,8 @@ const List<_Tutorial> _tutorials = [
   ),
 ];
 
+/// Builds a tappable tutorial card with icon, title, and subtitle
+/// 构建可点击的教程卡片，包含图标、标题和副标题
 Widget _buildTutorialCard(
   BuildContext context,
   bool isDark,
@@ -889,6 +934,8 @@ Widget _buildTutorialCard(
   );
 }
 
+/// Shows a detailed tutorial bottom sheet with numbered steps
+/// 显示带编号步骤的详细教程底部弹窗
 void _showTutorialDetail(
   BuildContext context,
   bool isDark,
@@ -934,6 +981,8 @@ void _showTutorialDetail(
   );
 }
 
+/// Builds a numbered tutorial step row with title and description
+/// 构建带编号的教程步骤行，包含标题和描述
 Widget _buildTutorialStep(bool isDark, int number, _TutorialStep step) {
   return Row(
     crossAxisAlignment: CrossAxisAlignment.start,
@@ -992,6 +1041,8 @@ Widget _buildTutorialStep(bool isDark, int number, _TutorialStep step) {
 
 // ==================== AI Transparency Widgets ====================
 
+/// Builds the AI transparency hero banner with Gemini branding
+/// 构建 AI 透明度横幅，展示 Gemini 品牌信息
 Widget _buildAIHeroBanner(bool isDark) {
   return Container(
     width: double.infinity,
@@ -1047,14 +1098,23 @@ Widget _buildAIHeroBanner(bool isDark) {
 
 // ==================== Contact Support Form ====================
 
+/// Contact support form bottom sheet widget
+/// 联系支持表单底部弹窗组件
 class _ContactSupportSheet extends StatefulWidget {
   final bool isDark;
+
+  /// Creates a contact support sheet with the given theme mode
+  /// 使用给定主题模式创建联系支持弹窗
   const _ContactSupportSheet({required this.isDark});
 
+  /// Creates the mutable state for the contact support sheet
+  /// 创建联系支持弹窗的可变状态
   @override
   State<_ContactSupportSheet> createState() => _ContactSupportSheetState();
 }
 
+/// State for the contact support form sheet
+/// 联系支持表单弹窗的状态
 class _ContactSupportSheetState extends State<_ContactSupportSheet> {
   final _subjectController = TextEditingController();
   final _messageController = TextEditingController();
@@ -1070,6 +1130,8 @@ class _ContactSupportSheetState extends State<_ContactSupportSheet> {
     'Other',
   ];
 
+  /// Disposes text editing controllers
+  /// 销毁文本编辑控制器
   @override
   void dispose() {
     _subjectController.dispose();
@@ -1077,6 +1139,8 @@ class _ContactSupportSheetState extends State<_ContactSupportSheet> {
     super.dispose();
   }
 
+  /// Validates and submits the support message via Firebase Cloud Functions
+  /// 验证并通过 Firebase Cloud Functions 提交支持消息
   Future<void> _submit() async {
     setState(() => _submitted = true);
     if (_subjectController.text.trim().isEmpty ||
@@ -1110,6 +1174,8 @@ class _ContactSupportSheetState extends State<_ContactSupportSheet> {
     }
   }
 
+  /// Builds the contact support form with category dropdown, subject, and message fields
+  /// 构建联系支持表单，包含类别下拉框、主题和消息字段
   @override
   Widget build(BuildContext context) {
     final isDark = widget.isDark;
@@ -1183,14 +1249,23 @@ class _ContactSupportSheetState extends State<_ContactSupportSheet> {
 
 // ==================== Report Bug Form ====================
 
+/// Bug report form bottom sheet widget
+/// 错误报告表单底部弹窗组件
 class _ReportBugSheet extends StatefulWidget {
   final bool isDark;
+
+  /// Creates a bug report sheet with the given theme mode
+  /// 使用给定主题模式创建错误报告弹窗
   const _ReportBugSheet({required this.isDark});
 
+  /// Creates the mutable state for the bug report sheet
+  /// 创建错误报告弹窗的可变状态
   @override
   State<_ReportBugSheet> createState() => _ReportBugSheetState();
 }
 
+/// State for the bug report form sheet
+/// 错误报告表单弹窗的状态
 class _ReportBugSheetState extends State<_ReportBugSheet> {
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
@@ -1200,12 +1275,16 @@ class _ReportBugSheetState extends State<_ReportBugSheet> {
   bool _isSubmitting = false;
   String _deviceInfo = 'Loading device info...';
 
+  /// Initializes state and loads device information
+  /// 初始化状态并加载设备信息
   @override
   void initState() {
     super.initState();
     _loadDeviceInfo();
   }
 
+  /// Disposes all text editing controllers
+  /// 销毁所有文本编辑控制器
   @override
   void dispose() {
     _titleController.dispose();
@@ -1215,6 +1294,8 @@ class _ReportBugSheetState extends State<_ReportBugSheet> {
     super.dispose();
   }
 
+  /// Loads device model, OS version, and app version asynchronously
+  /// 异步加载设备型号、操作系统版本和应用版本
   Future<void> _loadDeviceInfo() async {
     try {
       final packageInfo = await PackageInfo.fromPlatform();
@@ -1253,6 +1334,8 @@ class _ReportBugSheetState extends State<_ReportBugSheet> {
     }
   }
 
+  /// Validates and submits the bug report via Firebase Cloud Functions
+  /// 验证并通过 Firebase Cloud Functions 提交错误报告
   Future<void> _submit() async {
     setState(() => _submitted = true);
     if (_titleController.text.trim().isEmpty ||
@@ -1290,6 +1373,8 @@ class _ReportBugSheetState extends State<_ReportBugSheet> {
     }
   }
 
+  /// Builds the bug report form with title, description, steps, expected behavior, and device info
+  /// 构建错误报告表单，包含标题、描述、重现步骤、预期行为和设备信息
   @override
   Widget build(BuildContext context) {
     final isDark = widget.isDark;
@@ -1366,6 +1451,8 @@ class _ReportBugSheetState extends State<_ReportBugSheet> {
     );
   }
 
+  /// Builds a read-only box displaying auto-collected device information
+  /// 构建只读框，显示自动采集的设备信息
   Widget _buildDeviceInfoBox(bool isDark) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
@@ -1414,14 +1501,23 @@ class _ReportBugSheetState extends State<_ReportBugSheet> {
 
 // ==================== Request Feature Form ====================
 
+/// Feature request form bottom sheet widget
+/// 功能请求表单底部弹窗组件
 class _RequestFeatureSheet extends StatefulWidget {
   final bool isDark;
+
+  /// Creates a feature request sheet with the given theme mode
+  /// 使用给定主题模式创建功能请求弹窗
   const _RequestFeatureSheet({required this.isDark});
 
+  /// Creates the mutable state for the feature request sheet
+  /// 创建功能请求弹窗的可变状态
   @override
   State<_RequestFeatureSheet> createState() => _RequestFeatureSheetState();
 }
 
+/// State for the feature request form sheet
+/// 功能请求表单弹窗的状态
 class _RequestFeatureSheetState extends State<_RequestFeatureSheet> {
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
@@ -1439,6 +1535,8 @@ class _RequestFeatureSheetState extends State<_RequestFeatureSheet> {
     'Other',
   ];
 
+  /// Disposes all text editing controllers
+  /// 销毁所有文本编辑控制器
   @override
   void dispose() {
     _titleController.dispose();
@@ -1447,6 +1545,8 @@ class _RequestFeatureSheetState extends State<_RequestFeatureSheet> {
     super.dispose();
   }
 
+  /// Validates and submits the feature request via Firebase Cloud Functions
+  /// 验证并通过 Firebase Cloud Functions 提交功能请求
   Future<void> _submit() async {
     setState(() => _submitted = true);
     if (_titleController.text.trim().isEmpty ||
@@ -1483,6 +1583,8 @@ class _RequestFeatureSheetState extends State<_RequestFeatureSheet> {
     }
   }
 
+  /// Builds the feature request form with title, description, use case, and category
+  /// 构建功能请求表单，包含标题、描述、使用场景和类别
   @override
   Widget build(BuildContext context) {
     final isDark = widget.isDark;

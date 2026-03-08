@@ -7,7 +7,10 @@
 // =============================================================================
 
 /// App-wide constants and configuration values
+/// 应用级常量和配置值
 class AppConstants {
+  /// Private constructor to prevent instantiation
+  /// 私有构造函数，防止实例化
   AppConstants._();
 
   /// Minimum number of days of tracking required before AI insights are available

@@ -12,6 +12,7 @@
 import 'habit_category.dart';
 
 /// AI-generated habit suggestion model
+/// AI 生成的习惯建议模型
 class AIHabitSuggestion {
   final String id;
   final String habitName;
@@ -19,6 +20,8 @@ class AIHabitSuggestion {
   final String explanation;
   final String reason;
 
+  /// Creates an AIHabitSuggestion with all required fields
+  /// 使用所有必需字段创建 AIHabitSuggestion
   const AIHabitSuggestion({
     required this.id,
     required this.habitName,
@@ -27,6 +30,8 @@ class AIHabitSuggestion {
     required this.reason,
   });
 
+  /// String representation for debugging
+  /// 用于调试的字符串表示
   @override
   String toString() {
     return 'AIHabitSuggestion(id: $id, habitName: $habitName, category: $category, explanation: $explanation)';

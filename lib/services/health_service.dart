@@ -25,7 +25,12 @@ import '../models/health_data_models.dart' as models;
 /// Service for integrating with device health data (Apple Health / Google Health Connect)
 class HealthService {
   static final HealthService _instance = HealthService._internal();
+  /// Factory constructor returning the singleton instance
+  /// 工厂构造函数，返回单例实例
   factory HealthService() => _instance;
+
+  /// Private internal constructor for singleton pattern
+  /// 单例模式的私有内部构造函数
   HealthService._internal();
 
   final health_pkg.Health _health = health_pkg.Health();
@@ -43,12 +48,15 @@ class HealthService {
   ];
 
   /// Check if health integration is available on this platform
+  /// 检查当前平台是否支持健康集成
   bool get isAvailable => !kIsWeb && (Platform.isIOS || Platform.isAndroid);
 
   /// Check if we have permissions
+  /// 检查是否已获得权限
   bool get hasPermissions => _hasPermissions;
 
   /// Initialize the health service
+  /// 初始化健康服务
   Future<void> initialize() async {
     if (_isInitialized || !isAvailable) return;
 
@@ -63,7 +71,9 @@ class HealthService {
   }
 
   /// Request permissions to access health data
+  /// 请求访问健康数据的权限
   /// Returns a record with granted status and optional error message
+  /// 返回包含授权状态和可选错误消息的记录
   Future<({bool granted, String? error})> requestPermissions() async {
     if (!isAvailable) {
       return (granted: false, error: 'Health integration is not available on this platform');
@@ -117,6 +127,7 @@ class HealthService {
   }
 
   /// Check current permission status
+  /// 检查当前权限状态
   Future<bool> checkPermissions() async {
     if (!isAvailable) return false;
 
@@ -138,6 +149,7 @@ class HealthService {
   }
 
   /// Get health data for a specific date
+  /// 获取指定日期的健康数据
   Future<models.HealthDataPoint?> getHealthDataForDate(DateTime date) async {
     if (!_hasPermissions || !isAvailable) return null;
 
@@ -241,6 +253,7 @@ class HealthService {
   }
 
   /// Get health data for a date range
+  /// 获取指定日期范围的健康数据
   Future<List<models.HealthDataPoint>> getHealthDataForRange({
     required DateTime startDate,
     required DateTime endDate,
@@ -262,6 +275,7 @@ class HealthService {
   }
 
   /// Get health data summary for the last N days
+  /// 获取最近 N 天的健康数据摘要
   Future<models.HealthDataSummary> getHealthSummary({int days = 7}) async {
     final endDate = DateTime.now();
     final startDate = endDate.subtract(Duration(days: days - 1));
@@ -275,11 +289,13 @@ class HealthService {
   }
 
   /// Get today's health data
+  /// 获取今天的健康数据
   Future<models.HealthDataPoint?> getTodaysHealthData() async {
     return getHealthDataForDate(DateTime.now());
   }
 
   /// Convert sleep hours to quality rating
+  /// 将睡眠小时数转换为质量评级
   String _getSleepQuality(double? hours) {
     if (hours == null) return 'Unknown';
     if (hours >= 7.5) return 'Excellent';
@@ -289,6 +305,7 @@ class HealthService {
   }
 
   /// Prepare health data for AI analysis
+  /// 为 AI 分析准备健康数据
   Future<List<Map<String, dynamic>>> prepareHealthDataForAnalysis({
     int days = 30,
   }) async {
@@ -304,6 +321,7 @@ class HealthService {
   }
 
   /// Revoke health permissions (user wants to disconnect)
+  /// 撤销健康权限（用户想要断开连接）
   Future<void> revokePermissions() async {
     // Note: Most platforms don't allow programmatic permission revocation
     // User must go to system settings to revoke

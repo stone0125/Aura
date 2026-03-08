@@ -19,7 +19,10 @@ import 'package:flutter/material.dart';
 import 'app_colors.dart';
 
 /// Standardized UI constants for consistent styling across the app
+/// 标准化 UI 常量，确保应用中样式一致
 class UIConstants {
+  /// Private constructor to prevent instantiation
+  /// 私有构造函数，防止实例化
   UIConstants._();
 
   // ==================== Spacing Scale ====================
@@ -148,12 +151,15 @@ class UIConstants {
   ];
 
   /// Get appropriate shadow based on theme
+  /// 根据主题获取合适的阴影
   static List<BoxShadow> getShadow(bool isDark) => isDark ? shadowDark : shadowLight;
 
   /// Get appropriate subtle shadow based on theme
+  /// 根据主题获取合适的轻微阴影
   static List<BoxShadow> getShadowSubtle(bool isDark) => isDark ? shadowDarkSubtle : shadowLightSubtle;
 
   /// Get appropriate elevated shadow based on theme
+  /// 根据主题获取合适的高层阴影
   static List<BoxShadow> getShadowElevated(bool isDark) => isDark ? shadowDarkElevated : shadowLightElevated;
 
   // ==================== Typography Constants ====================
@@ -232,6 +238,7 @@ class UIConstants {
   // ==================== Standard Decorations ====================
 
   /// Get standard card decoration
+  /// 获取标准卡片装饰
   static BoxDecoration cardDecoration({
     required bool isDark,
     bool elevated = false,
@@ -248,6 +255,7 @@ class UIConstants {
   }
 
   /// Get button decoration
+  /// 获取按钮装饰
   static BoxDecoration buttonDecoration({
     required bool isDark,
     required bool isPrimary,

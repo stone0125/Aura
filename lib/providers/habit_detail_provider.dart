@@ -19,6 +19,7 @@ import '../services/firestore_service.dart';
 import '../services/subscription_service.dart';
 
 /// Provider for managing habit detail data
+/// 管理习惯详情数据的 Provider
 class HabitDetailProvider with ChangeNotifier {
   Habit? _habit;
   HabitStats? _stats;
@@ -34,17 +35,40 @@ class HabitDetailProvider with ChangeNotifier {
   bool _isToggling = false;
   bool _isDisposed = false;
 
-  // Getters
+  /// Get the current habit
+  /// 获取当前习惯
   Habit? get habit => _habit;
+
+  /// Get the habit statistics
+  /// 获取习惯统计数据
   HabitStats? get stats => _stats;
+
+  /// Get the completion history list
+  /// 获取完成历史列表
   List<HabitCompletion> get completions => _completions;
+
+  /// Get the AI-generated insight
+  /// 获取 AI 生成的洞察
   AIInsight? get aiInsight => _aiInsight;
+
+  /// Whether an AI insight is currently loading
+  /// AI 洞察是否正在加载中
   bool get isLoadingInsight => _isLoadingInsight;
+
+  /// Whether habit data is currently loading
+  /// 习惯数据是否正在加载中
   bool get isLoadingData => _isLoadingData;
+
+  /// Get the current error message if any
+  /// 获取当前错误消息（如果有）
   String? get errorMessage => _errorMessage;
+
+  /// Get the calendar completion data
+  /// 获取日历完成数据
   Map<DateTime, bool> get calendarData => _calendarData;
 
   /// Check if habit was completed today (cached)
+  /// 检查习惯今天是否已完成（已缓存）
   bool get isCompletedToday {
     _cachedIsCompletedToday ??= _completions.any((c) => c.isToday);
     return _cachedIsCompletedToday!;
@@ -53,10 +77,14 @@ class HabitDetailProvider with ChangeNotifier {
   final FirestoreService _firestoreService = FirestoreService();
   final SubscriptionService _subscriptionService = SubscriptionService();
 
+  /// Safely notify listeners only if provider is not disposed
+  /// 仅在 Provider 未被销毁时安全地通知监听器
   void _safeNotifyListeners() {
     if (!_isDisposed) notifyListeners();
   }
 
+  /// Dispose the provider and mark as disposed
+  /// 销毁 Provider 并标记为已销毁
   @override
   void dispose() {
     _isDisposed = true;
@@ -64,6 +92,7 @@ class HabitDetailProvider with ChangeNotifier {
   }
 
   /// Load habit details with real history
+  /// 加载习惯详情及真实历史数据
   Future<void> loadHabitDetails(Habit habit) async {
     _habit = habit;
     _errorMessage = null;
@@ -82,6 +111,7 @@ class HabitDetailProvider with ChangeNotifier {
   }
 
   /// Load real data from Firestore
+  /// 从 Firestore 加载真实数据
   Future<void> _loadData() async {
     if (_habit == null) return;
 
@@ -126,6 +156,8 @@ class HabitDetailProvider with ChangeNotifier {
     }
   }
 
+  /// Calculate habit statistics from completion history
+  /// 从完成历史计算习惯统计数据
   void _calculateStats(List<DateTime> history) {
     if (_habit == null) return;
 
@@ -250,6 +282,7 @@ class HabitDetailProvider with ChangeNotifier {
   }
 
   /// Load AI insight from Cloud Function
+  /// 从 Cloud Function 加载 AI 洞察
   Future<void> _loadAIInsight() async {
     if (_habit == null) return;
 
@@ -321,11 +354,13 @@ class HabitDetailProvider with ChangeNotifier {
   }
 
   /// Refresh AI insight
+  /// 刷新 AI 洞察
   Future<void> refreshAIInsight() async {
     await _loadAIInsight();
   }
 
   /// Mark habit as complete for today
+  /// 将习惯标记为今日已完成
   Future<void> completeHabit() async {
     if (_habit == null || _isToggling) return;
 
@@ -342,11 +377,13 @@ class HabitDetailProvider with ChangeNotifier {
   }
 
   /// Undo today's completion (handled by toggle logic mostly, but explicit undo might be needed)
+  /// 撤消今日完成（主要由切换逻辑处理，但可能需要显式撤消）
   Future<void> undoCompletion() async {
     await completeHabit(); // Toggle acts as undo if already completed
   }
 
   /// Get chart data for time range
+  /// 获取指定时间范围的图表数据
   List<ChartDataPoint> getChartData(TimeRange timeRange) {
     final now = DateTime.now();
     final days = timeRange.days ?? 30; // Default to 30 if all time
@@ -370,6 +407,7 @@ class HabitDetailProvider with ChangeNotifier {
   }
 
   /// Clear all user-specific data on logout
+  /// 登出时清除所有用户数据
   void clearUserData() {
     _habit = null;
     _stats = null;
@@ -385,6 +423,7 @@ class HabitDetailProvider with ChangeNotifier {
   }
 
   /// Check if completion exists for a specific date
+  /// 检查特定日期是否有完成记录
   bool isCompletedOn(DateTime date) {
     final dateKey = DateTime(date.year, date.month, date.day);
     return _calendarData[dateKey] ?? false;

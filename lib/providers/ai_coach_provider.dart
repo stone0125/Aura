@@ -32,10 +32,13 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Provider for managing AI Coach data and state
+/// 管理 AI 教练数据和状态的 Provider
 class AICoachProvider with ChangeNotifier {
   final FirebaseFunctions? _firebaseFunctions;
   final SubscriptionService _subscriptionService = SubscriptionService();
 
+  /// Constructor with optional Firebase Functions injection for testing
+  /// 构造函数，可选注入 Firebase Functions 用于测试
   AICoachProvider({FirebaseFunctions? functions})
     : _firebaseFunctions = functions;
 
@@ -57,23 +60,64 @@ class AICoachProvider with ChangeNotifier {
   DateTime? _lastSuggestionRefreshTime;
   static const Duration _refreshCooldown = Duration(minutes: 5);
 
-  // Getters
+  /// Get the current active tab
+  /// 获取当前激活的标签页
   AICoachTab get currentTab => _currentTab;
+
+  /// Get the list of AI suggestions
+  /// 获取 AI 建议列表
   List<AICoachSuggestion> get suggestions => _suggestions;
+
+  /// Get the weekly AI summary
+  /// 获取每周 AI 总结
   WeeklyAISummary? get weeklySummary => _weeklySummary;
+
+  /// Get the discovered patterns
+  /// 获取发现的模式
   List<AIPattern> get patterns => _patterns;
+
+  /// Get tips organized by category
+  /// 获取按类别组织的技巧
   Map<TipCategory, List<AITip>> get tipsByCategory => _tipsByCategory;
+
+  /// Get the currently expanded tip category
+  /// 获取当前展开的技巧类别
   TipCategory? get expandedTipCategory => _expandedTipCategory;
+
+  /// Get the list of action items
+  /// 获取行动项列表
   List<AIActionItem> get actionItems => _actionItems;
+
+  /// Whether suggestions are currently loading
+  /// 建议是否正在加载中
   bool get isLoadingSuggestions => _isLoadingSuggestions;
+
+  /// Whether insights are currently loading
+  /// 洞察是否正在加载中
   bool get isLoadingInsights => _isLoadingInsights;
+
+  /// Whether tips are currently loading
+  /// 技巧是否正在加载中
   bool get isLoadingTips => _isLoadingTips;
+
+  /// Whether actions are currently loading
+  /// 行动项是否正在加载中
   bool get isLoadingActions => _isLoadingActions;
+
+  /// Get the suggestions error message if any
+  /// 获取建议的错误消息（如果有）
   String? get suggestionsError => _suggestionsError;
+
+  /// Get the actions error message if any
+  /// 获取行动项的错误消息（如果有）
   String? get actionsError => _actionsError;
+
+  /// Whether fallback suggestions are being used
+  /// 是否正在使用后备建议
   bool get usedFallback => _usedFallback;
 
   /// Whether the refresh button should be enabled (not loading and not in cooldown)
+  /// 刷新按钮是否应该启用（未加载中且不在冷却期内）
   bool get canRefreshSuggestions {
     if (_isLoadingSuggestions) return false;
     if (_lastSuggestionRefreshTime == null) return true;
@@ -81,6 +125,7 @@ class AICoachProvider with ChangeNotifier {
   }
 
   /// Seconds remaining in cooldown (0 if no cooldown active)
+  /// 冷却期剩余秒数（无冷却期时为 0）
   int get refreshCooldownRemaining {
     if (_lastSuggestionRefreshTime == null) return 0;
     final elapsed = DateTime.now().difference(_lastSuggestionRefreshTime!);
@@ -89,6 +134,7 @@ class AICoachProvider with ChangeNotifier {
   }
 
   /// Formatted cooldown remaining string (e.g. "4:32" or "0:05")
+  /// 格式化的冷却期剩余时间字符串（例如 "4:32" 或 "0:05"）
   String get refreshCooldownFormatted {
     final total = refreshCooldownRemaining;
     final minutes = total ~/ 60;
@@ -97,19 +143,24 @@ class AICoachProvider with ChangeNotifier {
   }
 
   /// Check if user can use AI suggestions (subscription limit)
+  /// 检查用户是否可以使用 AI 建议（订阅限制）
   bool get canUseAISuggestion => _subscriptionService.canUseAISuggestion();
 
   /// Get remaining AI suggestions for today
+  /// 获取今日剩余 AI 建议次数
   int get remainingAISuggestions =>
       _subscriptionService.getRemainingAISuggestions();
 
   /// Check if user can use AI reports this month
+  /// 检查用户本月是否可以使用 AI 报告
   bool get canUseAIReport => _subscriptionService.canUseAIReport();
 
   /// Get remaining AI reports for this month
+  /// 获取本月剩余 AI 报告次数
   int get remainingAIReports => _subscriptionService.getRemainingAIReports();
 
   /// Build a sorted list of completed habit IDs for snapshot comparison
+  /// 构建已完成习惯 ID 的排序列表，用于快照比较
   static List<String> buildCompletionSnapshot(List<Habit> habits) {
     final ids = habits.where((h) => h.isCompleted).map((h) => h.id).toList()
       ..sort();
@@ -117,6 +168,7 @@ class AICoachProvider with ChangeNotifier {
   }
 
   /// Check if the weekly summary is outdated compared to current habit state
+  /// 检查每周总结是否相对于当前习惯状态已过期
   bool isWeeklySummaryOutdated(List<Habit> habits) {
     final summary = _weeklySummary;
     if (summary == null) return false;
@@ -124,6 +176,8 @@ class AICoachProvider with ChangeNotifier {
     return !listEquals(current, summary.completionSnapshot);
   }
 
+  /// Clear the actions error message
+  /// 清除行动项的错误消息
   void clearActionsError() {
     _actionsError = null;
   }
@@ -135,6 +189,7 @@ class AICoachProvider with ChangeNotifier {
   static const String _actionsCacheKey = 'ai_actions_cache';
   static const String _patternsCacheKey = 'ai_patterns_cache';
   /// Helper to get cached data if valid
+  /// 获取有效的缓存数据的辅助方法
   Future<dynamic> _getCachedData(String key) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -159,6 +214,7 @@ class AICoachProvider with ChangeNotifier {
   }
 
   /// Helper to save data to cache
+  /// 将数据保存到缓存的辅助方法
   Future<void> _cacheData(String key, dynamic data) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -174,6 +230,8 @@ class AICoachProvider with ChangeNotifier {
 
   /// Clear suggestions cache when habits change
   /// Call this when user adds or removes habits
+  /// 当习惯变化时清除建议缓存
+  /// 在用户添加或删除习惯时调用
   Future<void> clearSuggestionsCache() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -186,11 +244,13 @@ class AICoachProvider with ChangeNotifier {
   }
 
   /// Initialize AI coach data
+  /// 初始化 AI 教练数据
   Future<void> initialize() async {
     await loadTips();
   }
 
   /// Change active tab
+  /// 更改激活的标签页
   void setTab(AICoachTab tab) {
     _currentTab = tab;
     notifyListeners();
@@ -198,6 +258,8 @@ class AICoachProvider with ChangeNotifier {
 
   /// Load AI suggestions
   /// Returns false if rate limited, true otherwise
+  /// 加载 AI 建议
+  /// 如果受到速率限制则返回 false，否则返回 true
   Future<bool> loadSuggestions({
     required List<String> categories,
     required List<String> currentHabits,
@@ -356,6 +418,7 @@ class AICoachProvider with ChangeNotifier {
   }
 
   /// Default suggestions when Cloud Functions fail
+  /// Cloud Functions 失败时的默认建议
   List<AICoachSuggestion> _getDefaultSuggestions() {
     return [
       AICoachSuggestion(
@@ -416,6 +479,7 @@ class AICoachProvider with ChangeNotifier {
   }
 
   /// Load insights (weekly summary and patterns)
+  /// 加载洞察（每周总结和模式）
   Future<void> loadInsights({
     required Map<String, dynamic> weekData,
     List<Habit> habits = const [],
@@ -502,6 +566,7 @@ class AICoachProvider with ChangeNotifier {
   }
 
   /// Load AI-discovered patterns from habit completion history
+  /// 从习惯完成历史中加载 AI 发现的模式
   Future<void> loadPatterns({
     required List<Map<String, dynamic>> habitsData,
     bool forceRefresh = false,
@@ -593,6 +658,7 @@ class AICoachProvider with ChangeNotifier {
   }
 
   /// Load tips by category (personalized if user data provided)
+  /// 按类别加载技巧（如果提供了用户数据则个性化）
   Future<void> loadTips({
     List<String> userHabits = const [],
     double completionRate = 0,
@@ -712,6 +778,8 @@ class AICoachProvider with ChangeNotifier {
     }
   }
 
+  /// Organize tips into category buckets
+  /// 将技巧按类别分组
   void _bucketTips(List<AITip> tips) {
     _tipsByCategory = {for (var category in TipCategory.values) category: []};
     for (var tip in tips) {
@@ -720,6 +788,7 @@ class AICoachProvider with ChangeNotifier {
   }
 
   /// Load personalized action items
+  /// 加载个性化的行动项
   Future<void> loadActionItems({
     List<Map<String, dynamic>> habits = const [],
     double completionRate = 0,
@@ -822,6 +891,8 @@ class AICoachProvider with ChangeNotifier {
     }
   }
 
+  /// Parse action type string to enum
+  /// 将行动类型字符串解析为枚举
   ActionItemType _parseActionType(String? type) {
     switch (type?.toLowerCase()) {
       case 'daily':
@@ -835,6 +906,8 @@ class AICoachProvider with ChangeNotifier {
     }
   }
 
+  /// Parse action priority string to enum
+  /// 将行动优先级字符串解析为枚举
   ActionPriority _parseActionPriority(String? priority) {
     switch (priority?.toLowerCase()) {
       case 'high':
@@ -849,6 +922,7 @@ class AICoachProvider with ChangeNotifier {
   }
 
   /// Mark an action item as completed
+  /// 将行动项标记为已完成
   void completeActionItem(String actionId) {
     final index = _actionItems.indexWhere((a) => a.id == actionId);
     if (index != -1) {
@@ -864,6 +938,8 @@ class AICoachProvider with ChangeNotifier {
     }
   }
 
+  /// Get default action items when Cloud Functions fail
+  /// Cloud Functions 失败时获取默认行动项
   List<AIActionItem> _getDefaultActionItems() {
     final now = DateTime.now();
     return [
@@ -911,12 +987,14 @@ class AICoachProvider with ChangeNotifier {
   }
 
   /// Dismiss a suggestion
+  /// 忽略一条建议
   void dismissSuggestion(String suggestionId) {
     _suggestions.removeWhere((s) => s.id == suggestionId);
     notifyListeners();
   }
 
   /// Toggle tip category expansion
+  /// 切换技巧类别的展开/折叠状态
   void toggleTipCategory(TipCategory category) {
     if (_expandedTipCategory == category) {
       _expandedTipCategory = null;
@@ -927,6 +1005,7 @@ class AICoachProvider with ChangeNotifier {
   }
 
   /// Toggle tip bookmark
+  /// 切换技巧的收藏状态
   void toggleTipBookmark(String tipId) {
     for (var category in _tipsByCategory.keys) {
       final tips = _tipsByCategory[category]!;
@@ -943,6 +1022,7 @@ class AICoachProvider with ChangeNotifier {
   }
 
   /// Clear all user-specific data on logout
+  /// 登出时清除所有用户数据
   Future<void> clearUserData() async {
     _inProgressOps.clear();
     _suggestions = [];
@@ -974,6 +1054,7 @@ class AICoachProvider with ChangeNotifier {
   }
 
   /// Refresh all data
+  /// 刷新所有数据
   Future<void> refreshAll() async {
     await loadTips(forceRefresh: true);
   }

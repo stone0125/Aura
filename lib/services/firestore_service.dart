@@ -36,18 +36,27 @@ class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
+  /// Get the current authenticated user's ID
+  /// 获取当前已认证用户的 ID
   String? get _userId => _auth.currentUser?.uid;
 
-  // Collection References
+  /// Reference to the users collection
+  /// 用户集合的引用
   CollectionReference get _usersRef => _db.collection('users');
 
+  /// Reference to the current user's document
+  /// 当前用户文档的引用
   DocumentReference? get _userDoc =>
       _userId != null ? _usersRef.doc(_userId) : null;
 
+  /// Reference to the current user's habits subcollection
+  /// 当前用户习惯子集合的引用
   CollectionReference? get _habitsRef => _userDoc?.collection('habits');
 
   // --- User Operations ---
 
+  /// Create user document in Firestore if it does not already exist
+  /// 如果用户文档不存在则在 Firestore 中创建
   Future<void> createUserIfNotExists() async {
     final userDoc = _userDoc;
     if (_userId == null || userDoc == null) return;
@@ -68,6 +77,8 @@ class FirestoreService {
     }
   }
 
+  /// Fetch the user profile for the given user ID (own profile only)
+  /// 获取指定用户 ID 的用户资料（仅限自己的资料）
   Future<UserProfile?> getUserProfile(String userId) async {
     // Security: Only allow fetching own profile
     if (userId != _userId) {
@@ -103,6 +114,8 @@ class FirestoreService {
     }
   }
 
+  /// Update the user profile in Firestore (own profile only)
+  /// 更新 Firestore 中的用户资料（仅限自己的资料）
   Future<void> updateUserProfile(UserProfile profile) async {
     final userDoc = _userDoc;
     if (_userId == null || userDoc == null) return;
@@ -121,6 +134,8 @@ class FirestoreService {
     }, SetOptions(merge: true));
   }
 
+  /// Save FCM device token to the user document
+  /// 将 FCM 设备令牌保存到用户文档
   Future<void> saveDeviceToken(String token) async {
     final userDoc = _userDoc;
     if (_userId == null || userDoc == null) return;
@@ -130,6 +145,7 @@ class FirestoreService {
   }
 
   /// Save notification preferences for daily summary
+  /// 保存每日摘要的通知偏好设置
   Future<void> saveNotificationPreferences({
     required bool enabled,
     required int hour,
@@ -153,6 +169,7 @@ class FirestoreService {
   }
 
   /// Get notification preferences
+  /// 获取通知偏好设置
   Future<Map<String, dynamic>?> getNotificationPreferences() async {
     final userDoc = _userDoc;
     if (_userId == null || userDoc == null) return null;
@@ -175,7 +192,8 @@ class FirestoreService {
 
   // --- Habit Operations ---
 
-  // Stream of habits
+  /// Stream real-time list of habits from Firestore
+  /// 从 Firestore 实时流式获取习惯列表
   Stream<List<Habit>> getHabits() {
     final habitsRef = _habitsRef;
     if (habitsRef == null) return Stream.value([]);
@@ -239,6 +257,7 @@ class FirestoreService {
   }
 
   /// Check if the given date is today
+  /// 检查给定日期是否为今天
   bool _isCompletedToday(DateTime? lastCompletedDate) {
     if (lastCompletedDate == null) return false;
     final now = DateTime.now();
@@ -248,7 +267,8 @@ class FirestoreService {
         localDate.day == now.day;
   }
 
-  // Add Habit
+  /// Add a new habit to Firestore
+  /// 向 Firestore 添加新习惯
   Future<void> addHabit(Habit habit) async {
     final habitsRef = _habitsRef;
     if (habitsRef == null) return;
@@ -270,7 +290,8 @@ class FirestoreService {
     });
   }
 
-  // Update Habit
+  /// Update an existing habit in Firestore
+  /// 更新 Firestore 中已有的习惯
   Future<void> updateHabit(Habit habit) async {
     final habitsRef = _habitsRef;
     if (habitsRef == null) return;
@@ -291,7 +312,8 @@ class FirestoreService {
     });
   }
 
-  // Delete Habit (including history subcollection)
+  /// Delete a habit and its history subcollection from Firestore
+  /// 从 Firestore 删除习惯及其历史子集合
   Future<void> deleteHabit(String habitId) async {
     final habitsRef = _habitsRef;
     if (habitsRef == null) return;
@@ -320,7 +342,8 @@ class FirestoreService {
 
   // --- History Operations ---
 
-  // Log a completion
+  /// Log a habit completion for a specific date
+  /// 记录特定日期的习惯完成情况
   Future<void> logCompletion(String habitId, DateTime date) async {
     final habitsRef = _habitsRef;
     if (habitsRef == null) return;
@@ -334,7 +357,8 @@ class FirestoreService {
     });
   }
 
-  // Remove a completion (undo)
+  /// Remove a habit completion record (undo)
+  /// 移除习惯完成记录（撤销）
   Future<void> removeCompletion(String habitId, DateTime date) async {
     final habitsRef = _habitsRef;
     if (habitsRef == null) return;
@@ -345,7 +369,8 @@ class FirestoreService {
     await habitsRef.doc(habitId).collection('history').doc(dateStr).delete();
   }
 
-  // Get history (limited to 90 days for performance)
+  /// Get completion history for a habit (limited to N days for performance)
+  /// 获取习惯的完成历史（为提升性能限制天数）
   Future<List<DateTime>> getHabitHistory(String habitId, {int limitDays = 90}) async {
     final habitsRef = _habitsRef;
     if (habitsRef == null) return [];
@@ -373,7 +398,8 @@ class FirestoreService {
     }
   }
 
-  // Toggle Completion (atomic batch write)
+  /// Toggle habit completion status using an atomic batch write
+  /// 使用原子批量写入切换习惯完成状态
   Future<void> toggleHabitCompletion(Habit habit) async {
     final habitsRef = _habitsRef;
     if (habitsRef == null) return;
@@ -441,6 +467,7 @@ class FirestoreService {
   }
 
   /// Check if habit was completed yesterday
+  /// 检查习惯是否在昨天完成
   bool _wasCompletedYesterday(DateTime? lastCompletedDate) {
     if (lastCompletedDate == null) return false;
     final now = DateTime.now();
@@ -458,18 +485,22 @@ class FirestoreService {
   // --- AI Scoring Operations ---
 
   /// Collection reference for daily reviews
+  /// 每日回顾集合的引用
   CollectionReference? get _dailyReviewsRef =>
       _userDoc?.collection('dailyReviews');
 
   /// Collection reference for habit scores
+  /// 习惯评分集合的引用
   CollectionReference? get _habitScoresRef =>
       _userDoc?.collection('habitScores');
 
   /// Collection reference for health correlations
+  /// 健康关联分析集合的引用
   CollectionReference? get _healthCorrelationsRef =>
       _userDoc?.collection('healthCorrelations');
 
   /// Save a daily review
+  /// 保存每日回顾
   Future<void> saveDailyReview(DailyReview review) async {
     final dailyReviewsRef = _dailyReviewsRef;
     if (dailyReviewsRef == null) return;
@@ -481,6 +512,7 @@ class FirestoreService {
   }
 
   /// Get daily review for a specific date
+  /// 获取指定日期的每日回顾
   Future<DailyReview?> getDailyReview(String date) async {
     final dailyReviewsRef = _dailyReviewsRef;
     if (dailyReviewsRef == null) return null;
@@ -498,6 +530,7 @@ class FirestoreService {
   }
 
   /// Get daily review history for a date range
+  /// 获取指定日期范围内的每日回顾历史
   Future<List<DailyReview>> getDailyReviewHistory({
     DateTime? startDate,
     DateTime? endDate,
@@ -533,6 +566,7 @@ class FirestoreService {
   }
 
   /// Save a habit score
+  /// 保存习惯评分
   Future<void> saveHabitScore(HabitScore score) async {
     final habitScoresRef = _habitScoresRef;
     if (habitScoresRef == null) return;
@@ -557,6 +591,7 @@ class FirestoreService {
   }
 
   /// Get latest habit score
+  /// 获取最新的习惯评分
   Future<HabitScore?> getHabitScore(String habitId) async {
     final habitScoresRef = _habitScoresRef;
     if (habitScoresRef == null) return null;
@@ -577,6 +612,7 @@ class FirestoreService {
   }
 
   /// Get habit score history
+  /// 获取习惯评分历史
   Future<List<ScoreHistoryEntry>> getScoreHistory(
     String habitId, {
     int limit = 30,
@@ -602,6 +638,7 @@ class FirestoreService {
   }
 
   /// Get all habit scores for the user (limited to 100 for performance)
+  /// 获取用户的所有习惯评分（为提升性能限制 100 条）
   Future<Map<String, HabitScore>> getAllHabitScores() async {
     final habitScoresRef = _habitScoresRef;
     if (habitScoresRef == null) return {};
@@ -626,6 +663,7 @@ class FirestoreService {
   }
 
   /// Save health correlation analysis
+  /// 保存健康关联分析
   Future<void> saveHealthCorrelation(HealthCorrelationAnalysis analysis) async {
     final healthCorrelationsRef = _healthCorrelationsRef;
     if (healthCorrelationsRef == null) return;
@@ -639,6 +677,7 @@ class FirestoreService {
   }
 
   /// Get latest health correlation analysis
+  /// 获取最新的健康关联分析
   Future<HealthCorrelationAnalysis?> getLatestHealthCorrelation() async {
     final healthCorrelationsRef = _healthCorrelationsRef;
     if (healthCorrelationsRef == null) return null;
@@ -662,7 +701,9 @@ class FirestoreService {
   }
 
   /// Get completion history for the last N days (for AI scoring)
+  /// 获取最近 N 天的完成历史（用于 AI 评分）
   /// Optimized to use a single query instead of N+1 individual document fetches
+  /// 优化为使用单次查询替代 N+1 次单独文档读取
   Future<List<bool>> getCompletionHistoryForScoring(
     String habitId, {
     int days = 30,
@@ -708,6 +749,7 @@ class FirestoreService {
   }
 
   /// Save health integration enabled preference
+  /// 保存健康集成启用偏好设置
   Future<void> saveHealthIntegrationEnabled(bool enabled) async {
     final userDoc = _userDoc;
     if (userDoc == null) return;
@@ -718,6 +760,7 @@ class FirestoreService {
   }
 
   /// Get health integration enabled preference
+  /// 获取健康集成启用偏好设置
   Future<bool> getHealthIntegrationEnabled() async {
     final userDoc = _userDoc;
     if (userDoc == null) return false;
@@ -738,7 +781,9 @@ class FirestoreService {
   // --- Account Deletion ---
 
   /// Delete all user data from Firestore (subcollections + user doc).
+  /// 从 Firestore 删除所有用户数据（子集合 + 用户文档）。
   /// Subcollection counts are bounded, so client-side batch deletes are safe.
+  /// 子集合数量有限，因此客户端批量删除是安全的。
   Future<void> deleteAllUserData() async {
     final userId = _userId;
     final userDoc = _userDoc;

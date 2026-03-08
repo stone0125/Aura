@@ -23,6 +23,7 @@ import '../services/subscription_service.dart';
 import '../models/settings_models.dart';
 
 /// Provider for managing app settings and user profile
+/// 管理应用设置和用户资料的 Provider
 class SettingsProvider with ChangeNotifier {
   final FirestoreService _firestoreService = FirestoreService();
   StreamSubscription<User?>? _authSubscription;
@@ -41,10 +42,14 @@ class SettingsProvider with ChangeNotifier {
   AppSettings _settings = const AppSettings();
   bool _isInitializing = false;
 
+  /// Constructor that sets up authentication state listener
+  /// 构造函数，设置身份验证状态监听器
   SettingsProvider() {
     _initAuthListener();
   }
 
+  /// Initialize Firebase auth state listener to handle login/logout
+  /// 初始化 Firebase 身份验证状态监听器以处理登录/登出
   void _initAuthListener() {
     _authSubscription = FirebaseAuth.instance.authStateChanges().listen((user) {
       if (user != null) {
@@ -79,6 +84,7 @@ class SettingsProvider with ChangeNotifier {
   }
 
   /// Clear user-specific SharedPreferences keys on logout
+  /// 登出时清除用户相关的 SharedPreferences 键
   Future<void> _clearUserPreferences() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -96,17 +102,24 @@ class SettingsProvider with ChangeNotifier {
     }
   }
 
+  /// Dispose resources and cancel auth subscription
+  /// 释放资源并取消身份验证订阅
   @override
   void dispose() {
     _authSubscription?.cancel();
     super.dispose();
   }
 
-  // Getters
+  /// Get the current user profile
+  /// 获取当前用户资料
   UserProfile get userProfile => _userProfile;
+
+  /// Get the current app settings
+  /// 获取当前应用设置
   AppSettings get settings => _settings;
 
   /// Initialize settings and load user profile
+  /// 初始化设置并加载用户资料
   Future<void> initialize() async {
     if (_isInitializing) return;
     _isInitializing = true;
@@ -202,6 +215,7 @@ class SettingsProvider with ChangeNotifier {
   // ==================== Profile Methods ====================
 
   /// Update user profile
+  /// 更新用户资料
   Future<void> updateProfile({
     String? firstName,
     String? lastName,
@@ -244,6 +258,7 @@ class SettingsProvider with ChangeNotifier {
   }
 
   /// Upgrade to Pro — presents the RevenueCat paywall
+  /// 升级到 Pro — 展示 RevenueCat 付费墙
   Future<void> upgradeToPro() async {
     final subscriptionService = SubscriptionService();
     await subscriptionService.presentPaywall();
@@ -260,6 +275,7 @@ class SettingsProvider with ChangeNotifier {
   // ==================== Appearance Methods ====================
 
   /// Change theme preference
+  /// 更改主题偏好
   void setThemePreference(ThemePreference preference) {
     _settings = _settings.copyWith(themePreference: preference);
     notifyListeners();
@@ -269,6 +285,7 @@ class SettingsProvider with ChangeNotifier {
   // ==================== Notification Methods ====================
 
   /// Toggle notifications
+  /// 切换通知开关
   void setNotificationsEnabled(bool enabled) {
     _settings = _settings.copyWith(notificationsEnabled: enabled);
     notifyListeners();
@@ -276,6 +293,7 @@ class SettingsProvider with ChangeNotifier {
   }
 
   /// Set default reminder time
+  /// 设置默认提醒时间
   void setDefaultReminderTime(TimeOfDay time) {
     _settings = _settings.copyWith(defaultReminderTime: time);
     notifyListeners();
@@ -283,6 +301,7 @@ class SettingsProvider with ChangeNotifier {
   }
 
   /// Change notification sound
+  /// 更改通知声音
   void setNotificationSound(String sound) {
     _settings = _settings.copyWith(notificationSound: sound);
     notifyListeners();
@@ -290,6 +309,7 @@ class SettingsProvider with ChangeNotifier {
   }
 
   /// Toggle badge
+  /// 切换徽章开关
   void setBadgeEnabled(bool enabled) {
     _settings = _settings.copyWith(badgeEnabled: enabled);
     BadgeService().setBadgeEnabled(enabled);
@@ -298,6 +318,7 @@ class SettingsProvider with ChangeNotifier {
   }
 
   /// Toggle motivational messages
+  /// 切换激励消息开关
   void setMotivationalMessages(bool enabled) {
     _settings = _settings.copyWith(motivationalMessages: enabled);
     notifyListeners();
@@ -307,6 +328,7 @@ class SettingsProvider with ChangeNotifier {
   // ==================== AI Preferences Methods ====================
 
   /// Toggle AI suggestions
+  /// 切换 AI 建议开关
   void setAISuggestionsEnabled(bool enabled) {
     _settings = _settings.copyWith(aiSuggestionsEnabled: enabled);
     notifyListeners();
@@ -314,6 +336,7 @@ class SettingsProvider with ChangeNotifier {
   }
 
   /// Set suggestion frequency
+  /// 设置建议频率
   void setSuggestionFrequency(NotificationFrequency frequency) {
     _settings = _settings.copyWith(suggestionFrequency: frequency);
     notifyListeners();
@@ -321,6 +344,7 @@ class SettingsProvider with ChangeNotifier {
   }
 
   /// Toggle AI optimized reminders
+  /// 切换 AI 优化提醒开关
   void setAIOptimizedReminders(bool enabled) {
     _settings = _settings.copyWith(aiOptimizedReminders: enabled);
     notifyListeners();
@@ -328,6 +352,7 @@ class SettingsProvider with ChangeNotifier {
   }
 
   /// Toggle share data for AI
+  /// 切换为 AI 共享数据的开关
   void setShareDataForAI(bool enabled) {
     _settings = _settings.copyWith(shareDataForAI: enabled);
     notifyListeners();
@@ -337,6 +362,7 @@ class SettingsProvider with ChangeNotifier {
   // ==================== Data & Sync Methods ====================
 
   /// Toggle cloud sync
+  /// 切换云同步开关
   Future<void> setCloudSyncEnabled(bool enabled) async {
     if (enabled) {
       // Simulate enabling sync
@@ -363,6 +389,7 @@ class SettingsProvider with ChangeNotifier {
   }
 
   /// Manually trigger sync
+  /// 手动触发同步
   Future<void> syncNow() async {
     if (!_settings.cloudSyncEnabled) return;
 
@@ -380,6 +407,7 @@ class SettingsProvider with ChangeNotifier {
   }
 
   /// Toggle auto backup
+  /// 切换自动备份开关
   void setAutoBackupEnabled(bool enabled) {
     _settings = _settings.copyWith(autoBackupEnabled: enabled);
     notifyListeners();
@@ -387,6 +415,7 @@ class SettingsProvider with ChangeNotifier {
   }
 
   /// Export data
+  /// 导出数据
   Future<void> exportData(ExportFormat format) async {
     // Simulate export process
     await Future.delayed(const Duration(seconds: 1));
@@ -394,6 +423,7 @@ class SettingsProvider with ChangeNotifier {
   }
 
   /// Import data
+  /// 导入数据
   Future<bool> importData() async {
     // Simulate import process
     await Future.delayed(const Duration(seconds: 1));
@@ -402,6 +432,7 @@ class SettingsProvider with ChangeNotifier {
   }
 
   /// Clear all habit data (keep settings)
+  /// 清除所有习惯数据（保留设置）
   Future<void> clearAllData() async {
     // Simulate clearing data
     await Future.delayed(const Duration(milliseconds: 500));
@@ -412,6 +443,7 @@ class SettingsProvider with ChangeNotifier {
   // ==================== Account Methods ====================
 
   /// Change email
+  /// 更改邮箱
   Future<bool> changeEmail(String newEmail) async {
     // Simulate API call
     await Future.delayed(const Duration(seconds: 1));
@@ -420,6 +452,7 @@ class SettingsProvider with ChangeNotifier {
   }
 
   /// Change password
+  /// 更改密码
   Future<bool> changePassword(
     String currentPassword,
     String newPassword,
@@ -431,13 +464,16 @@ class SettingsProvider with ChangeNotifier {
   }
 
   /// Sign out
+  /// 登出
   Future<void> signOut() async {
     await AuthService().signOut();
     notifyListeners();
   }
 
   /// Delete account — deletes Firebase Auth account first (may throw
-  /// requires-recent-login), then removes Firestore data and signs out.
+  /// requires-recent-login), then removes Firestore data and signs out
+  /// 删除账户 — 先删除 Firebase Auth 账户（可能抛出 requires-recent-login），
+  /// 然后删除 Firestore 数据并登出
   Future<void> deleteAccount() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -459,6 +495,7 @@ class SettingsProvider with ChangeNotifier {
   // ==================== Accessibility Methods ====================
 
   /// Set text size
+  /// 设置文字大小
   void setTextSize(TextSizePreference size) {
     _settings = _settings.copyWith(textSize: size);
     notifyListeners();
@@ -466,6 +503,7 @@ class SettingsProvider with ChangeNotifier {
   }
 
   /// Toggle reduce motion
+  /// 切换减少动画开关
   void setReduceMotion(bool enabled) {
     _settings = _settings.copyWith(reduceMotion: enabled);
     notifyListeners();
@@ -473,6 +511,7 @@ class SettingsProvider with ChangeNotifier {
   }
 
   /// Toggle color blind mode
+  /// 切换色盲模式开关
   void setColorBlindMode(bool enabled) {
     _settings = _settings.copyWith(colorBlindMode: enabled);
     notifyListeners();
@@ -482,16 +521,19 @@ class SettingsProvider with ChangeNotifier {
   // ==================== Help & Support Methods ====================
 
   /// Open FAQ
+  /// 打开常见问题
   void openFAQ() {
     // In real app, would navigate to FAQ screen or open web page
   }
 
   /// Open tutorials
+  /// 打开教程
   void openTutorials() {
     // In real app, would navigate to tutorials screen
   }
 
   /// Contact support
+  /// 联系客服
   Future<void> contactSupport(String message) async {
     // Simulate sending support request
     await Future.delayed(const Duration(seconds: 1));
@@ -499,6 +541,7 @@ class SettingsProvider with ChangeNotifier {
   }
 
   /// Report bug
+  /// 报告缺陷
   Future<void> reportBug(String description) async {
     // Simulate bug report
     await Future.delayed(const Duration(seconds: 1));
@@ -506,6 +549,7 @@ class SettingsProvider with ChangeNotifier {
   }
 
   /// Request feature
+  /// 提交功能请求
   Future<void> requestFeature(String description) async {
     // Simulate feature request
     await Future.delayed(const Duration(seconds: 1));
@@ -513,6 +557,7 @@ class SettingsProvider with ChangeNotifier {
   }
 
   /// Open AI transparency info
+  /// 打开 AI 透明度信息
   void openAITransparency() {
     // In real app, would navigate to detailed AI transparency screen
   }
@@ -520,6 +565,7 @@ class SettingsProvider with ChangeNotifier {
   // ==================== Storage ====================
 
   /// Save settings to persistent storage
+  /// 将设置保存到持久化存储
   Future<void> _saveToStorage() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -557,6 +603,7 @@ class SettingsProvider with ChangeNotifier {
   }
 
   /// Load settings from persistent storage
+  /// 从持久化存储加载设置
   Future<void> _loadFromStorage() async {
     try {
       final prefs = await SharedPreferences.getInstance();

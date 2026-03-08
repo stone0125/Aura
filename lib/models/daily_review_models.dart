@@ -11,12 +11,15 @@
 // =============================================================================
 
 /// Individual habit's daily performance score
+/// 单个习惯的每日表现评分
 class HabitDayScore {
   final String habitId;
   final int score;
   final HabitDayStatus status;
   final String comment;
 
+  /// Creates a HabitDayScore with habit ID, score, status, and comment
+  /// 使用习惯 ID、分数、状态和评语创建 HabitDayScore
   const HabitDayScore({
     required this.habitId,
     required this.score,
@@ -24,6 +27,8 @@ class HabitDayScore {
     required this.comment,
   });
 
+  /// Create a HabitDayScore from a JSON map
+  /// 从 JSON 映射创建 HabitDayScore
   factory HabitDayScore.fromJson(Map<String, dynamic> json) {
     return HabitDayScore(
       habitId: json['habitId']?.toString() ?? '',
@@ -33,6 +38,8 @@ class HabitDayScore {
     );
   }
 
+  /// Serialize this day score to a JSON map
+  /// 将此每日评分序列化为 JSON 映射
   Map<String, dynamic> toJson() => {
         'habitId': habitId,
         'score': score,
@@ -42,6 +49,7 @@ class HabitDayScore {
 }
 
 /// Status of a habit for the day
+/// 习惯的当日状态
 enum HabitDayStatus {
   completed('completed'),
   missed('missed'),
@@ -51,6 +59,8 @@ enum HabitDayStatus {
   final String value;
   const HabitDayStatus(this.value);
 
+  /// Parse a HabitDayStatus from a string value
+  /// 从字符串值解析 HabitDayStatus
   static HabitDayStatus fromString(String value) {
     switch (value.toLowerCase()) {
       case 'completed':
@@ -66,6 +76,8 @@ enum HabitDayStatus {
     }
   }
 
+  /// Get display name for the habit day status
+  /// 获取习惯当日状态的显示名称
   String get displayName {
     switch (this) {
       case HabitDayStatus.completed:
@@ -79,17 +91,22 @@ enum HabitDayStatus {
     }
   }
 
+  /// Check if this status represents a positive outcome
+  /// 检查此状态是否代表积极结果
   bool get isPositive =>
       this == HabitDayStatus.completed || this == HabitDayStatus.streakMilestone;
 }
 
 /// AI Coach commentary for the daily review
+/// 每日回顾的 AI 教练评语
 class CoachComments {
   final String summary;
   final String highlight;
   final String? concern;
   final String actionItem;
 
+  /// Creates CoachComments with summary, highlight, concern, and action item
+  /// 使用总结、亮点、关注点和行动项创建 CoachComments
   const CoachComments({
     required this.summary,
     required this.highlight,
@@ -97,6 +114,8 @@ class CoachComments {
     required this.actionItem,
   });
 
+  /// Create CoachComments from a JSON map
+  /// 从 JSON 映射创建 CoachComments
   factory CoachComments.fromJson(Map<String, dynamic> json) {
     return CoachComments(
       summary: json['summary']?.toString() ?? '',
@@ -106,6 +125,8 @@ class CoachComments {
     );
   }
 
+  /// Serialize this coach comments to a JSON map
+  /// 将此教练评语序列化为 JSON 映射
   Map<String, dynamic> toJson() => {
         'summary': summary,
         'highlight': highlight,
@@ -115,15 +136,20 @@ class CoachComments {
 }
 
 /// Health-related insights from daily review
+/// 每日回顾中的健康相关洞察
 class HealthInsights {
   final String? correlation;
   final String? recommendation;
 
+  /// Creates HealthInsights with optional correlation and recommendation
+  /// 使用可选的关联分析和建议创建 HealthInsights
   const HealthInsights({
     this.correlation,
     this.recommendation,
   });
 
+  /// Create HealthInsights from an optional JSON map
+  /// 从可选的 JSON 映射创建 HealthInsights
   factory HealthInsights.fromJson(Map<String, dynamic>? json) {
     if (json == null) {
       return const HealthInsights();
@@ -134,15 +160,20 @@ class HealthInsights {
     );
   }
 
+  /// Serialize this health insights to a JSON map
+  /// 将此健康洞察序列化为 JSON 映射
   Map<String, dynamic> toJson() => {
         'correlation': correlation,
         'recommendation': recommendation,
       };
 
+  /// Check if there is any meaningful data
+  /// 检查是否有有意义的数据
   bool get hasData => correlation != null || recommendation != null;
 }
 
 /// Comprehensive daily review from AI coach
+/// AI 教练的综合每日回顾
 class DailyReview {
   final String date;
   final int overallScore;
@@ -156,6 +187,8 @@ class DailyReview {
   final DateTime generatedAt;
   final List<String> completionSnapshot; // Sorted habit IDs completed at generation time
 
+  /// Creates a DailyReview with all required and optional fields
+  /// 使用所有必需和可选字段创建 DailyReview
   const DailyReview({
     required this.date,
     required this.overallScore,
@@ -170,6 +203,8 @@ class DailyReview {
     this.completionSnapshot = const [],
   });
 
+  /// Create a DailyReview from a JSON map with safe parsing
+  /// 从 JSON 映射创建 DailyReview，带有安全解析
   factory DailyReview.fromJson(Map<String, dynamic> json) {
     return DailyReview(
       date: json['date']?.toString() ?? DateTime.now().toIso8601String().split('T')[0],
@@ -199,6 +234,8 @@ class DailyReview {
     );
   }
 
+  /// Serialize this daily review to a JSON map
+  /// 将此每日回顾序列化为 JSON 映射
   Map<String, dynamic> toJson() => {
         'date': date,
         'overallScore': overallScore,
@@ -214,26 +251,33 @@ class DailyReview {
       };
 
   /// Check if score improved
+  /// 检查分数是否提升
   bool get isImprovement => scoreChange > 0;
 
   /// Check if score declined
+  /// 检查分数是否下降
   bool get isDecline => scoreChange < 0;
 
   /// Get completion count from habit scores
+  /// 从习惯评分中获取完成数量
   int get completedCount =>
       habitScores.where((h) => h.status.isPositive).length;
 
   /// Get total habits count
+  /// 获取习惯总数
   int get totalHabits => habitScores.length;
 
   /// Get completion percentage
+  /// 获取完成百分比
   double get completionPercentage =>
       totalHabits > 0 ? (completedCount / totalHabits) * 100 : 0;
 
   /// Check if it's a perfect day
+  /// 检查是否是完美的一天
   bool get isPerfectDay => completedCount == totalHabits && totalHabits > 0;
 
   /// Get score tier
+  /// 获取分数等级
   String get scoreTier {
     if (overallScore >= 90) return 'Excellent';
     if (overallScore >= 80) return 'Great';
@@ -244,6 +288,7 @@ class DailyReview {
 }
 
 /// Summary of daily reviews over a period
+/// 一段时期内每日回顾的总结
 class DailyReviewSummary {
   final List<DailyReview> reviews;
   final double averageScore;
@@ -252,6 +297,8 @@ class DailyReviewSummary {
   final String bestDay;
   final String worstDay;
 
+  /// Creates a DailyReviewSummary with aggregated statistics
+  /// 使用汇总统计数据创建 DailyReviewSummary
   const DailyReviewSummary({
     required this.reviews,
     required this.averageScore,
@@ -261,6 +308,8 @@ class DailyReviewSummary {
     required this.worstDay,
   });
 
+  /// Create a DailyReviewSummary by computing stats from a list of reviews
+  /// 通过计算回顾列表的统计数据创建 DailyReviewSummary
   factory DailyReviewSummary.fromReviews(List<DailyReview> reviews) {
     if (reviews.isEmpty) {
       return const DailyReviewSummary(
@@ -288,6 +337,7 @@ class DailyReviewSummary {
   }
 
   /// Get consistency rating
+  /// 获取一致性评级
   String get consistencyRating {
     final perfectPercentage = totalDays > 0 ? (perfectDays / totalDays) * 100 : 0;
     if (perfectPercentage >= 80) return 'Excellent';

@@ -13,11 +13,16 @@ import '../config/theme/ui_constants.dart';
 import 'habit_creation_screen.dart';
 
 /// Habit Detail Screen - Comprehensive habit statistics and management
+/// 习惯详情屏幕 - 全面的习惯统计和管理
 class HabitDetailScreen extends StatefulWidget {
   final Habit habit;
 
+  /// Creates the habit detail screen for a specific habit
+  /// 为特定习惯创建习惯详情屏幕
   const HabitDetailScreen({super.key, required this.habit});
 
+  /// Creates the mutable state for the habit detail screen
+  /// 创建习惯详情屏幕的可变状态
   @override
   State<HabitDetailScreen> createState() => _HabitDetailScreenState();
 }
@@ -27,6 +32,8 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
   TimeRange _selectedTimeRange = TimeRange.month;
   bool _isInsightExpanded = false;
 
+  /// Initializes state and loads habit details
+  /// 初始化状态并加载习惯详情
   @override
   void initState() {
     super.initState();
@@ -40,12 +47,16 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
     });
   }
 
+  /// Disposes the scroll controller
+  /// 释放滚动控制器
   @override
   void dispose() {
     _scrollController.dispose();
     super.dispose();
   }
 
+  /// Builds the habit detail screen with stats, charts, and actions
+  /// 构建带有统计、图表和操作的习惯详情屏幕
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -123,6 +134,8 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
     );
   }
 
+  /// Builds the app bar with dynamic opacity based on scroll position
+  /// 构建根据滚动位置动态调整不透明度的应用栏
   PreferredSizeWidget _buildAppBar(
     bool isDark,
     double opacity,
@@ -201,6 +214,8 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
     );
   }
 
+  /// Builds the hero header section with habit info and streak
+  /// 构建带有习惯信息和连续天数的英雄标题区域
   Widget _buildHeroHeader(bool isDark) {
     final gradientColors = widget.habit.category.getGradient(
       isDark ? Brightness.dark : Brightness.light,
@@ -371,6 +386,8 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
     );
   }
 
+  /// Builds the AI insight card with expandable content
+  /// 构建带有可展开内容的AI洞察卡片
   Widget _buildAIInsightCard(bool isDark, HabitDetailProvider provider) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -441,6 +458,8 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
     );
   }
 
+  /// Builds the AI insight loading spinner
+  /// 构建AI洞察加载旋转器
   Widget _buildAIInsightLoading(bool isDark) {
     final coral = isDark ? AppColors.darkCoral : AppColors.lightCoral;
     return Column(
@@ -489,6 +508,8 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
     );
   }
 
+  /// Builds the AI insight content with analysis and tips
+  /// 构建带有分析和提示的AI洞察内容
   Widget _buildAIInsightContent(bool isDark, AIInsight insight) {
     final textStyle = TextStyle(
       color: isDark
@@ -556,6 +577,8 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
     );
   }
 
+  /// Builds the empty state when no AI insight is available
+  /// 构建无AI洞察可用时的空状态
   Widget _buildAIInsightEmpty(bool isDark) {
     return Column(
       children: [
@@ -581,6 +604,8 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
     );
   }
 
+  /// Builds the reminder information row
+  /// 构建提醒信息行
   Widget _buildReminderRow(bool isDark) {
     return Padding(
       padding: const EdgeInsets.only(left: 16, right: 16, bottom: 20),
@@ -634,6 +659,8 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
     );
   }
 
+  /// Builds the statistics grid showing key habit metrics
+  /// 构建显示关键习惯指标的统计网格
   Widget _buildStatisticsGrid(bool isDark, HabitDetailProvider provider) {
     // Show loading indicator while data loads
     if (provider.isLoadingData) {
@@ -745,6 +772,8 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
     );
   }
 
+  /// Builds a single stat card with icon, value, and label
+  /// 构建带有图标、值和标签的单个统计卡片
   Widget _buildStatCard({
     required bool isDark,
     required IconData icon,
@@ -826,6 +855,8 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
     );
   }
 
+  /// Builds the calendar section showing monthly completion history
+  /// 构建显示月度完成历史的日历部分
   Widget _buildCalendarSection(bool isDark, HabitDetailProvider provider) {
     final now = DateTime.now();
     final daysInMonth = DateUtils.getDaysInMonth(now.year, now.month);
@@ -975,6 +1006,8 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
     );
   }
 
+  /// Formats a TimeOfDay to a readable string
+  /// 将TimeOfDay格式化为可读字符串
   String _formatTimeOfDay(TimeOfDay time) {
     final hour = time.hourOfPeriod == 0 ? 12 : time.hourOfPeriod;
     final minute = time.minute.toString().padLeft(2, '0');
@@ -982,6 +1015,8 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
     return '$hour:$minute $period';
   }
 
+  /// Returns the full month name for a given month number
+  /// 返回给定月份编号的完整月份名称
   String _getMonthName(int month) {
     const months = [
       'January',
@@ -1002,6 +1037,8 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
     return months[month - 1];
   }
 
+  /// Builds the progress line chart showing completion trend
+  /// 构建显示完成趋势的进度折线图
   Widget _buildProgressChart(bool isDark, HabitDetailProvider provider) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1278,6 +1315,8 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
     return spots;
   }
 
+  /// Returns the bottom axis label for a chart data point
+  /// 返回图表数据点的底部轴标签
   String _getBottomLabel(int index, TimeRange range) {
     final now = DateTime.now();
     if (range == TimeRange.week) {
@@ -1312,6 +1351,8 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
     }
   }
 
+  /// Builds the bottom action buttons (edit, delete, complete)
+  /// 构建底部操作按钮（编辑、删除、完成）
   Widget _buildBottomActionButton(bool isDark, HabitDetailProvider provider) {
     final isCompleted = provider.isCompletedToday;
 

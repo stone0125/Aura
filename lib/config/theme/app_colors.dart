@@ -20,6 +20,7 @@
 import 'package:flutter/material.dart';
 
 /// App color constants for light and dark themes
+/// 亮色和暗色主题的应用颜色常量
 ///
 /// NAMING CONVENTION:
 /// - Primary naming: light/dark + semantic name (e.g., lightPrimaryText)
@@ -28,6 +29,8 @@ import 'package:flutter/material.dart';
 /// - Surface colors: Background, Surface, SurfaceVariant
 /// - Accent colors: Coral, Pink, Gold, Red, Orange
 class AppColors {
+  /// Private constructor to prevent instantiation
+  /// 私有构造函数，防止实例化
   AppColors._(); // Prevent instantiation
 
   // ==================== Light Mode Colors ====================

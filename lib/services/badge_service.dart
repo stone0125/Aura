@@ -18,7 +18,12 @@ import 'dart:io';
 /// Service to manage app icon badge count (iOS only via NotificationService)
 class BadgeService {
   static final BadgeService _instance = BadgeService._internal();
+  /// Factory constructor returning the singleton instance
+  /// 工厂构造函数，返回单例实例
   factory BadgeService() => _instance;
+
+  /// Private internal constructor for singleton pattern
+  /// 单例模式的私有内部构造函数
   BadgeService._internal();
 
   bool _badgeEnabled = true;
@@ -27,6 +32,7 @@ class BadgeService {
   bool _isSupported = false;
 
   /// Initialize badge service
+  /// 初始化角标服务
   Future<void> initialize() async {
     final prefs = await SharedPreferences.getInstance();
     _badgeEnabled = prefs.getBool(_badgeEnabledKey) ?? true;
@@ -34,12 +40,15 @@ class BadgeService {
   }
 
   /// Get badge enabled state
+  /// 获取角标启用状态
   bool get isEnabled => _badgeEnabled;
 
   /// Check if device supports badges
+  /// 检查设备是否支持角标
   bool get isSupported => _isSupported;
 
   /// Set badge enabled/disabled
+  /// 设置角标启用/禁用
   Future<void> setBadgeEnabled(bool enabled) async {
     _badgeEnabled = enabled;
     final prefs = await SharedPreferences.getInstance();
@@ -52,6 +61,7 @@ class BadgeService {
   }
 
   /// Update badge count
+  /// 更新角标数量
   Future<void> updateBadgeCount(int incompleteCount) async {
     // Ensure count is never negative
     final safeCount = incompleteCount < 0 ? 0 : incompleteCount;
@@ -64,6 +74,7 @@ class BadgeService {
   }
 
   /// Clear the badge
+  /// 清除角标
   Future<void> clearBadge() async {
     _lastBadgeCount = 0;
     if (!kIsWeb && Platform.isIOS) {
@@ -72,6 +83,7 @@ class BadgeService {
   }
 
   /// Reset state on logout to prevent cross-user data leaks
+  /// 登出时重置状态以防止跨用户数据泄漏
   Future<void> resetOnLogout() async {
     _lastBadgeCount = 0;
     try {
@@ -83,5 +95,6 @@ class BadgeService {
   }
 
   /// Get current badge count to show
+  /// 获取要显示的当前角标数量
   int get currentBadgeCount => _badgeEnabled ? _lastBadgeCount : 0;
 }

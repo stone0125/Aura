@@ -23,11 +23,16 @@ import 'habit_detail_screen.dart';
 import '../widgets/outdated_report_banner.dart';
 
 /// AI Coach Screen with personalized suggestions and insights
+/// AI教练屏幕，提供个性化建议和洞察
 class AICoachScreen extends StatefulWidget {
   final AICoachTab? initialTab;
 
+  /// Creates the AI Coach screen with an optional initial tab
+  /// 创建AI教练屏幕，可选初始标签
   const AICoachScreen({super.key, this.initialTab});
 
+  /// Creates the mutable state for the AI Coach screen
+  /// 创建AI教练屏幕的可变状态
   @override
   State<AICoachScreen> createState() => _AICoachScreenState();
 }
@@ -43,6 +48,8 @@ class _AICoachScreenState extends State<AICoachScreen>
   OverlayEntry? _cooldownTooltip;
   final Set<String> _expandedHabits = {};
 
+  /// Initializes animations, controllers, and loads initial tab data
+  /// 初始化动画、控制器并加载初始标签数据
   @override
   void initState() {
     super.initState();
@@ -88,6 +95,8 @@ class _AICoachScreenState extends State<AICoachScreen>
     });
   }
 
+  /// Disposes animation controllers and removes overlay entries
+  /// 释放动画控制器并移除覆盖层条目
   @override
   void dispose() {
     _cooldownTooltip?.remove();
@@ -98,6 +107,8 @@ class _AICoachScreenState extends State<AICoachScreen>
     super.dispose();
   }
 
+  /// Builds the AI Coach screen with hero section, tabs, and content
+  /// 构建带有英雄区域、标签和内容的AI教练屏幕
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -122,6 +133,7 @@ class _AICoachScreenState extends State<AICoachScreen>
   }
 
   /// Hero section with gradient and AI avatar
+  /// 带有渐变和AI头像的英雄区域
   Widget _buildHeroSection(bool isDark) {
     return FadeTransition(
       opacity: _fadeAnimation,
@@ -295,7 +307,8 @@ class _AICoachScreenState extends State<AICoachScreen>
     );
   }
 
-  /// Tab navigation
+  /// Tab navigation with usage indicator
+  /// 带有使用量指示器的标签导航
   Widget _buildTabNavigation(bool isDark, AICoachProvider coachProvider) {
     final tier = SubscriptionService().currentTier;
     final isUnlimited = tier == SubscriptionTier.mastery;
@@ -430,6 +443,7 @@ class _AICoachScreenState extends State<AICoachScreen>
   }
 
   /// Show bottom sheet with AI usage breakdown
+  /// 显示AI使用量详情的底部弹出面板
   void _showUsageBottomSheet(
     BuildContext context,
     bool isDark,
@@ -554,6 +568,7 @@ class _AICoachScreenState extends State<AICoachScreen>
   }
 
   /// Build a single usage row for the bottom sheet
+  /// 为底部弹出面板构建单个使用量行
   Widget _buildUsageRow({
     required bool isDark,
     required IconData icon,
@@ -627,7 +642,8 @@ class _AICoachScreenState extends State<AICoachScreen>
     );
   }
 
-  /// Tab content
+  /// Tab content switcher based on current tab selection
+  /// 根据当前标签选择切换标签内容
   Widget _buildTabContent(bool isDark, AICoachProvider coachProvider) {
     switch (coachProvider.currentTab) {
       case AICoachTab.suggestions:
@@ -641,7 +657,8 @@ class _AICoachScreenState extends State<AICoachScreen>
     }
   }
 
-  /// Suggestions Tab
+  /// Suggestions Tab with pull-to-refresh and suggestion cards
+  /// 带有下拉刷新和建议卡片的建议标签
   Widget _buildSuggestionsTab(bool isDark, AICoachProvider coachProvider) {
     if (coachProvider.isLoadingSuggestions) {
       return _buildSuggestionsLoadingSkeleton(isDark);
@@ -690,6 +707,7 @@ class _AICoachScreenState extends State<AICoachScreen>
   }
 
   /// Header row for suggestions tab with refresh button and rate limit
+  /// 建议标签的标题行，包含刷新按钮和速率限制
   Widget _buildSuggestionsHeader(bool isDark, AICoachProvider coachProvider) {
     return Row(
       children: [
@@ -752,7 +770,8 @@ class _AICoachScreenState extends State<AICoachScreen>
     );
   }
 
-  /// Fallback/error banner for suggestions
+  /// Fallback/error banner for suggestions when AI fails
+  /// 当AI失败时显示的建议回退/错误横幅
   Widget _buildFallbackBanner(bool isDark, AICoachProvider coachProvider) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -811,7 +830,8 @@ class _AICoachScreenState extends State<AICoachScreen>
     );
   }
 
-  /// Suggestion Card
+  /// Suggestion Card displaying AI-generated habit suggestion
+  /// 显示AI生成的习惯建议的建议卡片
   Widget _buildSuggestionCard(
     bool isDark,
     AICoachSuggestion suggestion,
@@ -1113,7 +1133,8 @@ class _AICoachScreenState extends State<AICoachScreen>
     );
   }
 
-  /// Insights Tab
+  /// Insights Tab with weekly summary and pattern discovery
+  /// 带有每周总结和模式发现的洞察标签
   Widget _buildInsightsTab(bool isDark, AICoachProvider coachProvider) {
     if (coachProvider.isLoadingInsights) {
       return _buildInsightsLoadingSkeleton(isDark);
@@ -1180,6 +1201,7 @@ class _AICoachScreenState extends State<AICoachScreen>
   }
 
   /// Empty state hint when no patterns are available yet
+  /// 尚无可用模式时的空状态提示
   Widget _buildPatternsEmptyHint(bool isDark) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
@@ -1222,7 +1244,8 @@ class _AICoachScreenState extends State<AICoachScreen>
     );
   }
 
-  /// Weekly Summary Card
+  /// Weekly Summary Card with stats, insight, and next steps
+  /// 带有统计、洞察和下一步建议的每周总结卡片
   Widget _buildWeeklySummaryCard(bool isDark, WeeklyAISummary summary) {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -1462,6 +1485,8 @@ class _AICoachScreenState extends State<AICoachScreen>
     );
   }
 
+  /// Builds a single weekly statistic column (value + label)
+  /// 构建单个每周统计列（值 + 标签）
   Widget _buildWeeklyStat(bool isDark, String value, String label) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1490,6 +1515,7 @@ class _AICoachScreenState extends State<AICoachScreen>
   }
 
   /// Scores Tab - Daily Review and Habit Scores
+  /// 评分标签 - 每日回顾和习惯评分
   Widget _buildScoresTab(bool isDark) {
     final scoringProvider = Provider.of<AIScoringProvider>(context);
     final habitProvider = Provider.of<HabitProvider>(context);
@@ -1579,6 +1605,7 @@ class _AICoachScreenState extends State<AICoachScreen>
   }
 
   /// Generate Review Call-to-Action Card
+  /// 生成回顾的行动号召卡片
   Widget _buildGenerateReviewCard(
     bool isDark,
     AIScoringProvider scoringProvider,
@@ -1690,7 +1717,8 @@ class _AICoachScreenState extends State<AICoachScreen>
     );
   }
 
-  /// Daily Review Card
+  /// Daily Review Card with score, coach comments, and breakdown
+  /// 带有评分、教练评论和详情的每日回顾卡片
   Widget _buildDailyReviewCard(bool isDark, DailyReview review) {
     final scoreColor = review.overallScore >= 80
         ? (isDark ? const Color(0xFF66BB6A) : const Color(0xFF4CAF50))
@@ -2017,6 +2045,7 @@ class _AICoachScreenState extends State<AICoachScreen>
   }
 
   /// Per-habit score breakdown section with expandable details
+  /// 每个习惯的评分细分区域，支持展开查看详情
   Widget _buildHabitScoreBreakdown(bool isDark, DailyReview review) {
     final habitProvider = Provider.of<HabitProvider>(context, listen: false);
     final scoringProvider =
@@ -2179,6 +2208,7 @@ class _AICoachScreenState extends State<AICoachScreen>
   }
 
   /// Expanded detail for a single habit in the breakdown
+  /// 习惯细分中单个习惯的展开详情
   Widget _buildExpandedHabitDetail(
     bool isDark,
     HabitDayScore habitScore,
@@ -2234,6 +2264,7 @@ class _AICoachScreenState extends State<AICoachScreen>
   }
 
   /// Single dimension progress bar (e.g. Consistency: 72)
+  /// 单个维度进度条（如一致性：72）
   Widget _buildDimensionBar(bool isDark, String label, int score) {
     final barColor = score >= 70
         ? (isDark ? const Color(0xFF66BB6A) : const Color(0xFF4CAF50))
@@ -2291,6 +2322,7 @@ class _AICoachScreenState extends State<AICoachScreen>
   }
 
   /// Small insight row with icon + text
+  /// 带有图标和文本的小型洞察行
   Widget _buildInsightRow(
       bool isDark, IconData icon, Color iconColor, String text) {
     return Padding(
@@ -2317,6 +2349,8 @@ class _AICoachScreenState extends State<AICoachScreen>
     );
   }
 
+  /// Returns the icon for a given habit day status
+  /// 返回给定习惯日状态的图标
   IconData _getStatusIcon(HabitDayStatus status) {
     switch (status) {
       case HabitDayStatus.completed:
@@ -2330,6 +2364,8 @@ class _AICoachScreenState extends State<AICoachScreen>
     }
   }
 
+  /// Returns the color for a given habit day status
+  /// 返回给定习惯日状态的颜色
   Color _getStatusColor(HabitDayStatus status, bool isDark) {
     switch (status) {
       case HabitDayStatus.completed:
@@ -2344,6 +2380,7 @@ class _AICoachScreenState extends State<AICoachScreen>
   }
 
   /// 7-day score trend line chart
+  /// 7天评分趋势折线图
   Widget _buildScoreTrendDots(bool isDark) {
     final scoringProvider =
         Provider.of<AIScoringProvider>(context, listen: false);
@@ -2421,6 +2458,7 @@ class _AICoachScreenState extends State<AICoachScreen>
   }
 
   /// Health insights from daily review
+  /// 来自每日回顾的健康洞察
   Widget _buildReviewHealthInsights(bool isDark, DailyReview review) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
@@ -2490,6 +2528,8 @@ class _AICoachScreenState extends State<AICoachScreen>
     );
   }
 
+  /// Builds a single coach comment item with icon, label, and content
+  /// 构建带有图标、标签和内容的单个教练评论项
   Widget _buildCoachCommentItem(
     bool isDark,
     IconData icon,
@@ -2532,7 +2572,8 @@ class _AICoachScreenState extends State<AICoachScreen>
     );
   }
 
-  /// Overall Score Summary
+  /// Overall Score Summary with average score and progress bar
+  /// 带有平均分和进度条的总体评分摘要
   Widget _buildOverallScoreSummary(bool isDark, AIScoringProvider provider) {
     final avgScore = provider.overallAverageScore;
     final scoreColor = avgScore >= 80
@@ -2614,7 +2655,8 @@ class _AICoachScreenState extends State<AICoachScreen>
     );
   }
 
-  /// Health Insights Card
+  /// Health Insights Card showing health-habit correlations
+  /// 显示健康与习惯关联的健康洞察卡片
   Widget _buildHealthInsightsCard(bool isDark, AIScoringProvider provider) {
     final correlations = provider.healthCorrelations;
     if (correlations == null) return const SizedBox.shrink();
@@ -2691,7 +2733,8 @@ class _AICoachScreenState extends State<AICoachScreen>
     );
   }
 
-  /// Pattern Card
+  /// Pattern Card showing a discovered behavioral pattern
+  /// 显示发现的行为模式的模式卡片
   Widget _buildPatternCard(bool isDark, AIPattern pattern) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -2822,7 +2865,8 @@ class _AICoachScreenState extends State<AICoachScreen>
     );
   }
 
-  /// Actions Tab (replaces Tips)
+  /// Actions Tab with daily, weekly, and challenge action items
+  /// 带有每日、每周和挑战行动项的操作标签
   Widget _buildActionsTab(bool isDark, AICoachProvider coachProvider) {
     if (coachProvider.isLoadingActions) {
       return _buildActionsLoadingSkeleton(isDark);
@@ -2963,6 +3007,8 @@ class _AICoachScreenState extends State<AICoachScreen>
     );
   }
 
+  /// Builds an action group header with icon and title
+  /// 构建带有图标和标题的操作分组标题
   Widget _buildActionGroupHeader(bool isDark, String title, IconData icon) {
     return Row(
       children: [
@@ -2986,6 +3032,8 @@ class _AICoachScreenState extends State<AICoachScreen>
     );
   }
 
+  /// Builds a single action item card with checkbox and details
+  /// 构建带有复选框和详情的单个行动项卡片
   Widget _buildActionItemCard(
     bool isDark,
     AIActionItem action,
@@ -3191,6 +3239,7 @@ class _AICoachScreenState extends State<AICoachScreen>
   }
 
   /// Skeleton building block - rounded rectangle placeholder
+  /// 骨架屏构建块 - 圆角矩形占位符
   Widget _buildSkeletonBox(bool isDark, double width, double height) {
     return AnimatedBuilder(
       animation: _skeletonController,
@@ -3213,6 +3262,7 @@ class _AICoachScreenState extends State<AICoachScreen>
   }
 
   /// Skeleton building block - circle placeholder
+  /// 骨架屏构建块 - 圆形占位符
   Widget _buildSkeletonCircle(bool isDark, double size) {
     return AnimatedBuilder(
       animation: _skeletonController,
@@ -3235,6 +3285,7 @@ class _AICoachScreenState extends State<AICoachScreen>
   }
 
   /// Branded AI generating header for loading skeletons
+  /// 加载骨架屏的品牌化AI生成标题
   Widget _buildAIGeneratingHeader(bool isDark, String message) {
     final coral = isDark ? AppColors.darkCoral : AppColors.lightCoral;
     final pink = isDark ? AppColors.darkPink : AppColors.lightPink;
@@ -3315,7 +3366,8 @@ class _AICoachScreenState extends State<AICoachScreen>
     );
   }
 
-  /// Suggestions skeleton loading
+  /// Suggestions skeleton loading placeholder
+  /// 建议骨架屏加载占位符
   Widget _buildSuggestionsLoadingSkeleton(bool isDark) {
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
@@ -3367,7 +3419,8 @@ class _AICoachScreenState extends State<AICoachScreen>
     );
   }
 
-  /// Insights skeleton loading
+  /// Insights skeleton loading placeholder
+  /// 洞察骨架屏加载占位符
   Widget _buildInsightsLoadingSkeleton(bool isDark) {
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
@@ -3455,7 +3508,8 @@ class _AICoachScreenState extends State<AICoachScreen>
     );
   }
 
-  /// Scores skeleton loading
+  /// Scores skeleton loading placeholder
+  /// 评分骨架屏加载占位符
   Widget _buildScoresLoadingSkeleton(bool isDark) {
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
@@ -3503,7 +3557,8 @@ class _AICoachScreenState extends State<AICoachScreen>
     );
   }
 
-  /// Actions skeleton loading
+  /// Actions skeleton loading placeholder
+  /// 操作骨架屏加载占位符
   Widget _buildActionsLoadingSkeleton(bool isDark) {
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
@@ -3579,7 +3634,8 @@ class _AICoachScreenState extends State<AICoachScreen>
     );
   }
 
-  /// Empty state
+  /// Empty state placeholder with icon, title, and subtitle
+  /// 带有图标、标题和副标题的空状态占位符
   Widget _buildEmptyState(
     bool isDark, {
     required IconData icon,
@@ -3637,6 +3693,8 @@ class _AICoachScreenState extends State<AICoachScreen>
     );
   }
 
+  /// Refreshes AI suggestions by force-loading with current habit data
+  /// 通过强制加载当前习惯数据来刷新AI建议
   Future<void> _refreshSuggestions(BuildContext context) async {
     final coachProvider = Provider.of<AICoachProvider>(context, listen: false);
     final habitProvider = Provider.of<HabitProvider>(context, listen: false);
@@ -3655,6 +3713,8 @@ class _AICoachScreenState extends State<AICoachScreen>
     );
   }
 
+  /// Builds badge text showing frequency and goal for a suggestion
+  /// 为建议构建显示频率和目标的徽章文本
   String _buildSuggestionBadgeText(AICoachSuggestion suggestion) {
     final parts = <String>[];
     // Frequency
@@ -3671,6 +3731,8 @@ class _AICoachScreenState extends State<AICoachScreen>
     return parts.join(' | ');
   }
 
+  /// Shows a tooltip indicating the refresh cooldown time remaining
+  /// 显示刷新冷却剩余时间的工具提示
   void _showCooldownTooltip(BuildContext context) {
     _cooldownTooltip?.remove();
     _cooldownTooltip = null;
@@ -3723,6 +3785,8 @@ class _AICoachScreenState extends State<AICoachScreen>
     });
   }
 
+  /// Loads AI-generated action items based on current habits
+  /// 根据当前习惯加载AI生成的行动项
   Future<void> _loadActionItems(BuildContext context,
       {bool forceRefresh = false}) async {
     final coachProvider = Provider.of<AICoachProvider>(context, listen: false);
@@ -3755,6 +3819,8 @@ class _AICoachScreenState extends State<AICoachScreen>
     }
   }
 
+  /// Loads data for the selected tab if not already loaded
+  /// 如果尚未加载，则加载所选标签的数据
   void _loadTabData(AICoachTab tab, BuildContext context) {
     final coachProvider = Provider.of<AICoachProvider>(context, listen: false);
     final habitProvider = Provider.of<HabitProvider>(context, listen: false);
@@ -3790,6 +3856,8 @@ class _AICoachScreenState extends State<AICoachScreen>
     }
   }
 
+  /// Loads behavioral patterns from habit completion history
+  /// 从习惯完成历史中加载行为模式
   Future<void> _loadPatterns(BuildContext context) async {
     final habitProvider = Provider.of<HabitProvider>(context, listen: false);
     final coachProvider = Provider.of<AICoachProvider>(context, listen: false);
@@ -3838,6 +3906,7 @@ class _AICoachScreenState extends State<AICoachScreen>
 }
 
 /// Custom painter for the 7-day score trend line chart
+/// 7天评分趋势折线图的自定义绘制器
 class ScoreTrendChartPainter extends CustomPainter {
   final List<int> scores;
   final List<String> dayLabels;
@@ -3845,6 +3914,8 @@ class ScoreTrendChartPainter extends CustomPainter {
   final bool isDark;
   final TextStyle labelStyle;
 
+  /// Creates the score trend chart painter with data and styling
+  /// 使用数据和样式创建评分趋势图绘制器
   ScoreTrendChartPainter({
     required this.scores,
     required this.dayLabels,
@@ -3853,6 +3924,8 @@ class ScoreTrendChartPainter extends CustomPainter {
     required this.labelStyle,
   });
 
+  /// Paints the score trend chart with line, dots, and labels
+  /// 绘制带有折线、点和标签的评分趋势图
   @override
   void paint(Canvas canvas, Size size) {
     if (scores.isEmpty) return;
@@ -4028,6 +4101,8 @@ class ScoreTrendChartPainter extends CustomPainter {
             chartBottom - minTp.height / 2));
   }
 
+  /// Determines whether the chart should repaint when data changes
+  /// 确定数据变化时图表是否应重新绘制
   @override
   bool shouldRepaint(ScoreTrendChartPainter oldDelegate) =>
       scores != oldDelegate.scores ||

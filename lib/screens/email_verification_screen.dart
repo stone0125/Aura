@@ -4,9 +4,15 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../config/theme/app_colors.dart';
 import '../services/auth_service.dart';
 
+/// Screen prompting the user to verify their email address
+/// 提示用户验证其电子邮件地址的屏幕
 class EmailVerificationScreen extends StatefulWidget {
+  /// Creates the email verification screen
+  /// 创建电子邮件验证屏幕
   const EmailVerificationScreen({super.key});
 
+  /// Creates the mutable state for the email verification screen
+  /// 创建电子邮件验证屏幕的可变状态
   @override
   State<EmailVerificationScreen> createState() =>
       _EmailVerificationScreenState();
@@ -20,6 +26,8 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
   int _cooldownSeconds = 0;
   bool _isCheckingVerification = false;
 
+  /// Initializes the state, registers lifecycle observer, and starts polling
+  /// 初始化状态，注册生命周期观察者，并开始轮询
   @override
   void initState() {
     super.initState();
@@ -27,6 +35,8 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
     _startPolling();
   }
 
+  /// Disposes timers and removes lifecycle observer
+  /// 释放计时器并移除生命周期观察者
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
@@ -35,6 +45,8 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
     super.dispose();
   }
 
+  /// Checks verification when app resumes from background
+  /// 当应用从后台恢复时检查验证状态
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
@@ -42,12 +54,16 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
     }
   }
 
+  /// Starts periodic polling to check email verification status every 5 seconds
+  /// 启动每5秒检查一次电子邮件验证状态的定期轮询
   void _startPolling() {
     _pollingTimer = Timer.periodic(const Duration(seconds: 5), (_) {
       _checkVerification();
     });
   }
 
+  /// Checks if the user's email has been verified and refreshes the token
+  /// 检查用户的电子邮件是否已验证并刷新令牌
   Future<void> _checkVerification() async {
     if (_isCheckingVerification) return;
     _isCheckingVerification = true;
@@ -64,6 +80,8 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
     }
   }
 
+  /// Manually checks verification status and shows feedback to the user
+  /// 手动检查验证状态并向用户显示反馈
   Future<void> _manualCheck() async {
     setState(() => _isCheckingVerification = true);
     try {
@@ -88,6 +106,8 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
     }
   }
 
+  /// Resends the verification email and starts a cooldown timer
+  /// 重新发送验证邮件并启动冷却计时器
   Future<void> _resendEmail() async {
     try {
       await _authService.sendEmailVerification();
@@ -106,6 +126,8 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
     }
   }
 
+  /// Starts a 60-second cooldown timer for the resend email button
+  /// 启动重新发送邮件按钮的60秒冷却计时器
   void _startCooldown() {
     setState(() => _cooldownSeconds = 60);
     _cooldownTimer?.cancel();
@@ -119,6 +141,8 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
     });
   }
 
+  /// Builds the email verification screen UI with check and resend buttons
+  /// 构建带有检查和重新发送按钮的电子邮件验证屏幕界面
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;

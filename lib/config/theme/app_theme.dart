@@ -21,7 +21,10 @@ import 'app_colors.dart';
 import 'ui_constants.dart';
 
 /// App theme configuration
+/// 应用主题配置
 class AppTheme {
+  /// Private constructor to prevent instantiation
+  /// 私有构造函数，防止实例化
   AppTheme._(); // Prevent instantiation
 
   // Light Theme

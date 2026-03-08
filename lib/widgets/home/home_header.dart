@@ -7,11 +7,16 @@ import '../../models/settings_models.dart';
 import '../../config/theme/app_colors.dart';
 
 /// Home screen header with profile, greeting, and theme toggle
+/// 主屏幕头部组件，包含头像、问候语和主题切换
 class HomeHeader extends StatelessWidget {
   final String userName;
 
+  /// Creates a home header with an optional user name
+  /// 创建主屏幕头部，可选传入用户名
   const HomeHeader({super.key, this.userName = 'User'});
 
+  /// Builds the header with avatar, greeting text, date, and theme toggle
+  /// 构建头部，包含头像、问候文本、日期和主题切换按钮
   @override
   Widget build(BuildContext context) {
     // Use read() for themeProvider since we only call methods, don't depend on state
@@ -149,6 +154,7 @@ class HomeHeader extends StatelessWidget {
   }
 
   /// Get greeting based on time of day
+  /// 根据时间段获取问候语
   String _getGreeting(int hour) {
     if (hour >= 5 && hour < 12) {
       return 'Good morning';
@@ -160,6 +166,7 @@ class HomeHeader extends StatelessWidget {
   }
 
   /// Get user initials from name
+  /// 从用户名中提取首字母缩写
   String _getInitials(String name) {
     if (name.isEmpty) return 'U';
     final parts = name.trim().split(' ').where((p) => p.isNotEmpty).toList();

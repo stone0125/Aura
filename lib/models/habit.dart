@@ -14,6 +14,7 @@ import 'package:flutter/material.dart';
 import 'habit_category.dart';
 
 /// Habit model representing a user's habit
+/// 表示用户习惯的习惯模型
 class Habit {
   final String id;
   final String name;
@@ -32,6 +33,8 @@ class Habit {
   final TimeOfDay? reminderTime;
   final DateTime? createdAt;
 
+  /// Creates a Habit instance with the given properties
+  /// 使用给定属性创建一个 Habit 实例
   const Habit({
     required this.id,
     required this.name,
@@ -48,6 +51,7 @@ class Habit {
   });
 
   /// Create a copy with updated fields
+  /// 创建一个更新了指定字段的副本
   Habit copyWith({
     String? id,
     String? name,
@@ -85,6 +89,9 @@ class Habit {
   /// Toggle completion status
   /// Note: lastCompletedDate is preserved on undo to maintain history context.
   /// The actual completion history is managed by FirestoreService.
+  /// 切换完成状态
+  /// 注意：撤销时保留 lastCompletedDate 以维持历史上下文。
+  /// 实际完成历史由 FirestoreService 管理。
   @Deprecated('Use FirestoreService.toggleHabitCompletion() instead - this method has incorrect streak logic')
   Habit toggleCompletion() {
     return copyWith(
@@ -94,6 +101,8 @@ class Habit {
     );
   }
 
+  /// Equality operator comparing all fields
+  /// 比较所有字段的相等运算符
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
@@ -112,6 +121,8 @@ class Habit {
         other.createdAt == createdAt;
   }
 
+  /// Hash code combining all fields
+  /// 组合所有字段的哈希码
   @override
   int get hashCode => Object.hash(
         id,
@@ -128,6 +139,8 @@ class Habit {
         createdAt,
       );
 
+  /// String representation for debugging
+  /// 用于调试的字符串表示
   @override
   String toString() {
     return 'Habit(id: $id, name: $name, category: $category, streak: $streak, isCompleted: $isCompleted, goal: $goalType $goalValue $goalUnit, reminder: $reminderEnabled at $reminderTime)';

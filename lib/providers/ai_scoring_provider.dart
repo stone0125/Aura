@@ -23,6 +23,7 @@ import '../services/health_service.dart';
 import '../services/subscription_service.dart';
 
 /// Provider for AI scoring, daily reviews, and health correlations
+/// AI 评分、每日回顾和健康关联分析的 Provider
 class AIScoringProvider extends ChangeNotifier {
   final FirestoreService _firestoreService = FirestoreService();
   final HealthService _healthService = HealthService();
@@ -48,26 +49,60 @@ class AIScoringProvider extends ChangeNotifier {
   // Cached computed value (invalidated when _habitScores changes)
   double? _cachedOverallAverageScore;
 
-  // Getters
+  /// Whether the provider has been initialized
+  /// Provider 是否已初始化
   bool get isInitialized => _isInitialized;
+
+  /// Whether a score is currently being generated
+  /// 评分是否正在生成中
   bool get isLoadingScore => _isLoadingScore;
+
+  /// Whether a daily review is currently being generated
+  /// 每日回顾是否正在生成中
   bool get isLoadingReview => _isLoadingReview;
+
+  /// Whether health correlations are currently being generated
+  /// 健康关联分析是否正在生成中
   bool get isLoadingCorrelations => _isLoadingCorrelations;
+
+  /// Whether health integration is enabled
+  /// 健康集成是否已启用
   bool get healthIntegrationEnabled => _healthIntegrationEnabled;
+
+  /// Get the current error message if any
+  /// 获取当前错误消息（如果有）
   String? get errorMessage => _errorMessage;
+
+  /// Get all habit scores keyed by habit ID
+  /// 获取所有习惯评分（按习惯 ID 索引）
   Map<String, HabitScore> get habitScores => _habitScores;
+
+  /// Get today's daily review
+  /// 获取今日的每日回顾
   DailyReview? get todaysReview => _todaysReview;
+
+  /// Get the review history list
+  /// 获取回顾历史列表
   List<DailyReview> get reviewHistory => _reviewHistory;
+
+  /// Get the health correlation analysis
+  /// 获取健康关联分析
   HealthCorrelationAnalysis? get healthCorrelations => _healthCorrelations;
+
+  /// Get the health data summary
+  /// 获取健康数据摘要
   HealthDataSummary? get healthSummary => _healthSummary;
 
   /// Check if user can use AI reports this month
+  /// 检查用户本月是否可以使用 AI 报告
   bool get canUseAIReport => _subscriptionService.canUseAIReport();
 
   /// Get remaining AI reports for this month
+  /// 获取本月剩余 AI 报告次数
   int get remainingAIReports => _subscriptionService.getRemainingAIReports();
 
   /// Check if the daily review is outdated compared to current habit state
+  /// 检查每日回顾是否相对于当前习惯状态已过期
   bool isDailyReviewOutdated(List<Habit> habits) {
     final review = _todaysReview;
     if (review == null) return false;
@@ -76,9 +111,11 @@ class AIScoringProvider extends ChangeNotifier {
   }
 
   /// Get score for a specific habit
+  /// 获取特定习惯的评分
   HabitScore? getScoreForHabit(String habitId) => _habitScores[habitId];
 
   /// Calculate overall average score across all habits (cached)
+  /// 计算所有习惯的总体平均评分（已缓存）
   double get overallAverageScore {
     if (_cachedOverallAverageScore != null) return _cachedOverallAverageScore!;
     if (_habitScores.isEmpty) {
@@ -91,6 +128,7 @@ class AIScoringProvider extends ChangeNotifier {
   }
 
   /// Initialize the provider
+  /// 初始化 Provider
   Future<void> initialize() async {
     if (_isInitialized) return;
 
@@ -136,6 +174,7 @@ class AIScoringProvider extends ChangeNotifier {
   }
 
   /// Generate score for a single habit
+  /// 为单个习惯生成评分
   Future<HabitScore?> generateHabitScore(Habit habit) async {
     if (_inProgressOps.contains('score')) return _habitScores[habit.id];
     _inProgressOps.add('score');
@@ -236,6 +275,7 @@ class AIScoringProvider extends ChangeNotifier {
   }
 
   /// Generate daily review for today
+  /// 生成今日的每日回顾
   Future<DailyReview?> generateDailyReview(List<Habit> habits) async {
     if (habits.isEmpty) return null;
     if (_inProgressOps.contains('review')) return _todaysReview;
@@ -360,6 +400,7 @@ class AIScoringProvider extends ChangeNotifier {
   }
 
   /// Generate health correlations analysis
+  /// 生成健康关联分析
   Future<HealthCorrelationAnalysis?> generateHealthCorrelations({
     required List<Habit> habits,
     String timeRange = '30d',
@@ -486,6 +527,7 @@ class AIScoringProvider extends ChangeNotifier {
   }
 
   /// Enable health integration
+  /// 启用健康集成
   Future<bool> enableHealthIntegration() async {
     try {
       // Request permissions
@@ -514,6 +556,7 @@ class AIScoringProvider extends ChangeNotifier {
   }
 
   /// Disable health integration
+  /// 禁用健康集成
   Future<void> disableHealthIntegration() async {
     try {
       await _firestoreService.saveHealthIntegrationEnabled(false);
@@ -530,6 +573,7 @@ class AIScoringProvider extends ChangeNotifier {
   }
 
   /// Refresh health summary
+  /// 刷新健康摘要
   Future<void> refreshHealthSummary() async {
     if (!_healthIntegrationEnabled) return;
 
@@ -542,6 +586,7 @@ class AIScoringProvider extends ChangeNotifier {
   }
 
   /// Get score history for a habit
+  /// 获取习惯的评分历史趋势
   Future<ScoreTrend> getScoreTrend(String habitId) async {
     try {
       final entries = await _firestoreService.getScoreHistory(habitId);
@@ -553,6 +598,7 @@ class AIScoringProvider extends ChangeNotifier {
   }
 
   /// Clear all user-specific data on logout
+  /// 登出时清除所有用户数据
   void clearUserData() {
     _inProgressOps.clear();
     _habitScores = {};
@@ -571,6 +617,7 @@ class AIScoringProvider extends ChangeNotifier {
   }
 
   /// Clear error message
+  /// 清除错误消息
   void clearError() {
     _errorMessage = null;
     notifyListeners();

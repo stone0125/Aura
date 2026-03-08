@@ -7,11 +7,17 @@ import '../services/notification_service.dart';
 import '../services/subscription_service.dart';
 import '../services/badge_service.dart';
 
+/// Animated splash screen shown during app initialization
+/// 应用初始化时显示的动画启动屏幕
 class AnimatedSplashScreen extends StatefulWidget {
   final Widget Function() destinationBuilder;
 
+  /// Creates the animated splash screen with a destination builder callback
+  /// 使用目标构建器回调创建动画启动屏幕
   const AnimatedSplashScreen({super.key, required this.destinationBuilder});
 
+  /// Creates the mutable state for the splash screen
+  /// 创建启动屏幕的可变状态
   @override
   State<AnimatedSplashScreen> createState() => _AnimatedSplashScreenState();
 }
@@ -31,6 +37,8 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
   bool _minTimeElapsed = false;
   bool _transitioned = false;
 
+  /// Initializes animations and starts app initialization
+  /// 初始化动画并开始应用初始化
   @override
   void initState() {
     super.initState();
@@ -76,6 +84,8 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
     _startMinTimer();
   }
 
+  /// Initializes Firebase, notifications, subscriptions, and badge services
+  /// 初始化Firebase、通知、订阅和徽章服务
   Future<void> _initializeApp() async {
     try {
       await Firebase.initializeApp(
@@ -94,6 +104,8 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
     _tryTransition();
   }
 
+  /// Starts a minimum display timer to ensure splash is shown long enough
+  /// 启动最短显示计时器，确保启动屏幕显示足够长的时间
   void _startMinTimer() {
     Future.delayed(const Duration(milliseconds: 1500), () {
       _minTimeElapsed = true;
@@ -101,6 +113,8 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
     });
   }
 
+  /// Attempts to transition to the destination screen when both init and timer are done
+  /// 当初始化和计时器都完成时，尝试过渡到目标屏幕
   void _tryTransition() {
     if (!_initComplete || !_minTimeElapsed || _transitioned) return;
     if (!mounted) return;
@@ -111,6 +125,8 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
     setState(() {});
   }
 
+  /// Disposes animation controllers
+  /// 释放动画控制器资源
   @override
   void dispose() {
     _fadeController.dispose();
@@ -118,6 +134,8 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
     super.dispose();
   }
 
+  /// Builds the splash screen UI with animated logo and gradient background
+  /// 构建带有动画标志和渐变背景的启动屏幕界面
   @override
   Widget build(BuildContext context) {
     if (_transitioned) {

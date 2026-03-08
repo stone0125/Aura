@@ -3,13 +3,20 @@ import 'package:flutter/material.dart';
 import '../../config/theme/app_colors.dart';
 
 /// Motivational Quote Card widget
+/// 励志名言卡片组件
 class MotivationalQuoteCard extends StatefulWidget {
+  /// Creates a motivational quote card widget
+  /// 创建励志名言卡片组件
   const MotivationalQuoteCard({super.key});
 
+  /// Creates the mutable state for this widget
+  /// 创建此组件的可变状态
   @override
   State<MotivationalQuoteCard> createState() => _MotivationalQuoteCardState();
 }
 
+/// State for the motivational quote card, manages quote selection
+/// 励志名言卡片的状态，管理名言选择
 class _MotivationalQuoteCardState extends State<MotivationalQuoteCard> {
   late String _quote;
 
@@ -32,6 +39,8 @@ class _MotivationalQuoteCardState extends State<MotivationalQuoteCard> {
     'Excellence is not an act, but a habit',
   ];
 
+  /// Initializes the state with a date-seeded random quote
+  /// 使用基于日期的种子初始化随机名言
   @override
   void initState() {
     super.initState();
@@ -40,6 +49,8 @@ class _MotivationalQuoteCardState extends State<MotivationalQuoteCard> {
 
   final _random = Random();
 
+  /// Shuffles to a different random quote, avoiding repeats when possible
+  /// 随机切换到另一条名言，尽量避免重复
   void _shuffleQuote() {
     setState(() {
       final current = _quote;
@@ -57,12 +68,15 @@ class _MotivationalQuoteCardState extends State<MotivationalQuoteCard> {
   }
 
   /// Get random daily quote seeded by date (initial state)
+  /// 获取基于日期种子的每日随机名言（初始状态）
   String _getRandomQuote() {
     final today = DateTime.now();
     final seed = today.year * 10000 + today.month * 100 + today.day;
     return _quotes[seed % _quotes.length];
   }
 
+  /// Builds the motivational quote card with gradient styling and tap-to-shuffle
+  /// 构建励志名言卡片，带渐变样式和点击切换功能
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;

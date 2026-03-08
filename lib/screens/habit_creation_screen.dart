@@ -13,18 +13,27 @@ import '../config/theme/ui_constants.dart';
 import '../config/habit_icons.dart';
 import '../services/notification_service.dart';
 
-/// Habit Creation Screen
+/// Habit Creation Screen for creating or editing habits
+/// 用于创建或编辑习惯的习惯创建屏幕
 class HabitCreationScreen extends StatefulWidget {
   /// Live AI Coach suggestion from Cloud Functions
+  /// 来自Cloud Functions的实时AI教练建议
   final AICoachSuggestion? aiCoachSuggestion;
 
   /// Existing habit to edit (null = create mode)
+  /// 要编辑的现有习惯（null表示创建模式）
   final Habit? habitToEdit;
 
+  /// Creates the habit creation/editing screen
+  /// 创建习惯创建/编辑屏幕
   const HabitCreationScreen({super.key, this.aiCoachSuggestion, this.habitToEdit});
 
+  /// Whether the screen is in editing mode
+  /// 屏幕是否处于编辑模式
   bool get isEditing => habitToEdit != null;
 
+  /// Creates the mutable state for the habit creation screen
+  /// 创建习惯创建屏幕的可变状态
   @override
   State<HabitCreationScreen> createState() => _HabitCreationScreenState();
 }
@@ -39,6 +48,8 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
   String? _categoryError;
   String? _frequencyError;
 
+  /// Initializes the form and sets up name change listener
+  /// 初始化表单并设置名称变更监听器
   @override
   void initState() {
     super.initState();
@@ -46,6 +57,8 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
     _nameController.addListener(_onNameChanged);
   }
 
+  /// Initializes form data from AI suggestion or existing habit
+  /// 从AI建议或现有习惯初始化表单数据
   void _initializeForm() {
     _formData = HabitFormData();
 
@@ -130,6 +143,8 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
     }
   }
 
+  /// Clears name error when user types in the name field
+  /// 当用户在名称字段中输入时清除名称错误
   void _onNameChanged() {
     setState(() {
       _formData.name = _nameController.text;
@@ -139,6 +154,8 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
     });
   }
 
+  /// Validates the habit name is not empty
+  /// 验证习惯名称不为空
   bool _validateName() {
     if (_formData.name.isEmpty) {
       setState(() => _nameError = 'Habit name is required');
@@ -152,6 +169,8 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
     return true;
   }
 
+  /// Validates that a category has been selected
+  /// 验证是否已选择类别
   bool _validateCategory() {
     if (_formData.category == null) {
       setState(() => _categoryError = 'Please select a category');
@@ -161,6 +180,8 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
     return true;
   }
 
+  /// Validates that weekly frequency has at least one day selected
+  /// 验证每周频率是否至少选择了一天
   bool _validateFrequency() {
     if (_formData.frequencyType == FrequencyType.weekly &&
         _formData.weeklyDays.isEmpty) {
@@ -171,6 +192,8 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
     return true;
   }
 
+  /// Validates the entire form and scrolls to the first error
+  /// 验证整个表单并滚动到第一个错误位置
   bool _validateForm() {
     final nameValid = _validateName();
     final categoryValid = _validateCategory();
@@ -179,6 +202,8 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
     return nameValid && categoryValid && frequencyValid;
   }
 
+  /// Saves the habit (creates new or updates existing) to the provider
+  /// 将习惯保存（创建新的或更新现有的）到提供者
   Future<void> _saveHabit() async {
     if (!_validateForm()) {
       // Shake animation would go here
@@ -298,6 +323,8 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
     }
   }
 
+  /// Shows confirmation dialog when user tries to leave with unsaved changes
+  /// 当用户尝试带有未保存更改离开时显示确认对话框
   Future<bool> _onWillPop() async {
     // Check if form has content
     if (_formData.name.isNotEmpty || _formData.description.isNotEmpty) {
@@ -324,6 +351,8 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
     return true;
   }
 
+  /// Disposes controllers and scroll controller
+  /// 释放控制器和滚动控制器
   @override
   void dispose() {
     _nameController.dispose();
@@ -333,6 +362,8 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
   }
 
   @override
+  /// Builds the habit creation/editing form UI
+  /// 构建习惯创建/编辑表单界面
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -455,6 +486,8 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
     );
   }
 
+  /// Builds the AI suggestion banner shown when pre-filling from AI
+  /// 构建从AI预填充时显示的AI建议横幅
   Widget _buildAIBanner(bool isDark) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -522,6 +555,8 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
     );
   }
 
+  /// Builds the basic info section with name and description fields
+  /// 构建带有名称和描述字段的基本信息部分
   Widget _buildBasicInfoSection(bool isDark) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
@@ -712,6 +747,8 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
     );
   }
 
+  /// Builds the category selection grid
+  /// 构建类别选择网格
   Widget _buildCategorySection(bool isDark) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
@@ -840,6 +877,8 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
     );
   }
 
+  /// Builds the icon selection section for the habit
+  /// 构建习惯的图标选择部分
   Widget _buildIconSection(bool isDark) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
@@ -917,6 +956,8 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
     );
   }
 
+  /// Builds the frequency selection section (daily/weekly)
+  /// 构建频率选择部分（每日/每周）
   Widget _buildFrequencySection(bool isDark) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
@@ -1113,6 +1154,8 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
     );
   }
 
+  /// Builds the goal configuration section (duration, count, distance)
+  /// 构建目标配置部分（时长、次数、距离）
   Widget _buildGoalSection(bool isDark) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
@@ -1437,6 +1480,8 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
     );
   }
 
+  /// Builds the reminders toggle and time picker section
+  /// 构建提醒开关和时间选择部分
   Widget _buildRemindersSection(bool isDark) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
@@ -1548,6 +1593,8 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
     );
   }
 
+  /// Formats a TimeOfDay to a readable string (e.g., "9:00 AM")
+  /// 将TimeOfDay格式化为可读字符串（如"9:00 AM"）
   String _formatTimeOfDay(TimeOfDay time) {
     final hour = time.hourOfPeriod == 0 ? 12 : time.hourOfPeriod;
     final minute = time.minute.toString().padLeft(2, '0');
@@ -1555,6 +1602,8 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
     return '$hour:$minute $period';
   }
 
+  /// Shows the time picker dialog for setting reminder time
+  /// 显示设置提醒时间的时间选择器对话框
   Future<void> _showReminderTimePicker(bool isDark) async {
     final picked = await showTimePicker(
       context: context,
@@ -1584,6 +1633,8 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
     }
   }
 
+  /// Builds the bottom save/create action button
+  /// 构建底部保存/创建操作按钮
   Widget _buildBottomActionButton(bool isDark) {
     return Container(
       padding: const EdgeInsets.all(16),

@@ -24,9 +24,14 @@ import 'home_screen.dart';
 import '../utils/date_utils.dart' as date_utils;
 
 /// Progress/Analytics Screen with comprehensive data visualization
+/// 带有全面数据可视化的进度/分析屏幕
 class ProgressScreen extends StatefulWidget {
+  /// Creates the progress screen
+  /// 创建进度屏幕
   const ProgressScreen({super.key});
 
+  /// Creates the mutable state for the progress screen
+  /// 创建进度屏幕的可变状态
   @override
   State<ProgressScreen> createState() => _ProgressScreenState();
 }
@@ -38,6 +43,8 @@ class _ProgressScreenState extends State<ProgressScreen>
   late Animation<double> _fadeAnimation;
   bool _insightsRequested = false;
 
+  /// Initializes animations and loads progress data
+  /// 初始化动画并加载进度数据
   @override
   void initState() {
     super.initState();
@@ -65,12 +72,16 @@ class _ProgressScreenState extends State<ProgressScreen>
     });
   }
 
+  /// Disposes the animation controller
+  /// 释放动画控制器
   @override
   void dispose() {
     _animationController.dispose();
     super.dispose();
   }
 
+  /// Builds the progress screen with app bar, hero section, and analytics
+  /// 构建带有应用栏、英雄区域和分析的进度屏幕
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -134,7 +145,8 @@ class _ProgressScreenState extends State<ProgressScreen>
     );
   }
 
-  /// App Bar
+  /// App Bar with title and theme toggle
+  /// 带有标题和主题切换的应用栏
   Widget _buildAppBar(
     bool isDark,
     ProgressProvider progressProvider,
@@ -178,7 +190,8 @@ class _ProgressScreenState extends State<ProgressScreen>
     );
   }
 
-  /// Hero Section with Progress Ring
+  /// Hero Section with Progress Ring and key stats
+  /// 带有进度环和关键统计的英雄区域
   Widget _buildHeroSection(bool isDark, ProgressProvider progressProvider) {
     // Use actual stats or default empty stats for new users
     final stats =
@@ -356,6 +369,8 @@ class _ProgressScreenState extends State<ProgressScreen>
     );
   }
 
+  /// Builds a single hero stat column with icon, value, and label
+  /// 构建带有图标、值和标签的单个英雄统计列
   Widget _buildHeroStat({
     required IconData icon,
     required String value,
@@ -387,6 +402,7 @@ class _ProgressScreenState extends State<ProgressScreen>
   }
 
   /// AI Weekly Summary Card - reads from AICoachProvider
+  /// AI每周总结卡片 - 从AICoachProvider读取
   Widget _buildAIWeeklySummary(bool isDark, ProgressProvider progressProvider) {
     final coachProvider = context.watch<AICoachProvider>();
     final summary = coachProvider.weeklySummary;
@@ -627,6 +643,8 @@ class _ProgressScreenState extends State<ProgressScreen>
     );
   }
 
+  /// Builds a single AI stat column (value + label)
+  /// 构建单个AI统计列（值 + 标签）
   Widget _buildAIStat(bool isDark, String value, String label) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -654,6 +672,8 @@ class _ProgressScreenState extends State<ProgressScreen>
     );
   }
 
+  /// Builds the AI insights loading spinner with message
+  /// 构建带有消息的AI洞察加载旋转器
   Widget _buildAIInsightsLoadingSpinner(bool isDark) {
     final coral = isDark ? AppColors.darkCoral : AppColors.lightCoral;
     final pink = isDark ? AppColors.darkPink : AppColors.lightPink;
@@ -705,6 +725,8 @@ class _ProgressScreenState extends State<ProgressScreen>
     );
   }
 
+  /// Builds the empty state prompting user to track habits for AI insights
+  /// 构建提示用户追踪习惯以获取AI洞察的空状态
   Widget _buildAILoadingState(bool isDark) {
     return Column(
       children: [
@@ -742,6 +764,8 @@ class _ProgressScreenState extends State<ProgressScreen>
     );
   }
 
+  /// Builds the limit reached state for AI reports
+  /// 构建AI报告达到限制时的状态
   Widget _buildAIReportLimitReached(bool isDark) {
     return Column(
       children: [
@@ -777,7 +801,8 @@ class _ProgressScreenState extends State<ProgressScreen>
     );
   }
 
-  /// Category Breakdown Section
+  /// Category Breakdown Section with donut chart and legend
+  /// 带有环形图和图例的类别细分部分
   Widget _buildCategoryBreakdown(
     bool isDark,
     ProgressProvider progressProvider,
@@ -876,6 +901,8 @@ class _ProgressScreenState extends State<ProgressScreen>
     );
   }
 
+  /// Builds a single category legend item with color, name, count, and percentage
+  /// 构建带有颜色、名称、数量和百分比的单个类别图例项
   Widget _buildCategoryLegendItem(bool isDark, CategoryBreakdown breakdown) {
     final colors = breakdown.category.getGradient(
       isDark ? Brightness.dark : Brightness.light,
@@ -929,7 +956,8 @@ class _ProgressScreenState extends State<ProgressScreen>
     );
   }
 
-  /// Weekly Heatmap Section
+  /// Weekly Heatmap Section showing daily completion rates
+  /// 显示每日完成率的每周热力图部分
   Widget _buildWeeklyHeatmap(bool isDark, ProgressProvider progressProvider) {
     final heatmap = progressProvider.weeklyHeatmap;
 
@@ -1008,6 +1036,8 @@ class _ProgressScreenState extends State<ProgressScreen>
     );
   }
 
+  /// Builds a single heatmap cell with color intensity based on completion rate
+  /// 构建根据完成率调整颜色强度的单个热力图单元格
   Widget _buildHeatmapCell(bool isDark, DayHeatmapData day) {
     Color cellColor;
     Color textColor;
@@ -1101,6 +1131,8 @@ class _ProgressScreenState extends State<ProgressScreen>
     );
   }
 
+  /// Shows a bottom sheet with detailed habit data for a specific day
+  /// 显示包含特定日期详细习惯数据的底部弹出面板
   void _showDayDetailSheet(
     BuildContext context,
     bool isDark,
@@ -1131,6 +1163,7 @@ class _ProgressScreenState extends State<ProgressScreen>
   }
 
   /// Build day detail content with error boundary
+  /// 构建带有错误边界的日期详情内容
   Widget _buildDayDetailContent(
     BuildContext context,
     bool isDark,
@@ -1230,11 +1263,14 @@ class _ProgressScreenState extends State<ProgressScreen>
     }
   }
 
+  /// Formats a date to a full readable string
+  /// 将日期格式化为完整的可读字符串
   String _formatDate(DateTime date) {
     return date_utils.formatDateFull(date);
   }
 
-  /// Build habit list for a specific day
+  /// Build habit list for a specific day showing completion status
+  /// 构建显示完成状态的特定日期习惯列表
   Widget _buildDayHabitList(
     BuildContext context,
     DayHeatmapData day,
@@ -1320,7 +1356,8 @@ class _ProgressScreenState extends State<ProgressScreen>
     );
   }
 
-  /// Trend Chart Section with fl_chart
+  /// Trend Chart Section with fl_chart line graph
+  /// 使用fl_chart折线图的趋势图部分
   Widget _buildTrendChart(bool isDark, ProgressProvider progressProvider) {
     final trendData = progressProvider.trendData;
 
@@ -1529,7 +1566,8 @@ class _ProgressScreenState extends State<ProgressScreen>
     );
   }
 
-  /// Best & Worst Performers Section (Continued in next part due to length)
+  /// Best & Worst Performers Section showing top and bottom habits
+  /// 最佳和最差表现部分，显示表现最好和最差的习惯
   Widget _buildPerformers(bool isDark, ProgressProvider progressProvider) {
     final topPerformers = progressProvider.topPerformers;
     final bottomPerformers = progressProvider.bottomPerformers;
@@ -1617,6 +1655,8 @@ class _ProgressScreenState extends State<ProgressScreen>
     );
   }
 
+  /// Builds a single performer row with rank badge, icon, name, and rate
+  /// 构建带有排名徽章、图标、名称和比率的单个表现者行
   Widget _buildPerformerItem(
     bool isDark,
     HabitPerformance performer,
@@ -1719,7 +1759,8 @@ class _ProgressScreenState extends State<ProgressScreen>
     );
   }
 
-  /// Achievement Gallery Section
+  /// Builds the achievement gallery section with badge grid and view all link
+  /// 构建包含徽章网格和查看全部链接的成就画廊部分
   Widget _buildAchievementGallery(
     bool isDark,
     ProgressProvider progressProvider,
@@ -1817,6 +1858,8 @@ class _ProgressScreenState extends State<ProgressScreen>
     );
   }
 
+  /// Builds a single achievement badge with icon, name, and progress
+  /// 构建带有图标、名称和进度的单个成就徽章
   Widget _buildAchievementBadge(bool isDark, Achievement achievement) {
     final badgeColor = achievement.category.getColor(isDark);
 
@@ -1905,6 +1948,8 @@ class _ProgressScreenState extends State<ProgressScreen>
     );
   }
 
+  /// Shows a detail dialog for a specific achievement with progress and share
+  /// 显示特定成就的详细对话框，包含进度和分享功能
   void _showAchievementDetail(
     BuildContext context,
     bool isDark,
@@ -2116,10 +2161,14 @@ class _ProgressScreenState extends State<ProgressScreen>
     );
   }
 
+  /// Shares an achievement via the share service
+  /// 通过分享服务分享成就
   Future<void> _shareAchievement(Achievement achievement) async {
     await ShareService().shareAchievement(achievement);
   }
 
+  /// Exports habit data as CSV file and shares it
+  /// 将习惯数据导出为CSV文件并分享
   Future<void> _exportData() async {
     // Store scaffold messenger BEFORE any async operations to avoid context issues
     final scaffoldMessenger = ScaffoldMessenger.of(context);
@@ -2172,7 +2221,8 @@ class _ProgressScreenState extends State<ProgressScreen>
     }
   }
 
-  /// Quick Actions Section
+  /// Builds the quick actions section with share and export buttons
+  /// 构建包含分享和导出按钮的快捷操作部分
   Widget _buildQuickActions(bool isDark, ProgressProvider progressProvider) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
@@ -2262,6 +2312,8 @@ class _ProgressScreenState extends State<ProgressScreen>
     );
   }
 
+  /// Shows a bottom sheet displaying all achievements in a grid
+  /// 显示包含所有成就网格的底部弹出窗口
   void _showAllAchievements(
     BuildContext context,
     bool isDark,
@@ -2371,13 +2423,18 @@ class _ProgressScreenState extends State<ProgressScreen>
   }
 }
 
-/// Custom painter for donut chart
+/// Custom painter for rendering the category donut chart
+/// 用于渲染分类甜甜圈图表的自定义画家
 class _DonutChartPainter extends CustomPainter {
   final List<CategoryBreakdown> breakdown;
   final bool isDark;
 
+  /// Creates a donut chart painter with category breakdown and theme
+  /// 创建带有分类数据和主题的甜甜圈图表画家
   _DonutChartPainter({required this.breakdown, required this.isDark});
 
+  /// Paints the donut chart arcs for each category
+  /// 为每个分类绘制甜甜圈图表弧线
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
@@ -2412,6 +2469,8 @@ class _DonutChartPainter extends CustomPainter {
     }
   }
 
+  /// Determines whether the chart should repaint when data changes
+  /// 确定数据变化时图表是否需要重新绘制
   @override
   bool shouldRepaint(_DonutChartPainter oldDelegate) {
     return oldDelegate.breakdown != breakdown || oldDelegate.isDark != isDark;

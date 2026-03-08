@@ -5,9 +5,15 @@ import '../services/auth_service.dart';
 import '../config/theme/app_colors.dart';
 import 'dart:io';
 
+/// Login screen with email/password and social authentication options
+/// 带有邮箱/密码和社交认证选项的登录屏幕
 class LoginScreen extends StatefulWidget {
+  /// Creates the login screen
+  /// 创建登录屏幕
   const LoginScreen({super.key});
 
+  /// Creates the mutable state for the login screen
+  /// 创建登录屏幕的可变状态
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
@@ -21,6 +27,10 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
 
+  /// Disposes text editing controllers
+  /// 释放文本编辑控制器资源
+  /// Disposes text editing controllers
+  /// 释放文本编辑控制器
   @override
   void dispose() {
     _emailController.dispose();
@@ -28,6 +38,10 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  /// Handles email/password authentication (sign-in or sign-up)
+  /// 处理邮箱密码认证（登录或注册）
+  /// Handles email/password sign-in or sign-up based on current mode
+  /// 根据当前模式处理邮箱/密码登录或注册
   Future<void> _handleEmailAuth() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -55,6 +69,10 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  /// Sends a password reset email to the entered email address
+  /// 向输入的邮箱地址发送密码重置邮件
+  /// Sends a password reset email to the entered address
+  /// 向输入的地址发送密码重置邮件
   Future<void> _handleForgotPassword() async {
     final email = _emailController.text.trim();
     if (email.isEmpty) {
@@ -84,6 +102,10 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  /// Handles Google OAuth sign-in flow
+  /// 处理Google OAuth登录流程
+  /// Handles Google OAuth sign-in flow
+  /// 处理Google OAuth登录流程
   Future<void> _handleGoogleSignIn() async {
     setState(() => _isLoading = true);
     try {
@@ -99,6 +121,8 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  /// Handles Apple sign-in flow
+  /// 处理Apple登录流程
   Future<void> _handleAppleSignIn() async {
     setState(() => _isLoading = true);
     try {
@@ -114,6 +138,8 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  /// Builds the login screen UI with form fields and social login buttons
+  /// 构建带有表单字段和社交登录按钮的登录屏幕界面
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -395,6 +421,8 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
+/// Reusable social login button widget (Google, Apple, etc.)
+/// 可复用的社交登录按钮组件（Google、Apple等）
 class _SocialLoginButton extends StatelessWidget {
   final String text;
   final String? icon;
@@ -402,6 +430,8 @@ class _SocialLoginButton extends StatelessWidget {
   final VoidCallback onPressed;
   final bool isDark;
 
+  /// Creates a social login button with text, icon, and callback
+  /// 创建带有文本、图标和回调的社交登录按钮
   const _SocialLoginButton({
     required this.text,
     this.icon,
@@ -410,6 +440,8 @@ class _SocialLoginButton extends StatelessWidget {
     required this.isDark,
   });
 
+  /// Builds the social login button with icon and label
+  /// 构建带有图标和标签的社交登录按钮
   @override
   Widget build(BuildContext context) {
     return ElevatedButton(

@@ -16,6 +16,7 @@
 import 'package:flutter/material.dart';
 
 /// User profile data
+/// 用户资料数据
 class UserProfile {
   final String id;
   final String firstName;
@@ -27,6 +28,8 @@ class UserProfile {
   final DateTime memberSince;
   final bool isPro;
 
+  /// Creates a UserProfile with all required and optional fields
+  /// 使用所有必需和可选字段创建 UserProfile
   const UserProfile({
     required this.id,
     required this.firstName,
@@ -39,14 +42,20 @@ class UserProfile {
     this.isPro = false,
   });
 
+  /// Get the full name by combining first and last name
+  /// 通过组合名和姓获取全名
   String get fullName => '$firstName $lastName';
 
+  /// Get user initials from first and last name
+  /// 从名和姓获取用户首字母缩写
   String get initials {
     final first = firstName.isNotEmpty ? firstName[0] : '';
     final last = lastName.isNotEmpty ? lastName[0] : '';
     return (first + last).toUpperCase();
   }
 
+  /// Get formatted "Member since" text
+  /// 获取格式化的"注册时间"文本
   String get memberSinceText {
     final months = [
       'Jan',
@@ -70,6 +79,8 @@ class UserProfile {
     return 'Member since ${months[monthIndex - 1]} ${memberSince.year}';
   }
 
+  /// Create a copy with optionally updated fields
+  /// 创建一个可选更新字段的副本
   UserProfile copyWith({
     String? firstName,
     String? lastName,
@@ -94,6 +105,7 @@ class UserProfile {
 }
 
 /// Theme preference
+/// 主题偏好
 enum ThemePreference {
   light,
   dark,
@@ -101,6 +113,8 @@ enum ThemePreference {
 }
 
 extension ThemePreferenceExtension on ThemePreference {
+  /// Get display name for the theme preference
+  /// 获取主题偏好的显示名称
   String get displayName {
     switch (this) {
       case ThemePreference.light:
@@ -114,6 +128,7 @@ extension ThemePreferenceExtension on ThemePreference {
 }
 
 /// Notification frequency
+/// 通知频率
 enum NotificationFrequency {
   daily,
   weekly,
@@ -122,6 +137,8 @@ enum NotificationFrequency {
 }
 
 extension NotificationFrequencyExtension on NotificationFrequency {
+  /// Get display name for the notification frequency
+  /// 获取通知频率的显示名称
   String get displayName {
     switch (this) {
       case NotificationFrequency.daily:
@@ -135,6 +152,8 @@ extension NotificationFrequencyExtension on NotificationFrequency {
     }
   }
 
+  /// Get description for the notification frequency
+  /// 获取通知频率的描述
   String get description {
     switch (this) {
       case NotificationFrequency.daily:
@@ -150,6 +169,7 @@ extension NotificationFrequencyExtension on NotificationFrequency {
 }
 
 /// Text size preference
+/// 字体大小偏好
 enum TextSizePreference {
   system,
   small,
@@ -159,6 +179,8 @@ enum TextSizePreference {
 }
 
 extension TextSizePreferenceExtension on TextSizePreference {
+  /// Get display name for the text size preference
+  /// 获取字体大小偏好的显示名称
   String get displayName {
     switch (this) {
       case TextSizePreference.system:
@@ -174,6 +196,8 @@ extension TextSizePreferenceExtension on TextSizePreference {
     }
   }
 
+  /// Get scale factor for the text size preference
+  /// 获取字体大小偏好的缩放因子
   double get scale {
     switch (this) {
       case TextSizePreference.system:
@@ -191,6 +215,7 @@ extension TextSizePreferenceExtension on TextSizePreference {
 }
 
 /// Export format
+/// 导出格式
 enum ExportFormat {
   csv,
   json,
@@ -198,6 +223,8 @@ enum ExportFormat {
 }
 
 extension ExportFormatExtension on ExportFormat {
+  /// Get display name for the export format
+  /// 获取导出格式的显示名称
   String get displayName {
     switch (this) {
       case ExportFormat.csv:
@@ -209,6 +236,8 @@ extension ExportFormatExtension on ExportFormat {
     }
   }
 
+  /// Get description for the export format
+  /// 获取导出格式的描述
   String get description {
     switch (this) {
       case ExportFormat.csv:
@@ -220,6 +249,8 @@ extension ExportFormatExtension on ExportFormat {
     }
   }
 
+  /// Get icon for the export format
+  /// 获取导出格式的图标
   IconData get icon {
     switch (this) {
       case ExportFormat.csv:
@@ -233,6 +264,7 @@ extension ExportFormatExtension on ExportFormat {
 }
 
 /// Sync status
+/// 同步状态
 enum SyncStatus {
   synced,
   syncing,
@@ -241,6 +273,8 @@ enum SyncStatus {
 }
 
 extension SyncStatusExtension on SyncStatus {
+  /// Get display name for the sync status
+  /// 获取同步状态的显示名称
   String get displayName {
     switch (this) {
       case SyncStatus.synced:
@@ -254,6 +288,8 @@ extension SyncStatusExtension on SyncStatus {
     }
   }
 
+  /// Get color for the sync status based on theme
+  /// 根据主题获取同步状态的颜色
   Color getColor(bool isDark) {
     switch (this) {
       case SyncStatus.synced:
@@ -267,6 +303,8 @@ extension SyncStatusExtension on SyncStatus {
     }
   }
 
+  /// Get icon for the sync status
+  /// 获取同步状态的图标
   IconData get icon {
     switch (this) {
       case SyncStatus.synced:
@@ -282,6 +320,7 @@ extension SyncStatusExtension on SyncStatus {
 }
 
 /// App settings state
+/// 应用设置状态
 class AppSettings {
   final ThemePreference themePreference;
   final bool notificationsEnabled;
@@ -301,6 +340,8 @@ class AppSettings {
   final bool reduceMotion;
   final bool colorBlindMode;
 
+  /// Creates AppSettings with default values for all preferences
+  /// 使用所有偏好的默认值创建 AppSettings
   const AppSettings({
     this.themePreference = ThemePreference.system,
     this.notificationsEnabled = true,
@@ -321,6 +362,8 @@ class AppSettings {
     this.colorBlindMode = false,
   });
 
+  /// Get formatted reminder time text (e.g., "9:00 AM")
+  /// 获取格式化的提醒时间文本（例如 "9:00 AM"）
   String get reminderTimeText {
     final hour = defaultReminderTime.hour;
     final minute = defaultReminderTime.minute;
@@ -330,6 +373,8 @@ class AppSettings {
     return '$displayHour:$displayMinute $period';
   }
 
+  /// Get human-readable last sync time text
+  /// 获取人类可读的上次同步时间文本
   String? get lastSyncText {
     if (lastSyncTime == null) return null;
     final now = DateTime.now();
@@ -346,6 +391,8 @@ class AppSettings {
     }
   }
 
+  /// Create a copy with optionally updated settings
+  /// 创建一个可选更新设置的副本
   AppSettings copyWith({
     ThemePreference? themePreference,
     bool? notificationsEnabled,

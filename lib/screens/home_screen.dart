@@ -15,12 +15,18 @@ import 'ai_coach_screen.dart';
 import 'progress_screen.dart';
 import 'settings_screen.dart';
 
-/// Home Screen - Primary Dashboard
+/// Home Screen - Primary Dashboard with tab navigation
+/// 主屏幕 - 带有标签导航的主要仪表板
 class HomeScreen extends StatefulWidget {
   static final GlobalKey<HomeScreenState> homeKey =
       GlobalKey<HomeScreenState>();
+
+  /// Creates the home screen
+  /// 创建主屏幕
   const HomeScreen({super.key});
 
+  /// Creates the mutable state for the home screen
+  /// 创建主屏幕的可变状态
   @override
   State<HomeScreen> createState() => HomeScreenState();
 }
@@ -40,12 +46,16 @@ class HomeScreenState extends State<HomeScreen> {
     const SettingsScreen(),
   ];
 
+  /// Switches to the specified bottom navigation tab
+  /// 切换到指定的底部导航标签
   void switchToTab(int index) {
     setState(() {
       _currentIndex = index;
     });
   }
 
+  /// Initializes state and sets up AI data preloading
+  /// 初始化状态并设置AI数据预加载
   @override
   void initState() {
     super.initState();
@@ -55,6 +65,8 @@ class HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  /// Sets up listeners to preload AI suggestions, tips, and insights
+  /// 设置监听器以预加载AI建议、提示和洞察
   void _setupAIPreloading() {
     _habitProvider = Provider.of<HabitProvider>(context, listen: false);
     _progressProvider = Provider.of<ProgressProvider>(context, listen: false);
@@ -68,6 +80,8 @@ class HomeScreenState extends State<HomeScreen> {
     _checkAndLoadAI(); // Initial check
   }
 
+  /// Checks if data is ready and loads AI suggestions, tips, and insights
+  /// 检查数据是否就绪并加载AI建议、提示和洞察
   void _checkAndLoadAI() {
     if (_habitProvider == null || !mounted) return;
 
@@ -139,6 +153,8 @@ class HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  /// Removes listeners and disposes resources
+  /// 移除监听器并释放资源
   @override
   void dispose() {
     if (_habitProvider != null && _habitListener != null) {
@@ -150,6 +166,8 @@ class HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
+  /// Builds the home screen with tab content, FAB, and bottom navigation
+  /// 构建带有标签内容、浮动按钮和底部导航的主屏幕
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -218,10 +236,15 @@ class HomeScreenState extends State<HomeScreen> {
   }
 }
 
-/// Home Tab Widget
+/// Home Tab Widget displaying dashboard content
+/// 显示仪表板内容的主页标签组件
 class _HomeTab extends StatelessWidget {
+  /// Creates the home tab widget
+  /// 创建主页标签组件
   const _HomeTab();
 
+  /// Builds the home tab with quote, stats, habits, and AI suggestion cards
+  /// 构建带有语录、统计、习惯和AI建议卡片的主页标签
   @override
   Widget build(BuildContext context) {
     return SafeArea(

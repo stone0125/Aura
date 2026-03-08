@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 /// Custom painter for animated circular progress ring
+/// 动画环形进度条的自定义画笔
 class ProgressRingPainter extends CustomPainter {
   final double progress; // 0.0 to 1.0
   final Color backgroundColor;
@@ -9,6 +10,8 @@ class ProgressRingPainter extends CustomPainter {
   final double strokeWidth;
   final bool showGlow;
 
+  /// Creates a progress ring painter with configurable colors, width, and glow
+  /// 创建可配置颜色、宽度和发光效果的进度环画笔
   ProgressRingPainter({
     required this.progress,
     required this.backgroundColor,
@@ -17,6 +20,8 @@ class ProgressRingPainter extends CustomPainter {
     this.showGlow = true,
   });
 
+  /// Paints the background circle, optional glow, and progress arc
+  /// 绘制背景圆环、可选发光效果和进度弧
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
@@ -68,6 +73,8 @@ class ProgressRingPainter extends CustomPainter {
     );
   }
 
+  /// Returns true if any visual property changed, triggering a repaint
+  /// 当任何视觉属性变化时返回 true，触发重绘
   @override
   bool shouldRepaint(ProgressRingPainter oldDelegate) {
     return oldDelegate.progress != progress ||

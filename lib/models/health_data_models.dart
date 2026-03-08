@@ -13,6 +13,7 @@
 // =============================================================================
 
 /// Single day's health data point
+/// 单日健康数据点
 class HealthDataPoint {
   final DateTime date;
   final int? steps;
@@ -22,6 +23,8 @@ class HealthDataPoint {
   final int? activeMinutes;
   final int? caloriesBurned;
 
+  /// Creates a HealthDataPoint with date and optional health metrics
+  /// 使用日期和可选健康指标创建 HealthDataPoint
   const HealthDataPoint({
     required this.date,
     this.steps,
@@ -32,6 +35,8 @@ class HealthDataPoint {
     this.caloriesBurned,
   });
 
+  /// Create a HealthDataPoint from a JSON map
+  /// 从 JSON 映射创建 HealthDataPoint
   factory HealthDataPoint.fromJson(Map<String, dynamic> json) {
     return HealthDataPoint(
       date: json['date'] != null
@@ -46,6 +51,8 @@ class HealthDataPoint {
     );
   }
 
+  /// Serialize this health data point to a JSON map
+  /// 将此健康数据点序列化为 JSON 映射
   Map<String, dynamic> toJson() => {
         'date': date.toIso8601String(),
         'steps': steps,
@@ -57,6 +64,7 @@ class HealthDataPoint {
       };
 
   /// Check if has meaningful data
+  /// 检查是否有有意义的数据
   bool get hasData =>
       steps != null ||
       sleepHours != null ||
@@ -64,11 +72,13 @@ class HealthDataPoint {
       activeMinutes != null;
 
   /// Get formatted date string
+  /// 获取格式化的日期字符串
   String get dateString =>
       '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
 }
 
 /// Aggregated health data summary
+/// 汇总的健康数据摘要
 class HealthDataSummary {
   final int totalDays;
   final double avgSteps;
@@ -77,6 +87,8 @@ class HealthDataSummary {
   final double avgActiveMinutes;
   final double avgCaloriesBurned;
 
+  /// Creates a HealthDataSummary with average values for all metrics
+  /// 使用所有指标的平均值创建 HealthDataSummary
   const HealthDataSummary({
     required this.totalDays,
     required this.avgSteps,
@@ -86,6 +98,8 @@ class HealthDataSummary {
     required this.avgCaloriesBurned,
   });
 
+  /// Create a HealthDataSummary by computing averages from data points
+  /// 通过计算数据点的平均值创建 HealthDataSummary
   factory HealthDataSummary.fromDataPoints(List<HealthDataPoint> points) {
     if (points.isEmpty) {
       return const HealthDataSummary(
@@ -139,6 +153,8 @@ class HealthDataSummary {
     );
   }
 
+  /// Serialize this summary to a JSON map
+  /// 将此摘要序列化为 JSON 映射
   Map<String, dynamic> toJson() => {
         'totalDays': totalDays,
         'avgSteps': avgSteps,
@@ -150,6 +166,7 @@ class HealthDataSummary {
 }
 
 /// Correlation impact level
+/// 关联影响级别
 enum CorrelationImpact {
   strongPositive('strong_positive'),
   moderatePositive('moderate_positive'),
@@ -162,6 +179,8 @@ enum CorrelationImpact {
   final String value;
   const CorrelationImpact(this.value);
 
+  /// Parse a CorrelationImpact from a string value
+  /// 从字符串值解析 CorrelationImpact
   static CorrelationImpact fromString(String value) {
     switch (value.toLowerCase()) {
       case 'strong_positive':
@@ -183,6 +202,8 @@ enum CorrelationImpact {
     }
   }
 
+  /// Get display name for the correlation impact
+  /// 获取关联影响的显示名称
   String get displayName {
     switch (this) {
       case CorrelationImpact.strongPositive:
@@ -202,16 +223,22 @@ enum CorrelationImpact {
     }
   }
 
+  /// Check if the correlation is positive
+  /// 检查关联是否为正相关
   bool get isPositive =>
       this == CorrelationImpact.strongPositive ||
       this == CorrelationImpact.moderatePositive ||
       this == CorrelationImpact.weakPositive;
 
+  /// Check if the correlation is negative
+  /// 检查关联是否为负相关
   bool get isNegative =>
       this == CorrelationImpact.strongNegative ||
       this == CorrelationImpact.moderateNegative ||
       this == CorrelationImpact.weakNegative;
 
+  /// Check if the correlation is statistically significant
+  /// 检查关联是否具有统计显著性
   bool get isSignificant =>
       this == CorrelationImpact.strongPositive ||
       this == CorrelationImpact.strongNegative ||
@@ -220,6 +247,7 @@ enum CorrelationImpact {
 }
 
 /// Single correlation between a health metric and habits
+/// 健康指标与习惯之间的单个关联
 class HealthCorrelation {
   final HealthMetricType metric;
   final CorrelationImpact impact;
@@ -227,6 +255,8 @@ class HealthCorrelation {
   final String insight;
   final String recommendation;
 
+  /// Creates a HealthCorrelation with metric, impact, and analysis
+  /// 使用指标、影响和分析创建 HealthCorrelation
   const HealthCorrelation({
     required this.metric,
     required this.impact,
@@ -235,6 +265,8 @@ class HealthCorrelation {
     required this.recommendation,
   });
 
+  /// Create a HealthCorrelation from a JSON map
+  /// 从 JSON 映射创建 HealthCorrelation
   factory HealthCorrelation.fromJson(Map<String, dynamic> json) {
     return HealthCorrelation(
       metric: HealthMetricType.fromString(json['metric']?.toString() ?? ''),
@@ -245,6 +277,8 @@ class HealthCorrelation {
     );
   }
 
+  /// Serialize this correlation to a JSON map
+  /// 将此关联序列化为 JSON 映射
   Map<String, dynamic> toJson() => {
         'metric': metric.value,
         'impact': impact.value,
@@ -255,6 +289,7 @@ class HealthCorrelation {
 }
 
 /// Types of health metrics
+/// 健康指标类型
 enum HealthMetricType {
   sleep('sleep'),
   steps('steps'),
@@ -265,6 +300,8 @@ enum HealthMetricType {
   final String value;
   const HealthMetricType(this.value);
 
+  /// Parse a HealthMetricType from a string value
+  /// 从字符串值解析 HealthMetricType
   static HealthMetricType fromString(String value) {
     switch (value.toLowerCase()) {
       case 'sleep':
@@ -282,6 +319,8 @@ enum HealthMetricType {
     }
   }
 
+  /// Get display name for the health metric type
+  /// 获取健康指标类型的显示名称
   String get displayName {
     switch (this) {
       case HealthMetricType.sleep:
@@ -297,6 +336,8 @@ enum HealthMetricType {
     }
   }
 
+  /// Get unit string for the health metric type
+  /// 获取健康指标类型的单位字符串
   String get unit {
     switch (this) {
       case HealthMetricType.sleep:
@@ -314,17 +355,22 @@ enum HealthMetricType {
 }
 
 /// Optimal range for a health metric
+/// 健康指标的最佳范围
 class OptimalRange {
   final double min;
   final double max;
   final String description;
 
+  /// Creates an OptimalRange with min, max, and description
+  /// 使用最小值、最大值和描述创建 OptimalRange
   const OptimalRange({
     required this.min,
     required this.max,
     required this.description,
   });
 
+  /// Create an OptimalRange from a JSON map
+  /// 从 JSON 映射创建 OptimalRange
   factory OptimalRange.fromJson(Map<String, dynamic> json) {
     return OptimalRange(
       min: (json['min'] as num?)?.toDouble() ?? 0,
@@ -333,6 +379,8 @@ class OptimalRange {
     );
   }
 
+  /// Serialize this optimal range to a JSON map
+  /// 将此最佳范围序列化为 JSON 映射
   Map<String, dynamic> toJson() => {
         'min': min,
         'max': max,
@@ -340,13 +388,16 @@ class OptimalRange {
       };
 
   /// Check if a value is within optimal range
+  /// 检查值是否在最佳范围内
   bool isOptimal(double value) => value >= min && value <= max;
 
   /// Get range as formatted string
+  /// 获取格式化的范围字符串
   String get rangeString => '${min.toStringAsFixed(0)} - ${max.toStringAsFixed(0)}';
 }
 
 /// Comprehensive health-habit correlation analysis
+/// 综合健康与习惯关联分析
 class HealthCorrelationAnalysis {
   final String timeRange;
   final List<HealthCorrelation> correlations;
@@ -355,6 +406,8 @@ class HealthCorrelationAnalysis {
   final String actionPlan;
   final DateTime generatedAt;
 
+  /// Creates a HealthCorrelationAnalysis with all analysis data
+  /// 使用所有分析数据创建 HealthCorrelationAnalysis
   const HealthCorrelationAnalysis({
     required this.timeRange,
     required this.correlations,
@@ -364,6 +417,8 @@ class HealthCorrelationAnalysis {
     required this.generatedAt,
   });
 
+  /// Create a HealthCorrelationAnalysis from a JSON map
+  /// 从 JSON 映射创建 HealthCorrelationAnalysis
   factory HealthCorrelationAnalysis.fromJson(Map<String, dynamic> json) {
     // Parse correlations
     final correlationsList = (json['correlations'] as List?)
@@ -403,6 +458,8 @@ class HealthCorrelationAnalysis {
     );
   }
 
+  /// Serialize this analysis to a JSON map
+  /// 将此分析序列化为 JSON 映射
   Map<String, dynamic> toJson() {
     final optimalJson = <String, dynamic>{};
     for (final entry in optimalConditions.entries) {
@@ -420,6 +477,7 @@ class HealthCorrelationAnalysis {
   }
 
   /// Get strongest positive correlation
+  /// 获取最强的正相关
   HealthCorrelation? get strongestPositive {
     final positive =
         correlations.where((c) => c.impact.isPositive).toList();
@@ -429,6 +487,7 @@ class HealthCorrelationAnalysis {
   }
 
   /// Get strongest negative correlation
+  /// 获取最强的负相关
   HealthCorrelation? get strongestNegative {
     final negative =
         correlations.where((c) => c.impact.isNegative).toList();
@@ -438,6 +497,7 @@ class HealthCorrelationAnalysis {
   }
 
   /// Get all significant correlations
+  /// 获取所有显著的关联
   List<HealthCorrelation> get significantCorrelations =>
       correlations.where((c) => c.impact.isSignificant).toList();
 }

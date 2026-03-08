@@ -25,12 +25,18 @@ import 'analytics_service.dart';
 /// Service for sharing achievements and progress
 class ShareService {
   static final ShareService _instance = ShareService._internal();
+  /// Factory constructor returning the singleton instance
+  /// 工厂构造函数，返回单例实例
   factory ShareService() => _instance;
+
+  /// Private internal constructor for singleton pattern
+  /// 单例模式的私有内部构造函数
   ShareService._internal();
 
   final _share = SharePlus.instance;
 
   /// Share a text summary of progress stats
+  /// 分享进度统计的文字摘要
   Future<void> shareProgressSummary({
     required int daysTracked,
     required int bestStreak,
@@ -56,6 +62,7 @@ Tracked with Aura Habit Tracker 💜
   }
 
   /// Share an achievement as text
+  /// 以文字形式分享成就
   Future<void> shareAchievement(Achievement achievement) async {
     final statusEmoji = achievement.isUnlocked ? '🏆' : '🎯';
     final progressPercent = achievement.progress * 100;
@@ -82,6 +89,7 @@ Tracked with Aura Habit Tracker 💜
   }
 
   /// Copy stats to clipboard
+  /// 将统计数据复制到剪贴板
   Future<void> copyStatsToClipboard({
     required int daysTracked,
     required int bestStreak,
@@ -100,6 +108,7 @@ Tracked with Aura Habit Tracker 💜
   }
 
   /// Share streak milestone
+  /// 分享连续记录里程碑
   Future<void> shareStreakMilestone({
     required String habitName,
     required int streakDays,
@@ -134,6 +143,7 @@ Tracked with Aura Habit Tracker 💜
   }
 
   /// Share multiple achievements summary
+  /// 分享多个成就的摘要
   Future<void> shareAchievementsSummary(List<Achievement> achievements) async {
     final unlocked = achievements.where((a) => a.isUnlocked).toList();
     final total = achievements.length;
@@ -155,6 +165,7 @@ Tracked with Aura Habit Tracker 💜
   }
 
   /// Share a file (e.g. CSV export)
+  /// 分享文件（如 CSV 导出）
   Future<void> shareFile(String path, String subject) async {
     // Verify file exists before attempting to share
     if (!File(path).existsSync()) {

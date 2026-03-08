@@ -12,6 +12,7 @@
 import 'package:flutter/material.dart';
 
 /// Available habit icons
+/// 可用的习惯图标
 class HabitIcons {
   static const List<HabitIconData> icons = [
     HabitIconData(icon: Icons.self_improvement_rounded, label: 'Meditation'),
@@ -47,6 +48,7 @@ class HabitIcons {
   ];
 
   /// Get default icon for category
+  /// 获取类别的默认图标
   static IconData getDefaultIconForCategory(String category) {
     switch (category.toLowerCase()) {
       case 'health':
@@ -66,10 +68,13 @@ class HabitIcons {
 }
 
 /// Habit icon data model
+/// 习惯图标数据模型
 class HabitIconData {
   final IconData icon;
   final String label;
 
+  /// Creates a habit icon data with the given icon and label
+  /// 使用给定图标和标签创建习惯图标数据
   const HabitIconData({
     required this.icon,
     required this.label,

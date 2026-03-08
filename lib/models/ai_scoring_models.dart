@@ -12,15 +12,20 @@
 // =============================================================================
 
 /// Individual score component for a dimension of habit performance
+/// 习惯表现某一维度的单个评分组件
 class ScoreComponent {
   final int score;
   final String analysis;
 
+  /// Creates a ScoreComponent with score value and analysis text
+  /// 使用分数值和分析文本创建 ScoreComponent
   const ScoreComponent({
     required this.score,
     required this.analysis,
   });
 
+  /// Create a ScoreComponent from a JSON map
+  /// 从 JSON 映射创建 ScoreComponent
   factory ScoreComponent.fromJson(Map<String, dynamic> json) {
     return ScoreComponent(
       score: (json['score'] as num?)?.toInt() ?? 0,
@@ -28,6 +33,8 @@ class ScoreComponent {
     );
   }
 
+  /// Serialize this score component to a JSON map
+  /// 将此评分组件序列化为 JSON 映射
   Map<String, dynamic> toJson() => {
         'score': score,
         'analysis': analysis,
@@ -35,12 +42,15 @@ class ScoreComponent {
 }
 
 /// Breakdown of habit score across multiple dimensions
+/// 习惯评分的多维度分解
 class ScoreBreakdown {
   final ScoreComponent consistency;
   final ScoreComponent momentum;
   final ScoreComponent resilience;
   final ScoreComponent engagement;
 
+  /// Creates a ScoreBreakdown with all four dimension scores
+  /// 使用所有四个维度的分数创建 ScoreBreakdown
   const ScoreBreakdown({
     required this.consistency,
     required this.momentum,
@@ -48,6 +58,8 @@ class ScoreBreakdown {
     required this.engagement,
   });
 
+  /// Create a ScoreBreakdown from a JSON map
+  /// 从 JSON 映射创建 ScoreBreakdown
   factory ScoreBreakdown.fromJson(Map<String, dynamic> json) {
     return ScoreBreakdown(
       consistency: ScoreComponent.fromJson(
@@ -61,6 +73,8 @@ class ScoreBreakdown {
     );
   }
 
+  /// Serialize this breakdown to a JSON map
+  /// 将此分解序列化为 JSON 映射
   Map<String, dynamic> toJson() => {
         'consistency': consistency.toJson(),
         'momentum': momentum.toJson(),
@@ -69,12 +83,14 @@ class ScoreBreakdown {
       };
 
   /// Get average score across all components
+  /// 获取所有组件的平均分
   double get averageScore =>
       (consistency.score + momentum.score + resilience.score + engagement.score) /
       4;
 }
 
 /// Comprehensive habit score from AI analysis
+/// AI 分析的综合习惯评分
 class HabitScore {
   final String habitId;
   final int overallScore;
@@ -87,6 +103,8 @@ class HabitScore {
   final String? healthCorrelation;
   final DateTime generatedAt;
 
+  /// Creates a HabitScore with all required and optional fields
+  /// 使用所有必需和可选字段创建 HabitScore
   const HabitScore({
     required this.habitId,
     required this.overallScore,
@@ -100,6 +118,8 @@ class HabitScore {
     required this.generatedAt,
   });
 
+  /// Create a HabitScore from a JSON map with optional habitId override
+  /// 从 JSON 映射创建 HabitScore，可选覆盖 habitId
   factory HabitScore.fromJson(Map<String, dynamic> json, {String? habitId}) {
     return HabitScore(
       habitId: habitId ?? json['habitId']?.toString() ?? '',
@@ -118,6 +138,8 @@ class HabitScore {
     );
   }
 
+  /// Serialize this habit score to a JSON map
+  /// 将此习惯评分序列化为 JSON 映射
   Map<String, dynamic> toJson() => {
         'habitId': habitId,
         'overallScore': overallScore,
@@ -131,13 +153,21 @@ class HabitScore {
         'generatedAt': generatedAt.toIso8601String(),
       };
 
-  /// Get color based on grade
+  /// Check if grade is Excellent (A)
+  /// 检查成绩是否为优秀（A）
   bool get isExcellent => grade.startsWith('A');
+  /// Check if grade is Good (B)
+  /// 检查成绩是否为良好（B）
   bool get isGood => grade.startsWith('B');
+  /// Check if grade is Average (C)
+  /// 检查成绩是否为一般（C）
   bool get isAverage => grade.startsWith('C');
+  /// Check if grade needs improvement (D or F)
+  /// 检查成绩是否需要改进（D 或 F）
   bool get needsImprovement => grade.startsWith('D') || grade.startsWith('F');
 
   /// Get score tier description
+  /// 获取分数等级描述
   String get scoreTier {
     if (overallScore >= 90) return 'Excellent';
     if (overallScore >= 80) return 'Great';
@@ -147,6 +177,7 @@ class HabitScore {
   }
 
   /// Calculate score change from previous
+  /// 计算与之前评分的变化量
   int scoreChange(HabitScore? previous) {
     if (previous == null) return 0;
     return overallScore - previous.overallScore;
@@ -154,17 +185,22 @@ class HabitScore {
 }
 
 /// Historical score entry for tracking progress over time
+/// 用于跟踪进度的历史评分条目
 class ScoreHistoryEntry {
   final DateTime date;
   final int score;
   final String grade;
 
+  /// Creates a ScoreHistoryEntry with date, score, and grade
+  /// 使用日期、分数和等级创建 ScoreHistoryEntry
   const ScoreHistoryEntry({
     required this.date,
     required this.score,
     required this.grade,
   });
 
+  /// Create a ScoreHistoryEntry from a JSON map
+  /// 从 JSON 映射创建 ScoreHistoryEntry
   factory ScoreHistoryEntry.fromJson(Map<String, dynamic> json) {
     return ScoreHistoryEntry(
       date: DateTime.tryParse(json['date'].toString()) ?? DateTime.now(),
@@ -173,6 +209,8 @@ class ScoreHistoryEntry {
     );
   }
 
+  /// Serialize this history entry to a JSON map
+  /// 将此历史条目序列化为 JSON 映射
   Map<String, dynamic> toJson() => {
         'date': date.toIso8601String(),
         'score': score,
@@ -181,6 +219,7 @@ class ScoreHistoryEntry {
 }
 
 /// Score trend analysis over time
+/// 评分随时间变化的趋势分析
 class ScoreTrend {
   final List<ScoreHistoryEntry> entries;
   final double averageScore;
@@ -189,6 +228,8 @@ class ScoreTrend {
   final int scoreChangeThisWeek;
   final int scoreChangeThisMonth;
 
+  /// Creates a ScoreTrend with computed statistics
+  /// 使用计算的统计数据创建 ScoreTrend
   const ScoreTrend({
     required this.entries,
     required this.averageScore,
@@ -198,6 +239,8 @@ class ScoreTrend {
     required this.scoreChangeThisMonth,
   });
 
+  /// Create a ScoreTrend by computing statistics from history entries
+  /// 通过计算历史条目的统计数据创建 ScoreTrend
   factory ScoreTrend.fromEntries(List<ScoreHistoryEntry> entries) {
     if (entries.isEmpty) {
       return const ScoreTrend(
@@ -240,6 +283,7 @@ class ScoreTrend {
   }
 
   /// Get trend direction
+  /// 获取趋势方向
   String get trendDirection {
     if (scoreChangeThisWeek > 5) return 'improving';
     if (scoreChangeThisWeek < -5) return 'declining';

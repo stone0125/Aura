@@ -15,6 +15,7 @@ import 'package:flutter/material.dart';
 import 'habit_category.dart';
 
 /// AI-generated habit suggestion for the coach screen
+/// AI 生成的教练界面习惯建议
 class AICoachSuggestion {
   final String id;
   final String title;
@@ -33,6 +34,8 @@ class AICoachSuggestion {
   final int? suggestedReminderHour; // 0-23, null if no recommendation
   final int? suggestedReminderMinute; // 0-59
 
+  /// Creates an AICoachSuggestion with all required and optional fields
+  /// 使用所有必需和可选字段创建 AICoachSuggestion
   const AICoachSuggestion({
     required this.id,
     required this.title,
@@ -52,6 +55,8 @@ class AICoachSuggestion {
     this.suggestedReminderMinute,
   });
 
+  /// Serialize this suggestion to a JSON map
+  /// 将此建议序列化为 JSON 映射
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -74,6 +79,8 @@ class AICoachSuggestion {
     };
   }
 
+  /// Create an AICoachSuggestion from a JSON map with safe parsing
+  /// 从 JSON 映射创建 AICoachSuggestion，带有安全解析
   factory AICoachSuggestion.fromJson(Map<String, dynamic> json) {
     // Restore icon if serialized, otherwise use default
     IconData restoredIcon = Icons.lightbulb_outline;
@@ -119,6 +126,7 @@ class AICoachSuggestion {
   }
 
   /// Get impact color based on level
+  /// 根据影响级别获取颜色
   Color getImpactColor(bool isDark) {
     switch (estimatedImpact.toLowerCase()) {
       case 'high':
@@ -134,23 +142,30 @@ class AICoachSuggestion {
 }
 
 /// A structured next-step from AI weekly insights
+/// AI 每周洞察中的结构化下一步操作
 class AINextStep {
   final String action;
   final String timeframe; // "today", "this week", etc.
   final String priority; // "high", "medium", "low"
 
+  /// Creates an AINextStep with action, timeframe, and priority
+  /// 使用操作、时间范围和优先级创建 AINextStep
   const AINextStep({
     required this.action,
     required this.timeframe,
     required this.priority,
   });
 
+  /// Serialize this next step to a JSON map
+  /// 将此下一步操作序列化为 JSON 映射
   Map<String, dynamic> toJson() => {
     'action': action,
     'timeframe': timeframe,
     'priority': priority,
   };
 
+  /// Create an AINextStep from a JSON map
+  /// 从 JSON 映射创建 AINextStep
   factory AINextStep.fromJson(Map<String, dynamic> json) {
     return AINextStep(
       action: json['action']?.toString() ?? '',
@@ -159,6 +174,8 @@ class AINextStep {
     );
   }
 
+  /// Get color based on priority level
+  /// 根据优先级获取颜色
   Color getPriorityColor(bool isDark) {
     switch (priority.toLowerCase()) {
       case 'high':
@@ -172,6 +189,7 @@ class AINextStep {
 }
 
 /// Weekly AI summary
+/// 每周 AI 总结
 class WeeklyAISummary {
   final String weekRange; // e.g., "Oct 28 - Nov 3"
   final int totalCompletions;
@@ -185,6 +203,8 @@ class WeeklyAISummary {
   final List<String> completionSnapshot; // Sorted habit IDs completed at generation time
   final List<AINextStep> nextSteps; // Structured next-steps from AI
 
+  /// Creates a WeeklyAISummary with performance data and AI commentary
+  /// 使用表现数据和 AI 评语创建 WeeklyAISummary
   const WeeklyAISummary({
     required this.weekRange,
     required this.totalCompletions,
@@ -199,6 +219,8 @@ class WeeklyAISummary {
     this.nextSteps = const [],
   });
 
+  /// Serialize this weekly summary to a JSON map
+  /// 将此每周总结序列化为 JSON 映射
   Map<String, dynamic> toJson() {
     return {
       'weekRange': weekRange,
@@ -215,6 +237,8 @@ class WeeklyAISummary {
     };
   }
 
+  /// Create a WeeklyAISummary from a JSON map
+  /// 从 JSON 映射创建 WeeklyAISummary
   factory WeeklyAISummary.fromJson(Map<String, dynamic> json) {
     return WeeklyAISummary(
       weekRange: json['weekRange']?.toString() ?? '',
@@ -241,6 +265,7 @@ class WeeklyAISummary {
   }
 
   /// Get performance level
+  /// 获取表现等级
   String get performanceLevel {
     if (completionRate >= 0.9) return 'Excellent';
     if (completionRate >= 0.7) return 'Good';
@@ -249,6 +274,7 @@ class WeeklyAISummary {
   }
 
   /// Get performance color
+  /// 获取表现对应的颜色
   Color getPerformanceColor(bool isDark) {
     if (completionRate >= 0.9) {
       return isDark ? const Color(0xFF66BB6A) : const Color(0xFF4CAF50);
@@ -261,6 +287,7 @@ class WeeklyAISummary {
 }
 
 /// Pattern discovered by AI
+/// AI 发现的行为模式
 class AIPattern {
   final String id;
   final String title;
@@ -271,6 +298,8 @@ class AIPattern {
   final double confidence; // 0.0 to 1.0
   final DateTime discoveredAt;
 
+  /// Creates an AIPattern with all required properties
+  /// 使用所有必需属性创建 AIPattern
   const AIPattern({
     required this.id,
     required this.title,
@@ -282,7 +311,8 @@ class AIPattern {
     required this.discoveredAt,
   });
 
-  /// Icon name string → IconData lookup
+  /// Icon name string to IconData lookup
+  /// 图标名称字符串到 IconData 的查找映射
   static const Map<String, IconData> _iconMap = {
     'schedule': Icons.schedule,
     'wb_sunny': Icons.wb_sunny,
@@ -295,7 +325,8 @@ class AIPattern {
     'insights': Icons.insights,
   };
 
-  /// Reverse lookup: IconData → string name
+  /// Reverse lookup: IconData to string name
+  /// 反向查找：IconData 到字符串名称
   static String _iconToString(IconData icon) {
     for (final entry in _iconMap.entries) {
       if (entry.value.codePoint == icon.codePoint) return entry.key;
@@ -303,6 +334,8 @@ class AIPattern {
     return 'insights';
   }
 
+  /// Serialize this pattern to a JSON map
+  /// 将此模式序列化为 JSON 映射
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -316,6 +349,8 @@ class AIPattern {
     };
   }
 
+  /// Create an AIPattern from a JSON map with safe parsing
+  /// 从 JSON 映射创建 AIPattern，带有安全解析
   factory AIPattern.fromJson(Map<String, dynamic> json) {
     // Parse PatternType with fallback
     PatternType type = PatternType.timeOfDay;
@@ -348,6 +383,7 @@ class AIPattern {
   }
 
   /// Get confidence label
+  /// 获取置信度标签
   String get confidenceLabel {
     if (confidence >= 0.8) return 'High confidence';
     if (confidence >= 0.6) return 'Medium confidence';
@@ -355,6 +391,7 @@ class AIPattern {
   }
 
   /// Get pattern color based on type
+  /// 根据模式类型获取颜色
   Color getPatternColor(bool isDark) {
     switch (type) {
       case PatternType.timeOfDay:
@@ -370,6 +407,7 @@ class AIPattern {
 }
 
 /// Type of pattern discovered
+/// 发现的模式类型
 enum PatternType {
   timeOfDay, // e.g., "You complete habits better in the morning"
   dayOfWeek, // e.g., "You're most consistent on weekdays"
@@ -378,6 +416,8 @@ enum PatternType {
 }
 
 extension PatternTypeExtension on PatternType {
+  /// Get display name for the pattern type
+  /// 获取模式类型的显示名称
   String get displayName {
     switch (this) {
       case PatternType.timeOfDay:
@@ -393,6 +433,7 @@ extension PatternTypeExtension on PatternType {
 }
 
 /// AI tip for habit building
+/// 用于建立习惯的 AI 技巧
 class AITip {
   final String id;
   final String title;
@@ -403,6 +444,8 @@ class AITip {
   final IconData icon;
   final bool isBookmarked;
 
+  /// Creates an AITip with all required and optional fields
+  /// 使用所有必需和可选字段创建 AITip
   const AITip({
     required this.id,
     required this.title,
@@ -414,6 +457,8 @@ class AITip {
     this.isBookmarked = false,
   });
 
+  /// Serialize this tip to a JSON map
+  /// 将此技巧序列化为 JSON 映射
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -426,6 +471,8 @@ class AITip {
     };
   }
 
+  /// Create an AITip from a JSON map with safe parsing
+  /// 从 JSON 映射创建 AITip，带有安全解析
   factory AITip.fromJson(Map<String, dynamic> json) {
     // Safe category parsing with type check
     TipCategory category = TipCategory.gettingStarted;
@@ -458,6 +505,8 @@ class AITip {
     );
   }
 
+  /// Create a copy with optionally updated bookmark status
+  /// 创建一个可选更新书签状态的副本
   AITip copyWith({bool? isBookmarked}) {
     return AITip(
       id: id,
@@ -473,6 +522,7 @@ class AITip {
 }
 
 /// Tip category
+/// 技巧类别
 enum TipCategory {
   gettingStarted,
   stayingConsistent,
@@ -482,6 +532,8 @@ enum TipCategory {
 }
 
 extension TipCategoryExtension on TipCategory {
+  /// Get display name for the tip category
+  /// 获取技巧类别的显示名称
   String get displayName {
     switch (this) {
       case TipCategory.gettingStarted:
@@ -497,6 +549,8 @@ extension TipCategoryExtension on TipCategory {
     }
   }
 
+  /// Get icon for the tip category
+  /// 获取技巧类别的图标
   IconData get icon {
     switch (this) {
       case TipCategory.gettingStarted:
@@ -512,6 +566,8 @@ extension TipCategoryExtension on TipCategory {
     }
   }
 
+  /// Get color for the tip category based on theme
+  /// 根据主题获取技巧类别的颜色
   Color getColor(bool isDark) {
     switch (this) {
       case TipCategory.gettingStarted:
@@ -529,9 +585,12 @@ extension TipCategoryExtension on TipCategory {
 }
 
 /// AI Coach tab enum
+/// AI 教练标签页枚举
 enum AICoachTab { suggestions, insights, scores, actions }
 
 extension AICoachTabExtension on AICoachTab {
+  /// Get display name for the AI coach tab
+  /// 获取 AI 教练标签页的显示名称
   String get displayName {
     switch (this) {
       case AICoachTab.suggestions:
@@ -545,6 +604,8 @@ extension AICoachTabExtension on AICoachTab {
     }
   }
 
+  /// Get icon for the AI coach tab
+  /// 获取 AI 教练标签页的图标
   IconData get icon {
     switch (this) {
       case AICoachTab.suggestions:
@@ -560,9 +621,12 @@ extension AICoachTabExtension on AICoachTab {
 }
 
 /// Type of action item
+/// 行动项类型
 enum ActionItemType { daily, weekly, challenge }
 
 extension ActionItemTypeExtension on ActionItemType {
+  /// Get display name for the action item type
+  /// 获取行动项类型的显示名称
   String get displayName {
     switch (this) {
       case ActionItemType.daily:
@@ -576,9 +640,12 @@ extension ActionItemTypeExtension on ActionItemType {
 }
 
 /// Priority level for action items
+/// 行动项的优先级
 enum ActionPriority { high, medium, low }
 
 extension ActionPriorityExtension on ActionPriority {
+  /// Get display name for the priority level
+  /// 获取优先级的显示名称
   String get displayName {
     switch (this) {
       case ActionPriority.high:
@@ -590,6 +657,8 @@ extension ActionPriorityExtension on ActionPriority {
     }
   }
 
+  /// Get color for the priority level based on theme
+  /// 根据主题获取优先级的颜色
   Color getColor(bool isDark) {
     switch (this) {
       case ActionPriority.high:
@@ -603,6 +672,7 @@ extension ActionPriorityExtension on ActionPriority {
 }
 
 /// AI-generated personalized action item
+/// AI 生成的个性化行动项
 class AIActionItem {
   final String id;
   final String title;
@@ -615,6 +685,8 @@ class AIActionItem {
   final bool isCompleted;
   final DateTime createdAt;
 
+  /// Creates an AIActionItem with all required and optional fields
+  /// 使用所有必需和可选字段创建 AIActionItem
   const AIActionItem({
     required this.id,
     required this.title,
@@ -628,6 +700,8 @@ class AIActionItem {
     required this.createdAt,
   });
 
+  /// Serialize this action item to a JSON map
+  /// 将此行动项序列化为 JSON 映射
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -643,6 +717,8 @@ class AIActionItem {
     };
   }
 
+  /// Create an AIActionItem from a JSON map with safe parsing
+  /// 从 JSON 映射创建 AIActionItem，带有安全解析
   factory AIActionItem.fromJson(Map<String, dynamic> json) {
     ActionItemType type = ActionItemType.daily;
     final typeStr = json['type']?.toString();
@@ -679,6 +755,8 @@ class AIActionItem {
     );
   }
 
+  /// Create a copy with optionally updated completion status
+  /// 创建一个可选更新完成状态的副本
   AIActionItem copyWith({bool? isCompleted}) {
     return AIActionItem(
       id: id,

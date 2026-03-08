@@ -26,7 +26,12 @@ import '../models/subscription_models.dart';
 
 class SubscriptionService {
   static final SubscriptionService _instance = SubscriptionService._internal();
+  /// Factory constructor returning the singleton instance
+  /// 工厂构造函数，返回单例实例
   factory SubscriptionService() => _instance;
+
+  /// Private internal constructor for singleton pattern
+  /// 单例模式的私有内部构造函数
   SubscriptionService._internal();
 
   // ============================================================
@@ -55,13 +60,17 @@ class SubscriptionService {
   int _aiReportsUsedThisMonth = 0;
   DateTime? _lastReportDate;
 
-  // Getters
+  /// Get the current subscription tier
+  /// 获取当前订阅层级
   SubscriptionTier get currentTier => _currentTier;
+  /// Check if the user has a paid subscription (Growth or Mastery)
+  /// 检查用户是否有付费订阅（成长或精通）
   bool get isPro =>
       _currentTier == SubscriptionTier.growth ||
       _currentTier == SubscriptionTier.mastery;
 
   /// Get current subscription limits
+  /// 获取当前订阅限制
   SubscriptionLimits getLimits(int currentHabitCount) {
     return SubscriptionLimits(
       tier: _currentTier,
@@ -74,17 +83,20 @@ class SubscriptionService {
   }
 
   /// Check if user can add more habits
+  /// 检查用户是否可以添加更多习惯
   bool canAddHabit(int currentHabitCount) {
     return getLimits(currentHabitCount).canAddHabit;
   }
 
   /// Check if user can use AI suggestions
+  /// 检查用户是否可以使用 AI 建议
   bool canUseAISuggestion() {
     if (kDebugMode) return true;
     return getLimits(0).canUseAISuggestion;
   }
 
   /// Record usage of an AI suggestion
+  /// 记录 AI 建议的使用
   Future<void> recordAISuggestionUsage() async {
     if (kDebugMode) return;
     final now = DateTime.now();
@@ -106,18 +118,21 @@ class SubscriptionService {
   }
 
   /// Get remaining AI suggestions for today
+  /// 获取今天剩余的 AI 建议次数
   int getRemainingAISuggestions() {
     if (kDebugMode) return 999;
     return getLimits(0).remainingAISuggestions;
   }
 
   /// Check if user can use AI reports this month
+  /// 检查用户本月是否可以使用 AI 报告
   bool canUseAIReport() {
     if (kDebugMode) return true;
     return getLimits(0).canUseAIReport;
   }
 
   /// Record usage of an AI report
+  /// 记录 AI 报告的使用
   Future<void> recordAIReportUsage() async {
     if (kDebugMode) return;
     final now = DateTime.now();
@@ -138,11 +153,14 @@ class SubscriptionService {
   }
 
   /// Get remaining AI reports for this month
+  /// 获取本月剩余的 AI 报告次数
   int getRemainingAIReports() {
     if (kDebugMode) return 999;
     return getLimits(0).remainingAIReports;
   }
 
+  /// Initialize the subscription service (load usage, configure RevenueCat)
+  /// 初始化订阅服务（加载使用量、配置 RevenueCat）
   Future<void> initialize() async {
     await _loadUsageFromStorage();
 
@@ -192,6 +210,8 @@ class SubscriptionService {
     }
   }
 
+  /// Check the current subscription status from RevenueCat
+  /// 从 RevenueCat 检查当前订阅状态
   Future<void> _checkSubscriptionStatus() async {
     if (_useMockMode) {
       return;
@@ -207,6 +227,8 @@ class SubscriptionService {
     }
   }
 
+  /// Update the subscription tier based on RevenueCat customer info
+  /// 根据 RevenueCat 客户信息更新订阅层级
   void _updateTierFromCustomerInfo(CustomerInfo customerInfo) {
     final activeEntitlements = customerInfo.entitlements.all.entries
         .where((e) => e.value.isActive)
@@ -227,6 +249,7 @@ class SubscriptionService {
   }
 
   /// Present the RevenueCat Paywall
+  /// 展示 RevenueCat 付费墙
   Future<void> presentPaywall({Offering? offering}) async {
     if (_useMockMode) {
       debugPrint('[RevenueCat] Paywall presentation skipped (mock mode)');
@@ -249,6 +272,7 @@ class SubscriptionService {
   }
 
   /// Present the Customer Center for subscription management
+  /// 展示客户中心用于订阅管理
   Future<void> presentCustomerCenter() async {
     if (_useMockMode) {
       debugPrint('[RevenueCat] Customer center skipped (mock mode)');
@@ -263,6 +287,8 @@ class SubscriptionService {
     }
   }
 
+  /// Fetch available subscription offerings from RevenueCat
+  /// 从 RevenueCat 获取可用的订阅产品
   Future<List<Package>> getOfferings() async {
     if (_useMockMode) {
       return [];
@@ -283,6 +309,8 @@ class SubscriptionService {
     return [];
   }
 
+  /// Purchase a subscription package and update the tier
+  /// 购买订阅套餐并更新层级
   Future<bool> purchasePackage(Package package) async {
     if (_useMockMode) {
       debugPrint('[RevenueCat] Purchase simulated (mock mode)');
@@ -304,6 +332,7 @@ class SubscriptionService {
   }
 
   /// Returns true if an active subscription was found and restored.
+  /// 如果找到并恢复了有效订阅则返回 true。
   Future<bool> restorePurchases() async {
     if (_useMockMode) {
       debugPrint('[RevenueCat] Restore purchases simulated (mock mode)');
@@ -327,6 +356,7 @@ class SubscriptionService {
   // --- Firebase Auth ↔ RevenueCat User Linking ---
 
   /// Link a Firebase Auth user to RevenueCat
+  /// 将 Firebase Auth 用户链接到 RevenueCat
   Future<void> loginUser(String firebaseUserId) async {
     if (_useMockMode) {
       debugPrint('[RevenueCat] loginUser skipped (mock mode)');
@@ -348,6 +378,7 @@ class SubscriptionService {
   }
 
   /// Reset RevenueCat to anonymous user on sign-out
+  /// 登出时将 RevenueCat 重置为匿名用户
   Future<void> logoutUser() async {
     if (_useMockMode) {
       debugPrint('[RevenueCat] logoutUser skipped (mock mode)');
@@ -386,6 +417,8 @@ class SubscriptionService {
 
   // --- Storage helpers for rate limiting ---
 
+  /// Load usage counters from SharedPreferences and reset if new day/month
+  /// 从 SharedPreferences 加载使用量计数器，如果是新的一天/月则重置
   Future<void> _loadUsageFromStorage() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -435,6 +468,8 @@ class SubscriptionService {
     }
   }
 
+  /// Save usage counters to SharedPreferences
+  /// 将使用量计数器保存到 SharedPreferences
   Future<void> _saveUsageToStorage() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -458,6 +493,7 @@ class SubscriptionService {
   }
 
   /// For testing: Set the subscription tier manually
+  /// 测试用：手动设置订阅层级
   void setTierForTesting(SubscriptionTier tier) {
     if (_useMockMode) {
       _currentTier = tier;

@@ -15,6 +15,7 @@ import 'package:flutter/material.dart';
 import 'habit_category.dart';
 
 /// Form data for creating a new habit
+/// 创建新习惯的表单数据
 class HabitFormData {
   String name;
   String description;
@@ -33,6 +34,8 @@ class HabitFormData {
   NotificationStyle notificationStyle;
   bool isAISuggested;
 
+  /// Creates a HabitFormData with default values for all fields
+  /// 使用所有字段的默认值创建 HabitFormData
   HabitFormData({
     this.name = '',
     this.description = '',
@@ -53,6 +56,7 @@ class HabitFormData {
   }) : weeklyDays = weeklyDays ?? [];
 
   /// Check if form is valid
+  /// 检查表单是否有效
   bool get isValid {
     if (name.isEmpty || name.length > 50) return false;
     if (category == null) return false;
@@ -75,19 +79,24 @@ class HabitFormData {
   }
 
   /// Check if icon is selected (has a valid icon)
+  /// 检查是否已选择图标（是否有有效图标）
   bool get hasValidIcon => selectedIcon != null;
 
   /// Get character count for name
+  /// 获取名称的字符数
   int get nameCharCount => name.length;
 
   /// Check if name is approaching limit
+  /// 检查名称是否接近字数上限
   bool get nameNearLimit => nameCharCount >= 40;
 
   /// Check if name exceeds limit
+  /// 检查名称是否超过字数上限
   bool get nameExceedsLimit => nameCharCount > 50;
 }
 
 /// Frequency type enumeration
+/// 频率类型枚举
 enum FrequencyType {
   daily,
   weekly,
@@ -95,6 +104,7 @@ enum FrequencyType {
 }
 
 /// Custom frequency unit
+/// 自定义频率单位
 enum CustomFrequencyUnit {
   days,
   weeks,
@@ -102,6 +112,7 @@ enum CustomFrequencyUnit {
 }
 
 /// Goal type enumeration
+/// 目标类型枚举
 enum GoalType {
   none,
   time,
@@ -109,6 +120,7 @@ enum GoalType {
 }
 
 /// Notification style enumeration
+/// 通知样式枚举
 enum NotificationStyle {
   standard,
   motivational,
@@ -116,7 +128,10 @@ enum NotificationStyle {
 }
 
 /// Extension for frequency type display
+/// 频率类型显示扩展
 extension FrequencyTypeExtension on FrequencyType {
+  /// Get display name for the frequency type
+  /// 获取频率类型的显示名称
   String get displayName {
     switch (this) {
       case FrequencyType.daily:
@@ -130,7 +145,10 @@ extension FrequencyTypeExtension on FrequencyType {
 }
 
 /// Extension for custom frequency unit display
+/// 自定义频率单位显示扩展
 extension CustomFrequencyUnitExtension on CustomFrequencyUnit {
+  /// Get display name for the frequency unit
+  /// 获取频率单位的显示名称
   String get displayName {
     switch (this) {
       case CustomFrequencyUnit.days:
@@ -144,7 +162,10 @@ extension CustomFrequencyUnitExtension on CustomFrequencyUnit {
 }
 
 /// Extension for goal type display
+/// 目标类型显示扩展
 extension GoalTypeExtension on GoalType {
+  /// Get display name for the goal type
+  /// 获取目标类型的显示名称
   String get displayName {
     switch (this) {
       case GoalType.none:
@@ -158,7 +179,10 @@ extension GoalTypeExtension on GoalType {
 }
 
 /// Extension for notification style display
+/// 通知样式显示扩展
 extension NotificationStyleExtension on NotificationStyle {
+  /// Get display name for the notification style
+  /// 获取通知样式的显示名称
   String get displayName {
     switch (this) {
       case NotificationStyle.standard:

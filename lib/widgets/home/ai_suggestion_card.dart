@@ -10,17 +10,26 @@ import '../../screens/habit_creation_screen.dart';
 import '../../screens/home_screen.dart';
 
 /// AI Suggestion Card widget (Live Version)
+/// AI 建议卡片组件（实时版本）
 class AISuggestionCard extends StatefulWidget {
+  /// Creates an AI suggestion card widget
+  /// 创建 AI 建议卡片组件
   const AISuggestionCard({super.key});
 
+  /// Creates the mutable state for this widget
+  /// 创建此组件的可变状态
   @override
   State<AISuggestionCard> createState() => _AISuggestionCardState();
 }
 
+/// State for the AI suggestion card, manages loading and refresh logic
+/// AI 建议卡片的状态，管理加载和刷新逻辑
 class _AISuggestionCardState extends State<AISuggestionCard> {
   final GlobalKey _refreshButtonKey = GlobalKey();
   OverlayEntry? _cooldownTooltip;
 
+  /// Initializes state and defers suggestion loading to the next frame
+  /// 初始化状态并将建议加载延迟到下一帧
   @override
   void initState() {
     super.initState();
@@ -30,6 +39,8 @@ class _AISuggestionCardState extends State<AISuggestionCard> {
     });
   }
 
+  /// Loads AI suggestions if none are loaded yet
+  /// 如果尚未加载 AI 建议则加载
   void _loadSuggestionsIfNeeded() {
     if (!mounted) return;
 
@@ -58,6 +69,8 @@ class _AISuggestionCardState extends State<AISuggestionCard> {
     }
   }
 
+  /// Shows a tooltip indicating the cooldown time before next refresh
+  /// 显示冷却时间提示，告知下次可刷新的时间
   void _showCooldownTooltip() {
     // Prevent duplicates
     _cooldownTooltip?.remove();
@@ -111,6 +124,8 @@ class _AISuggestionCardState extends State<AISuggestionCard> {
     });
   }
 
+  /// Disposes the cooldown tooltip overlay entry
+  /// 销毁冷却提示的浮层入口
   @override
   void dispose() {
     _cooldownTooltip?.remove();
@@ -118,6 +133,8 @@ class _AISuggestionCardState extends State<AISuggestionCard> {
     super.dispose();
   }
 
+  /// Forces a refresh of AI suggestions from the provider
+  /// 强制从提供者刷新 AI 建议
   void _refreshSuggestions() {
     final aiCoachProvider = Provider.of<AICoachProvider>(
       context,
@@ -137,6 +154,8 @@ class _AISuggestionCardState extends State<AISuggestionCard> {
     );
   }
 
+  /// Builds the AI suggestion card UI with header, subtitle, and suggestion list
+  /// 构建 AI 建议卡片界面，包含头部、副标题和建议列表
   @override
   Widget build(BuildContext context) {
     // Use Selector to only rebuild when specific fields change
@@ -340,6 +359,8 @@ class _AISuggestionCardState extends State<AISuggestionCard> {
     );
   }
 
+  /// Builds a shimmer-like loading placeholder while suggestions are being fetched
+  /// 在获取建议时构建类似闪烁效果的加载占位符
   Widget _buildLoadingState(bool isDark) {
     final coral = isDark ? AppColors.darkCoral : AppColors.lightCoral;
     return Column(
@@ -422,6 +443,8 @@ class _AISuggestionCardState extends State<AISuggestionCard> {
     );
   }
 
+  /// Builds the empty state shown when no suggestions are available
+  /// 构建无建议可用时显示的空状态
   Widget _buildEmptyState(bool isDark) {
     return Center(
       child: Padding(
@@ -453,6 +476,8 @@ class _AISuggestionCardState extends State<AISuggestionCard> {
     );
   }
 
+  /// Builds the horizontal scrollable list of AI suggestion cards
+  /// 构建 AI 建议卡片的水平滚动列表
   Widget _buildSuggestionsList(
     List<AICoachSuggestion> suggestions,
     bool isDark,

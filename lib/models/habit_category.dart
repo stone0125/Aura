@@ -14,6 +14,7 @@ import 'package:flutter/material.dart';
 import '../config/theme/app_colors.dart';
 
 /// Habit category enumeration
+/// 习惯类别枚举
 enum HabitCategory {
   health,
   learning,
@@ -23,8 +24,10 @@ enum HabitCategory {
 }
 
 /// Extension to provide category-specific properties
+/// 提供类别特定属性的扩展
 extension HabitCategoryExtension on HabitCategory {
   /// Get category display name
+  /// 获取类别显示名称
   String get displayName {
     switch (this) {
       case HabitCategory.health:
@@ -41,6 +44,7 @@ extension HabitCategoryExtension on HabitCategory {
   }
 
   /// Get category icon
+  /// 获取类别图标
   IconData get icon {
     switch (this) {
       case HabitCategory.health:
@@ -57,6 +61,7 @@ extension HabitCategoryExtension on HabitCategory {
   }
 
   /// Get light mode gradient colors
+  /// 获取浅色模式渐变颜色
   List<Color> getLightGradient() {
     switch (this) {
       case HabitCategory.health:
@@ -73,6 +78,7 @@ extension HabitCategoryExtension on HabitCategory {
   }
 
   /// Get dark mode gradient colors
+  /// 获取深色模式渐变颜色
   List<Color> getDarkGradient() {
     switch (this) {
       case HabitCategory.health:
@@ -89,6 +95,7 @@ extension HabitCategoryExtension on HabitCategory {
   }
 
   /// Get gradient colors based on theme brightness
+  /// 根据主题亮度获取渐变颜色
   List<Color> getGradient(Brightness brightness) {
     return brightness == Brightness.light ? getLightGradient() : getDarkGradient();
   }

@@ -14,6 +14,7 @@
 // =============================================================================
 
 /// Subscription tier enumeration
+/// 订阅层级枚举
 enum SubscriptionTier {
   starter,
   growth,
@@ -21,8 +22,10 @@ enum SubscriptionTier {
 }
 
 /// Extension methods for SubscriptionTier
+/// SubscriptionTier 的扩展方法
 extension SubscriptionTierExtension on SubscriptionTier {
   /// Display name for the tier
+  /// 层级的显示名称
   String get displayName {
     switch (this) {
       case SubscriptionTier.starter:
@@ -35,6 +38,7 @@ extension SubscriptionTierExtension on SubscriptionTier {
   }
 
   /// Maximum number of habits allowed
+  /// 允许的最大习惯数量
   int get maxHabits {
     switch (this) {
       case SubscriptionTier.starter:
@@ -47,6 +51,7 @@ extension SubscriptionTierExtension on SubscriptionTier {
   }
 
   /// Maximum AI suggestions per day
+  /// 每日最大 AI 建议数量
   int get maxAISuggestionsPerDay {
     switch (this) {
       case SubscriptionTier.starter:
@@ -59,6 +64,7 @@ extension SubscriptionTierExtension on SubscriptionTier {
   }
 
   /// Whether trend charts are available
+  /// 趋势图表是否可用
   bool get hasTrendCharts {
     switch (this) {
       case SubscriptionTier.starter:
@@ -70,16 +76,19 @@ extension SubscriptionTierExtension on SubscriptionTier {
   }
 
   /// Whether full analytics are available
+  /// 完整分析功能是否可用
   bool get hasFullAnalytics {
     return this == SubscriptionTier.mastery;
   }
 
   /// Whether achievements are available
+  /// 成就功能是否可用
   bool get hasAchievements {
     return this == SubscriptionTier.mastery;
   }
 
   /// Maximum AI reports per month (insights, scores, reviews, etc.)
+  /// 每月最大 AI 报告数量（洞察、评分、回顾等）
   int get maxAIReportsPerMonth {
     switch (this) {
       case SubscriptionTier.starter:
@@ -92,6 +101,7 @@ extension SubscriptionTierExtension on SubscriptionTier {
   }
 
   /// Description of what's included
+  /// 包含内容的描述
   String get description {
     switch (this) {
       case SubscriptionTier.starter:
@@ -105,6 +115,7 @@ extension SubscriptionTierExtension on SubscriptionTier {
 }
 
 /// Subscription limits and current usage tracking
+/// 订阅限制与当前使用量追踪
 class SubscriptionLimits {
   final SubscriptionTier tier;
   final int currentHabitCount;
@@ -113,6 +124,8 @@ class SubscriptionLimits {
   final int aiReportsUsedThisMonth;
   final DateTime? lastReportDate;
 
+  /// Creates SubscriptionLimits with default Starter tier values
+  /// 使用默认 Starter 层级值创建 SubscriptionLimits
   const SubscriptionLimits({
     this.tier = SubscriptionTier.starter,
     this.currentHabitCount = 0,
@@ -123,6 +136,7 @@ class SubscriptionLimits {
   });
 
   /// Check if user can add more habits
+  /// 检查用户是否可以添加更多习惯
   bool get canAddHabit {
     final max = tier.maxHabits;
     if (max == -1) return true; // Unlimited
@@ -130,6 +144,7 @@ class SubscriptionLimits {
   }
 
   /// Get remaining habits that can be added
+  /// 获取可添加的剩余习惯数量
   int get remainingHabits {
     final max = tier.maxHabits;
     if (max == -1) return 999; // Effectively unlimited
@@ -137,6 +152,7 @@ class SubscriptionLimits {
   }
 
   /// Check if user can use AI suggestions today
+  /// 检查用户今天是否可以使用 AI 建议
   bool get canUseAISuggestion {
     final max = tier.maxAISuggestionsPerDay;
     if (max == -1) return true; // Unlimited
@@ -155,6 +171,7 @@ class SubscriptionLimits {
   }
 
   /// Get remaining AI suggestions for today
+  /// 获取今天剩余的 AI 建议次数
   int get remainingAISuggestions {
     final max = tier.maxAISuggestionsPerDay;
     if (max == -1) return 999; // Effectively unlimited
@@ -175,6 +192,7 @@ class SubscriptionLimits {
   }
 
   /// Check if user can use AI reports this month
+  /// 检查用户本月是否可以使用 AI 报告
   bool get canUseAIReport {
     final max = tier.maxAIReportsPerMonth;
     if (max == -1) return true; // Unlimited
@@ -192,6 +210,7 @@ class SubscriptionLimits {
   }
 
   /// Get remaining AI reports for this month
+  /// 获取本月剩余的 AI 报告次数
   int get remainingAIReports {
     final max = tier.maxAIReportsPerMonth;
     if (max == -1) return 999; // Effectively unlimited
@@ -211,6 +230,7 @@ class SubscriptionLimits {
   }
 
   /// Create a copy with updated values
+  /// 创建一个更新了指定值的副本
   SubscriptionLimits copyWith({
     SubscriptionTier? tier,
     int? currentHabitCount,

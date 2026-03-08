@@ -17,6 +17,7 @@ import '../models/habit_category.dart';
 import '../services/firestore_service.dart';
 
 /// Provider for managing progress and analytics data
+/// 管理进度和分析数据的 Provider
 class ProgressProvider with ChangeNotifier {
   DateRange _selectedRange = DateRange.thisWeek;
   ProgressStats? _stats;
@@ -36,47 +37,83 @@ class ProgressProvider with ChangeNotifier {
   List<Achievement>? _cachedUnlockedAchievements;
   List<Achievement>? _cachedLockedAchievements;
 
-  // Getters
+  /// Get the currently selected date range
+  /// 获取当前选中的日期范围
   DateRange get selectedRange => _selectedRange;
+
+  /// Get the progress statistics
+  /// 获取进度统计数据
   ProgressStats? get stats => _stats;
+
+  /// Get the category breakdown list
+  /// 获取类别细分列表
   List<CategoryBreakdown> get categoryBreakdown => _categoryBreakdown;
+
+  /// Get the weekly heatmap data
+  /// 获取每周热力图数据
   List<DayHeatmapData> get weeklyHeatmap => _weeklyHeatmap;
+
+  /// Get the trend data points
+  /// 获取趋势数据点
   List<TrendDataPoint> get trendData => _trendData;
+
+  /// Get the top performing habits
+  /// 获取表现最佳的习惯
   List<HabitPerformance> get topPerformers => _topPerformers;
+
+  /// Get the bottom performing habits
+  /// 获取表现最差的习惯
   List<HabitPerformance> get bottomPerformers => _bottomPerformers;
+
+  /// Get the achievements list
+  /// 获取成就列表
   List<Achievement> get achievements => _achievements;
+
+  /// Get the weekly summary
+  /// 获取每周总结
   WeeklySummary? get weeklySummary => _weeklySummary;
+
+  /// Whether data is currently loading
+  /// 数据是否正在加载中
   bool get isLoading => _isLoading;
 
-  // Cached achievement getters - computed once per data change
+  /// Get unlocked achievements (cached, computed once per data change)
+  /// 获取已解锁的成就（已缓存，每次数据变化时计算一次）
   List<Achievement> get unlockedAchievements {
     _cachedUnlockedAchievements ??= _achievements.where((a) => a.isUnlocked).toList();
     return _cachedUnlockedAchievements!;
   }
 
+  /// Get locked achievements (cached, computed once per data change)
+  /// 获取未解锁的成就（已缓存，每次数据变化时计算一次）
   List<Achievement> get lockedAchievements {
     _cachedLockedAchievements ??= _achievements.where((a) => !a.isUnlocked).toList();
     return _cachedLockedAchievements!;
   }
 
   /// Invalidate cached achievement lists when achievements change
+  /// 当成就数据变化时使缓存的成就列表失效
   void _invalidateAchievementCache() {
     _cachedUnlockedAchievements = null;
     _cachedLockedAchievements = null;
   }
 
   /// Called by ProxyProvider when habits change
+  /// 当习惯数据变化时由 ProxyProvider 调用
   void updateHabits(List<Habit> habits) {
     _habits = habits;
     _calculateAllStats();
   }
 
   /// Change selected date range
+  /// 更改选中的日期范围
   void setDateRange(DateRange range) {
     _selectedRange = range;
     _calculateAllStats(); // already calls notifyListeners()
   }
 
+  /// Calculate all statistics from current habit data
+  /// 从当前习惯数据计算所有统计信息
   void _calculateAllStats() {
     if (_habits.isEmpty) {
       _stats = const ProgressStats(
@@ -107,6 +144,8 @@ class ProgressProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  /// Calculate core progress statistics (completion rate, streaks, days tracked)
+  /// 计算核心进度统计数据（完成率、连续记录、追踪天数）
   void _calculateStats() {
     final totalHabits = _habits.length;
     final completedToday = _habits.where((h) => h.isCompleted).length;
@@ -174,6 +213,8 @@ class ProgressProvider with ChangeNotifier {
     );
   }
 
+  /// Calculate category breakdown percentages
+  /// 计算各类别的占比细分
   void _calculateCategoryBreakdown() {
     Map<HabitCategory, int> counts = {};
     for (var h in _habits) {
@@ -197,6 +238,7 @@ class ProgressProvider with ChangeNotifier {
   Map<String, Set<String>> _normalizedHistories = {};
 
   /// Build normalized date cache from habit histories for O(1) date lookups
+  /// 从习惯历史构建规范化日期缓存，以实现 O(1) 的日期查找
   void _buildNormalizedHistories() {
     _normalizedHistories = _habitHistories.map((id, dates) => MapEntry(
       id,
@@ -205,11 +247,13 @@ class ProgressProvider with ChangeNotifier {
   }
 
   /// Convert DateTime to normalized string key
+  /// 将 DateTime 转换为规范化的字符串键
   String _dateToKey(DateTime date) {
     return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }
 
-  /// Find the earliest date across all histories and habit createdAt dates.
+  /// Find the earliest date across all histories and habit createdAt dates
+  /// 查找所有历史记录和习惯创建日期中最早的日期
   DateTime _getEarliestDate() {
     DateTime? earliest;
     for (var history in _habitHistories.values) {
@@ -228,13 +272,16 @@ class ProgressProvider with ChangeNotifier {
     return earliest ?? DateTime.now().subtract(const Duration(days: 6));
   }
 
-  /// Get the start date for the currently selected range.
-  /// For week/month returns the calendar boundary; for allTime uses earliest date.
+  /// Get the start date for the currently selected range
+  /// For week/month returns the calendar boundary; for allTime uses earliest date
+  /// 获取当前选中范围的开始日期
+  /// 周/月返回日历边界；全部时间使用最早日期
   DateTime _getRangeStartDate() {
     return _selectedRange.startDate ?? _getEarliestDate();
   }
 
-  /// Check if a habit existed on a given date (createdAt is null or <= date).
+  /// Check if a habit existed on a given date (createdAt is null or <= date)
+  /// 检查习惯在给定日期是否已存在（createdAt 为 null 或 <= 该日期）
   bool _habitExistedOnDate(Habit habit, DateTime date) {
     if (habit.createdAt == null) return true; // legacy habit, assume always existed
     final createdDay = DateTime(habit.createdAt!.year, habit.createdAt!.month, habit.createdAt!.day);
@@ -242,6 +289,7 @@ class ProgressProvider with ChangeNotifier {
   }
 
   /// Check if a specific habit was completed on a specific date - O(1) lookup
+  /// 检查某个习惯在特定日期是否已完成——O(1) 查找
   bool wasHabitCompletedOnDate(String habitId, DateTime date) {
     final normalizedDates = _normalizedHistories[habitId];
     if (normalizedDates == null) return false;
@@ -249,6 +297,7 @@ class ProgressProvider with ChangeNotifier {
   }
 
   /// Initialize progress data
+  /// 初始化进度数据
   Future<void> initialize() async {
     _isLoading = true;
     // notifyListeners(); // Delay notification or rely on initial state if desirable, but typically yes.
@@ -261,6 +310,7 @@ class ProgressProvider with ChangeNotifier {
   }
 
   /// Refresh all data
+  /// 刷新所有数据
   Future<void> refresh() async {
     _isLoading = true;
     notifyListeners();
@@ -270,6 +320,8 @@ class ProgressProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  /// Fetch completion history for all habits from Firestore
+  /// 从 Firestore 获取所有习惯的完成历史
   Future<void> _fetchAllHistory() async {
     if (_habits.isEmpty) return;
     try {
@@ -300,18 +352,23 @@ class ProgressProvider with ChangeNotifier {
 
   /// Remove history entries for habits that no longer exist
   /// This prevents unbounded memory growth
+  /// 删除不再存在的习惯的历史记录
+  /// 防止内存无限增长
   void _pruneOldHistories() {
     final currentHabitIds = _habits.map((h) => h.id).toSet();
     _habitHistories.removeWhere((id, _) => !currentHabitIds.contains(id));
     _normalizedHistories.removeWhere((id, _) => !currentHabitIds.contains(id));
   }
 
+  /// Recalculate all statistics after data refresh
+  /// 数据刷新后重新计算所有统计信息
   void _recalculateAll() {
     _calculateAllStats();
     // notifyListeners() already called in _calculateAllStats
   }
 
-  // Updated Heatmap Calculation using Real History - O(1) lookups
+  /// Calculate weekly heatmap using real history with O(1) lookups
+  /// 使用真实历史数据和 O(1) 查找计算每周热力图
   void _calculateWeeklyHeatmap() {
     final now = DateTime.now();
     final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
@@ -343,7 +400,8 @@ class ProgressProvider with ChangeNotifier {
     });
   }
 
-  // Updated Trend Data using Real History - O(1) lookups
+  /// Calculate trend data using real history with O(1) lookups
+  /// 使用真实历史数据和 O(1) 查找计算趋势数据
   void _calculateTrendData() {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -374,6 +432,8 @@ class ProgressProvider with ChangeNotifier {
     }
   }
 
+  /// Calculate top and bottom performing habits
+  /// 计算表现最佳和最差的习惯
   void _calculatePerformers() {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -458,6 +518,8 @@ class ProgressProvider with ChangeNotifier {
         .toList();
   }
 
+  /// Calculate achievements based on current habit data and stats
+  /// 根据当前习惯数据和统计信息计算成就
   void _calculateAchievements() {
     // Invalidate cached lists since achievements are being recalculated
     _invalidateAchievementCache();
@@ -652,6 +714,7 @@ class ProgressProvider with ChangeNotifier {
   }
 
   /// Clear all user-specific data on logout
+  /// 登出时清除所有用户数据
   void clearUserData() {
     _habits = [];
     _habitHistories.clear();
@@ -671,6 +734,7 @@ class ProgressProvider with ChangeNotifier {
   }
 
   /// Calculate trend percentage change
+  /// 计算趋势变化百分比
   double getTrendChange() {
     if (_trendData.length < 2) return 0.0;
 
@@ -696,12 +760,15 @@ class ProgressProvider with ChangeNotifier {
 }
 
 /// Helper class for calculating habit performance
+/// 用于计算习惯表现的辅助类
 class _HabitPerfData {
   final Habit habit;
   final int completions;
   final int totalDays;
   final double successRate;
 
+  /// Create a habit performance data object
+  /// 创建习惯表现数据对象
   _HabitPerfData({
     required this.habit,
     required this.completions,

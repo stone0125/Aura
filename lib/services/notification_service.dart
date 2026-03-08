@@ -29,6 +29,8 @@ import 'firestore_service.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import '../models/habit.dart';
 
+/// Handle Firebase messages received while the app is in the background
+/// 处理应用在后台时收到的 Firebase 消息
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   debugPrint('Handling a background message: ${message.messageId}');
@@ -36,7 +38,12 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
+  /// Factory constructor returning the singleton instance
+  /// 工厂构造函数，返回单例实例
   factory NotificationService() => _instance;
+
+  /// Private internal constructor for singleton pattern
+  /// 单例模式的私有内部构造函数
   NotificationService._internal();
 
   final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
@@ -55,7 +62,9 @@ class NotificationService {
   int _notificationCounter = 0;
 
   /// Generates a unique notification ID for immediate (non-scheduled) notifications.
+  /// 为即时（非定时）通知生成唯一的通知 ID。
   /// Uses timestamp combined with a counter to avoid collisions.
+  /// 使用时间戳结合计数器以避免冲突。
   int _generateUniqueNotificationId() {
     _notificationCounter = (_notificationCounter + 1) % 10000;
     // Use milliseconds mod a large prime, offset by counter
@@ -65,7 +74,9 @@ class NotificationService {
   }
 
   /// Generates a deterministic notification ID from a habit ID.
+  /// 根据习惯 ID 生成确定性的通知 ID。
   /// Uses a better distribution than simple hashCode % small number.
+  /// 使用比简单 hashCode % 小数更好的分布方式。
   int _habitIdToNotificationId(String habitId) {
     // Use hashCode but spread across full 32-bit positive range
     // This gives ~2 billion possible IDs instead of just 100,000
@@ -73,6 +84,7 @@ class NotificationService {
   }
 
   /// Validates that a payload is a legitimate habit ID (alphanumeric/UUID format)
+  /// 验证 payload 是否为合法的习惯 ID（字母数字/UUID 格式）
   bool _isValidHabitId(String payload) {
     // Habit IDs are typically UUIDs or alphanumeric strings
     // Reject anything that looks like a path or URL
@@ -87,6 +99,8 @@ class NotificationService {
     return RegExp(r'^[a-zA-Z0-9_-]+$').hasMatch(payload);
   }
 
+  /// Initialize the notification service (timezone, permissions, FCM, local notifications)
+  /// 初始化通知服务（时区、权限、FCM、本地通知）
   Future<void> initialize() async {
     // Prevent double initialization
     if (_isInitialized) {
@@ -199,7 +213,9 @@ class NotificationService {
   }
 
   /// Dispose of stream subscriptions to prevent memory leaks
+  /// 释放流订阅以防止内存泄漏
   /// Call this when the app is being destroyed or the service is no longer needed
+  /// 在应用销毁或不再需要服务时调用
   Future<void> dispose() async {
     await _onMessageSubscription?.cancel();
     _onMessageSubscription = null;
@@ -209,6 +225,8 @@ class NotificationService {
     debugPrint('NotificationService disposed');
   }
 
+  /// Request notification permissions for FCM and local notifications
+  /// 请求 FCM 和本地通知的通知权限
   Future<void> _requestPermission() async {
     try {
       // 1. Request FCM Permission (iOS prompts here)
@@ -239,7 +257,9 @@ class NotificationService {
   }
 
   /// Set app badge count (iOS only)
+  /// 设置应用角标数量（仅限 iOS）
   /// Uses a silent notification to update the badge number
+  /// 使用静默通知更新角标数字
   Future<void> setBadgeCount(int count) async {
     _currentBadgeCount = count;
 
@@ -280,6 +300,7 @@ class NotificationService {
   }
 
   /// Clear app badge (iOS)
+  /// 清除应用角标（iOS）
   Future<void> clearBadge() async {
     _currentBadgeCount = 0;
 
@@ -297,8 +318,11 @@ class NotificationService {
   }
 
   /// Get current badge count
+  /// 获取当前角标数量
   int get currentBadgeCount => _currentBadgeCount;
 
+  /// Show a local notification from a Firebase remote message
+  /// 根据 Firebase 远程消息显示本地通知
   Future<void> _showLocalNotification(RemoteMessage message) async {
     final notification = message.notification;
 
@@ -325,6 +349,7 @@ class NotificationService {
   }
 
   /// Show a habit reminder notification
+  /// 显示习惯提醒通知
   Future<void> showHabitReminder({
     required String title,
     required String body,
@@ -355,8 +380,9 @@ class NotificationService {
   }
 
   /// Schedule a daily habit reminder
+  /// 安排每日习惯提醒
   /// [habitId] is used as the notification ID for cancellation
-  /// [time] is the time of day to send the reminder
+  /// [habitId] 用作取消通知的通知 ID
   Future<void> scheduleHabitReminder({
     required String habitId,
     required String habitName,
@@ -421,6 +447,7 @@ class NotificationService {
   }
 
   /// Show a generic notification immediately
+  /// 立即显示一条通用通知
   Future<void> show({
     required String title,
     required String body,
@@ -456,6 +483,7 @@ class NotificationService {
   }
 
   /// Show a test notification immediately (for debugging)
+  /// 立即显示测试通知（用于调试）
   Future<void> showTestNotification() async {
     try {
       await _localNotifications.show(
@@ -485,6 +513,7 @@ class NotificationService {
   }
 
   /// Show test daily summary notification immediately (for debugging)
+  /// 立即显示测试每日摘要通知（用于调试）
   Future<void> showTestDailySummary(int habitCount) async {
     try {
       final hour = DateTime.now().hour;
@@ -535,6 +564,7 @@ class NotificationService {
   }
 
   /// Cancel a scheduled habit reminder
+  /// 取消已安排的习惯提醒
   Future<void> cancelHabitReminder(String habitId) async {
     final notificationId = _habitIdToNotificationId(habitId);
     await _localNotifications.cancel(notificationId);
@@ -544,17 +574,20 @@ class NotificationService {
   }
 
   /// Reset state on logout to prevent cross-user data leaks
+  /// 登出时重置状态以防止跨用户数据泄漏
   void resetOnLogout() {
     _currentBadgeCount = 0;
   }
 
   /// Cancel all scheduled reminders
+  /// 取消所有已安排的提醒
   Future<void> cancelAllReminders() async {
     await _localNotifications.cancelAll();
     debugPrint('Cancelled all reminders');
   }
 
   /// Schedule reminders for multiple habits (parallel execution)
+  /// 为多个习惯安排提醒（并行执行）
   Future<void> scheduleAllHabitReminders(List<Habit> habits) async {
     // Filter habits with reminders enabled and schedule in parallel
     final reminderFutures = habits
@@ -575,7 +608,9 @@ class NotificationService {
   static const int _dailySummaryNotificationId = 1000;
 
   /// Schedule a daily summary notification
+  /// 安排每日摘要通知
   /// Shows a motivational message at the set time
+  /// 在设定时间显示激励消息
   Future<void> scheduleDailySummary({
     required int hour,
     required int minute,
@@ -649,6 +684,7 @@ class NotificationService {
   }
 
   /// Cancel the daily summary notification
+  /// 取消每日摘要通知
   Future<void> cancelDailySummary() async {
     await _localNotifications.cancel(_dailySummaryNotificationId);
     debugPrint('Cancelled daily summary notification');

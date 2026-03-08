@@ -6,9 +6,14 @@ import '../../config/theme/ui_constants.dart';
 import 'dart:math' as math;
 
 /// Summary Stats Card with circular progress
+/// 带环形进度条的统计摘要卡片
 class SummaryStatsCard extends StatelessWidget {
+  /// Creates a summary stats card widget
+  /// 创建统计摘要卡片组件
   const SummaryStatsCard({super.key});
 
+  /// Builds the stats card with circular progress and stat items
+  /// 构建统计卡片，包含环形进度条和统计项
   @override
   Widget build(BuildContext context) {
     // Use Selector to only rebuild when specific stats change
@@ -124,6 +129,8 @@ class SummaryStatsCard extends StatelessWidget {
     );
   }
 
+  /// Builds a single stat item with icon, number, and label
+  /// 构建单个统计项，包含图标、数值和标签
   Widget _buildStatItem({
     required IconData icon,
     required String number,
@@ -175,15 +182,20 @@ class SummaryStatsCard extends StatelessWidget {
 }
 
 /// Custom painter for circular progress indicator
+/// 环形进度指示器的自定义画笔
 class CircularProgressPainter extends CustomPainter {
   final double progress;
   final bool isDark;
 
+  /// Creates a circular progress painter with the given progress value and theme
+  /// 使用给定的进度值和主题创建环形进度画笔
   CircularProgressPainter({
     required this.progress,
     required this.isDark,
   });
 
+  /// Paints the background ring and progress arc on the canvas
+  /// 在画布上绘制背景环和进度弧
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
@@ -225,6 +237,8 @@ class CircularProgressPainter extends CustomPainter {
     }
   }
 
+  /// Returns true if progress or theme changed, triggering a repaint
+  /// 当进度或主题变化时返回 true，触发重绘
   @override
   bool shouldRepaint(covariant CircularProgressPainter oldDelegate) {
     return oldDelegate.progress != progress || oldDelegate.isDark != isDark;

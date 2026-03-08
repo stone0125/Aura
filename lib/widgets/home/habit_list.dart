@@ -11,9 +11,14 @@ import '../../screens/habit_creation_screen.dart';
 import '../../screens/habit_detail_screen.dart';
 
 /// Habit List widget with completion toggles
+/// 带完成切换功能的习惯列表组件
 class HabitList extends StatelessWidget {
+  /// Creates a habit list widget
+  /// 创建习惯列表组件
   const HabitList({super.key});
 
+  /// Builds the habit list with today's habits and an empty state fallback
+  /// 构建今日习惯列表，无习惯时显示空状态
   @override
   Widget build(BuildContext context) {
     // Use Selector to only rebuild when todaysHabits changes, not on every provider update
@@ -95,6 +100,8 @@ class HabitList extends StatelessWidget {
     );
   }
 
+  /// Builds the empty state UI prompting the user to create their first habit
+  /// 构建空状态界面，提示用户创建第一个习惯
   Widget _buildEmptyState(bool isDark) {
     return Builder(
       builder: (context) => Center(
@@ -188,11 +195,14 @@ class HabitList extends StatelessWidget {
 }
 
 /// Individual Habit Card widget
+/// 单个习惯卡片组件
 class HabitCard extends StatelessWidget {
   final Habit habit;
   final VoidCallback onToggle;
   final VoidCallback onDelete;
 
+  /// Creates a habit card with the given habit data and callbacks
+  /// 使用给定的习惯数据和回调创建习惯卡片
   const HabitCard({
     super.key,
     required this.habit,
@@ -200,6 +210,8 @@ class HabitCard extends StatelessWidget {
     required this.onDelete,
   });
 
+  /// Formats a TimeOfDay into a human-readable string (e.g., "8:30 AM")
+  /// 将 TimeOfDay 格式化为可读字符串（例如 "8:30 AM"）
   String _formatTimeOfDay(TimeOfDay time) {
     final hour = time.hourOfPeriod == 0 ? 12 : time.hourOfPeriod;
     final minute = time.minute.toString().padLeft(2, '0');
@@ -207,6 +219,8 @@ class HabitCard extends StatelessWidget {
     return '$hour:$minute $period';
   }
 
+  /// Builds the habit card with dismissible delete, completion toggle, and navigation
+  /// 构建习惯卡片，包含滑动删除、完成切换和导航功能
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;

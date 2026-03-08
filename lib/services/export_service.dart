@@ -28,12 +28,18 @@ import 'notification_service.dart';
 /// Service for exporting habit data to various formats
 class ExportService {
   static final ExportService _instance = ExportService._internal();
+  /// Factory constructor returning the singleton instance
+  /// 工厂构造函数，返回单例实例
   factory ExportService() => _instance;
+
+  /// Private internal constructor for singleton pattern
+  /// 单例模式的私有内部构造函数
   ExportService._internal();
 
   final FirestoreService _firestoreService = FirestoreService();
 
   /// Export all habit data to CSV format (saves to Downloads on Android)
+  /// 将所有习惯数据导出为 CSV 格式（在 Android 上保存到下载文件夹）
   Future<String?> exportToCSV(List<Habit> habits) async {
     try {
       final buffer = StringBuffer();
@@ -113,6 +119,7 @@ class ExportService {
   }
 
   /// Export all habit data to JSON format (full backup)
+  /// 将所有习惯数据导出为 JSON 格式（完整备份）
   Future<String?> exportToJSON(List<Habit> habits) async {
     try {
       // Fetch all histories in parallel (fixes N+1 query pattern)
@@ -205,6 +212,7 @@ class ExportService {
   }
 
   /// Share exported file using system share sheet
+  /// 使用系统分享面板分享导出的文件
   Future<void> shareFile(String filePath, {String? subject}) async {
     try {
       final file = XFile(filePath);
@@ -217,6 +225,7 @@ class ExportService {
   }
 
   /// Export and immediately share as CSV
+  /// 导出并立即分享 CSV 文件
   Future<void> exportAndShareCSV(List<Habit> habits) async {
     final filePath = await exportToCSV(habits);
     if (filePath != null) {
@@ -235,6 +244,7 @@ class ExportService {
   }
 
   /// Export and immediately share as JSON
+  /// 导出并立即分享 JSON 文件
   Future<void> exportAndShareJSON(List<Habit> habits) async {
     final filePath = await exportToJSON(habits);
     if (filePath != null) {
@@ -253,7 +263,9 @@ class ExportService {
   }
 
   /// Escape special characters for CSV
+  /// 转义 CSV 中的特殊字符
   /// Handles double quotes, newlines, and commas
+  /// 处理双引号、换行符和逗号
   String _escapeCSV(String value) {
     // Replace double quotes with escaped double quotes
     var escaped = value.replaceAll('"', '""');

@@ -21,6 +21,7 @@ import '../services/subscription_service.dart';
 import 'dart:async';
 
 /// Provider for managing habits data
+/// 管理习惯数据的 Provider
 class HabitProvider with ChangeNotifier {
   final FirestoreService _firestoreService = FirestoreService();
   final BadgeService _badgeService = BadgeService();
@@ -35,10 +36,14 @@ class HabitProvider with ChangeNotifier {
   // Cached computed values (invalidated when _habits changes)
   int? _cachedBestStreak;
 
+  /// Constructor that initializes Firestore subscription
+  /// 构造函数，初始化 Firestore 订阅
   HabitProvider() {
     _init();
   }
 
+  /// Initialize Firestore user and start listening to habits stream
+  /// 初始化 Firestore 用户并开始监听习惯数据流
   void _init() {
     // BadgeService is initialized in main.dart, don't double-initialize
     _firestoreService.createUserIfNotExists();
@@ -52,12 +57,14 @@ class HabitProvider with ChangeNotifier {
   }
 
   /// Update app icon badge with incomplete habits count
+  /// 用未完成习惯数更新应用图标徽章
   void _updateBadge() {
     final incompleteCount = _habits.where((h) => !h.isCompleted).length;
     _badgeService.updateBadgeCount(incompleteCount);
   }
 
   /// Clear all user-specific data on logout to prevent cross-user leaks
+  /// 登出时清除所有用户数据，防止跨用户数据泄漏
   void clearUserData() {
     _habitsSubscription?.cancel();
     _habitsSubscription = null;
@@ -69,6 +76,7 @@ class HabitProvider with ChangeNotifier {
   }
 
   /// Re-subscribe to Firestore for the newly logged-in user
+  /// 为新登录的用户重新订阅 Firestore
   void reinitialize() {
     _habitsSubscription?.cancel();
     _habitsSubscription = null;
@@ -79,6 +87,8 @@ class HabitProvider with ChangeNotifier {
     _init();
   }
 
+  /// Dispose resources and cancel Firestore subscription
+  /// 释放资源并取消 Firestore 订阅
   @override
   void dispose() {
     _habitsSubscription?.cancel();
@@ -86,22 +96,33 @@ class HabitProvider with ChangeNotifier {
     super.dispose();
   }
 
-  // Getters
+  /// Get the list of all habits
+  /// 获取所有习惯列表
   List<Habit> get habits => _habits;
+
+  /// Get today's habits (currently returns all habits)
+  /// 获取今日习惯（目前返回所有习惯）
   List<Habit> get todaysHabits => _habits;
+
+  /// Whether habits are still loading from Firestore
+  /// 习惯数据是否仍在从 Firestore 加载中
   bool get isLoadingHabits => _isLoadingHabits;
 
   /// Get completed habits count for today
+  /// 获取今日已完成习惯数量
   int get completedCount => _habits.where((h) => h.isCompleted).length;
 
   /// Get total habits count
+  /// 获取习惯总数
   int get totalCount => _habits.length;
 
   /// Get completion rate (0.0 to 1.0)
+  /// 获取完成率（0.0 到 1.0）
   double get completionRate =>
       totalCount > 0 ? completedCount / totalCount : 0.0;
 
   /// Get best streak across all habits (cached)
+  /// 获取所有习惯中的最佳连续记录（已缓存）
   int get bestStreak {
     if (_cachedBestStreak != null) return _cachedBestStreak!;
     _cachedBestStreak = _habits.isEmpty
@@ -112,6 +133,8 @@ class HabitProvider with ChangeNotifier {
 
   /// Toggle habit completion status
   /// Returns false if toggle was skipped due to an in-progress operation
+  /// 切换习惯完成状态
+  /// 如果因操作正在进行中而跳过切换，则返回 false
   Future<bool> toggleHabitCompletion(String habitId) async {
     // Prevent race condition: skip if this habit is already being toggled
     if (_togglingHabits.contains(habitId)) {
@@ -157,6 +180,7 @@ class HabitProvider with ChangeNotifier {
   }
 
   /// Check if habit was completed today
+  /// 检查习惯今天是否已完成
   bool _isCompletedToday(DateTime? lastCompletedDate) {
     if (lastCompletedDate == null) return false;
     final now = DateTime.now();
@@ -167,14 +191,18 @@ class HabitProvider with ChangeNotifier {
   }
 
   /// Check if user can add more habits based on subscription tier
+  /// 根据订阅等级检查用户是否可以添加更多习惯
   bool get canAddHabit => _subscriptionService.canAddHabit(_habits.length);
 
   /// Get remaining habits that can be added
+  /// 获取还可以添加的习惯数量
   int get remainingHabitsAllowed =>
       _subscriptionService.getLimits(_habits.length).remainingHabits;
 
   /// Add new habit with subscription limit check
   /// Throws an exception if habit limit is reached
+  /// 添加新习惯并检查订阅限制
+  /// 如果达到习惯数量上限则抛出异常
   Future<void> addHabit(Habit habit) async {
     // Check subscription limits before adding
     if (!_subscriptionService.canAddHabit(_habits.length)) {
@@ -194,6 +222,7 @@ class HabitProvider with ChangeNotifier {
   }
 
   /// Update existing habit
+  /// 更新现有习惯
   Future<void> updateHabit(Habit habit) async {
     try {
       await _firestoreService.updateHabit(habit);
@@ -204,6 +233,7 @@ class HabitProvider with ChangeNotifier {
   }
 
   /// Remove habit
+  /// 删除习惯
   Future<void> removeHabit(String habitId) async {
     try {
       await NotificationService().cancelHabitReminder(habitId);
@@ -216,10 +246,16 @@ class HabitProvider with ChangeNotifier {
 }
 
 /// Exception thrown when user tries to add more habits than their tier allows
+/// 当用户尝试添加超出其订阅等级允许数量的习惯时抛出的异常
 class HabitLimitExceededException implements Exception {
   final String message;
+
+  /// Create a habit limit exceeded exception with a message
+  /// 创建一个带有消息的习惯数量超限异常
   HabitLimitExceededException(this.message);
 
+  /// Return the exception message as string
+  /// 将异常消息作为字符串返回
   @override
   String toString() => message;
 }
