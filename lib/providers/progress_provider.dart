@@ -1,3 +1,15 @@
+// =============================================================================
+// progress_provider.dart — Progress Analytics Provider
+// 进度分析 Provider
+//
+// Calculates all analytics data from habit completion history: completion rates,
+// category breakdowns, weekly heatmaps, trend charts, top/bottom performers,
+// and achievements. Depends on HabitProvider via ProxyProvider.
+//
+// 从习惯完成历史计算所有分析数据：完成率、类别细分、每周热力图、趋势图表、
+// 最佳/最差表现者和成就。通过 ProxyProvider 依赖 HabitProvider。
+// =============================================================================
+
 import 'package:flutter/material.dart';
 import '../models/progress_models.dart';
 import '../models/habit.dart';

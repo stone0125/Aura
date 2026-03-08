@@ -1,3 +1,20 @@
+// =============================================================================
+// ui_constants.dart — UI Constants & Design Tokens
+// UI 常量与设计令牌
+//
+// Defines consistent spacing, sizing, and layout values used across the app:
+// - Spacing values (4, 8, 12, 16, 20, 24, 32, 48)
+// - Border radius presets (small, medium, large, extra-large)
+// - Button heights and icon sizes
+// - App bar configuration
+//
+// 定义应用中使用的一致间距、尺寸和布局值：
+// - 间距值（4、8、12、16、20、24、32、48）
+// - 圆角预设（小、中、大、超大）
+// - 按钮高度和图标尺寸
+// - 应用栏配置
+// =============================================================================
+
 import 'package:flutter/material.dart';
 import 'app_colors.dart';
 

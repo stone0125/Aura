@@ -1,3 +1,22 @@
+// =============================================================================
+// analytics_service.dart — Firebase Analytics Service
+// Firebase 分析服务
+//
+// Tracks user events and behaviour for product insights:
+// - Habit events (created, completed)
+// - Export and share events
+// - AI Coach interaction events
+// - Reminder configuration events
+// - User properties (habit count, best streak, pro status)
+//
+// 追踪用户事件和行为以获取产品洞察：
+// - 习惯事件（创建、完成）
+// - 导出和分享事件
+// - AI 教练交互事件
+// - 提醒配置事件
+// - 用户属性（习惯数量、最佳连续记录、专业版状态）
+// =============================================================================
+
 import 'package:firebase_analytics/firebase_analytics.dart';
 
 /// Service for tracking analytics events

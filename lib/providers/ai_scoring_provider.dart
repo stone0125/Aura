@@ -1,3 +1,16 @@
+// =============================================================================
+// ai_scoring_provider.dart — AI Scoring & Daily Review Provider
+// AI 评分与每日回顾 Provider
+//
+// Manages AI habit scoring (4 dimensions: Consistency, Momentum, Resilience,
+// Engagement), daily reviews, and health data correlations. Calls Firebase
+// Cloud Functions for AI analysis and stores results in Firestore.
+//
+// 管理 AI 习惯评分（4 个维度：一致性、动力、韧性、参与度）、每日回顾和
+// 健康数据关联分析。调用 Firebase Cloud Functions 进行 AI 分析，
+// 并将结果存储在 Firestore 中。
+// =============================================================================
+
 import 'package:flutter/foundation.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import '../models/ai_scoring_models.dart';

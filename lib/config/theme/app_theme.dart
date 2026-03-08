@@ -1,3 +1,21 @@
+// =============================================================================
+// app_theme.dart — App Theme Configuration
+// 应用主题配置
+//
+// Defines the complete Material 3 theme for both light and dark modes:
+// - Color scheme (coral primary, semantic colors)
+// - Typography system (display, headline, body, label styles)
+// - Component themes (cards, buttons, inputs, navigation bar, app bar)
+// All UI components inherit from these theme definitions, ensuring
+// consistent look and feel across the entire app.
+//
+// 定义亮色和暗色模式的完整 Material 3 主题：
+// - 色彩方案（珊瑚色主色、语义化颜色）
+// - 排版系统（展示、标题、正文、标签样式）
+// - 组件主题（卡片、按钮、输入框、导航栏、应用栏）
+// 所有 UI 组件继承这些主题定义，确保整个应用的外观和风格一致。
+// =============================================================================
+
 import 'package:flutter/material.dart';
 import 'app_colors.dart';
 import 'ui_constants.dart';

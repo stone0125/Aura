@@ -1,3 +1,22 @@
+// =============================================================================
+// health_service.dart — Health Data Integration Service
+// 健康数据集成服务
+//
+// Integrates with device health platforms using the 'health' package:
+// - Apple Health (iOS) / Google Health Connect (Android)
+// - Reads: steps, sleep, heart rate, active energy, workouts
+// - Provides daily and range-based health data summaries
+// - Prepares health data for AI correlation analysis
+// Uses singleton pattern. Cross-platform via platform channels.
+//
+// 使用 'health' 包集成设备健康平台：
+// - Apple Health (iOS) / Google Health Connect (Android)
+// - 读取：步数、睡眠、心率、活动能量、运动
+// - 提供每日和范围的健康数据摘要
+// - 为 AI 关联分析准备健康数据
+// 使用单例模式。通过平台通道实现跨平台。
+// =============================================================================
+
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:health/health.dart' as health_pkg;

@@ -1,3 +1,16 @@
+// =============================================================================
+// habit_detail_provider.dart — Habit Detail Provider
+// 习惯详情 Provider
+//
+// Manages detailed data for a single habit: completion history, calendar data,
+// statistics (streaks, completion rate, best day), chart data, and AI-generated
+// insights. Loads history from Firestore and AI insights from Cloud Functions.
+//
+// 管理单个习惯的详细数据：完成历史、日历数据、统计信息（连续记录、完成率、
+// 最佳日期）、图表数据和 AI 生成的洞察。从 Firestore 加载历史，
+// 从 Cloud Functions 加载 AI 洞察。
+// =============================================================================
+
 import 'package:flutter/material.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import '../models/habit.dart';

@@ -1,3 +1,22 @@
+// =============================================================================
+// auth_service.dart — Authentication Service
+// 身份验证服务
+//
+// Handles all authentication flows using Firebase Auth:
+// - Google Sign-In (OAuth2, supports web and mobile)
+// - Apple Sign-In (iOS/macOS only)
+// - Email/Password (sign up, sign in, password reset)
+// - Email verification
+// - Sign out
+//
+// 使用 Firebase Auth 处理所有身份验证流程：
+// - Google 登录（OAuth2，支持 Web 和移动端）
+// - Apple 登录（仅 iOS/macOS）
+// - 邮箱/密码（注册、登录、密码重置）
+// - 邮箱验证
+// - 登出
+// =============================================================================
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';

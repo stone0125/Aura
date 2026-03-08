@@ -1,3 +1,26 @@
+// =============================================================================
+// firestore_service.dart — Firestore Database Service
+// Firestore 数据库服务
+//
+// Handles all CRUD operations with Cloud Firestore (NoSQL database):
+// - User management (create, read, update profiles)
+// - Habit operations (add, update, delete, real-time stream)
+// - Completion history (log, remove, query)
+// - AI scores and daily reviews storage
+// - Health correlations storage
+// - Account deletion (batch delete all subcollections)
+// Data structure: users/{userId}/habits/{habitId}/history/{dateId}
+//
+// 处理与 Cloud Firestore（NoSQL 数据库）的所有增删改查操作：
+// - 用户管理（创建、读取、更新资料）
+// - 习惯操作（添加、更新、删除、实时流）
+// - 完成历史（记录、移除、查询）
+// - AI 评分和每日回顾存储
+// - 健康关联分析存储
+// - 账户删除（批量删除所有子集合）
+// 数据结构：users/{userId}/habits/{habitId}/history/{dateId}
+// =============================================================================
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';

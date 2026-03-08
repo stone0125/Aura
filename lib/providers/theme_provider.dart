@@ -1,3 +1,14 @@
+// =============================================================================
+// theme_provider.dart — Theme Provider
+// 主题 Provider
+//
+// Manages light/dark theme switching and persists the preference to
+// SharedPreferences. Uses ChangeNotifier to rebuild the UI when theme changes.
+//
+// 管理亮色/暗色主题切换，并将偏好持久化到 SharedPreferences。
+// 使用 ChangeNotifier 在主题更改时重建 UI。
+// =============================================================================
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

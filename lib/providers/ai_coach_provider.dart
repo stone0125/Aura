@@ -1,3 +1,24 @@
+// =============================================================================
+// ai_coach_provider.dart — AI Coach Provider
+// AI 教练 Provider
+//
+// Manages AI-powered features by calling Firebase Cloud Functions:
+// - Personalized habit suggestions (建议)
+// - Weekly insights and summaries (周报洞察)
+// - Pattern discovery from completion history (模式发现)
+// - Category-based tips (分类技巧)
+// - Actionable items (行动项)
+// Includes caching (SharedPreferences), rate limiting, and subscription checks.
+//
+// 通过调用 Firebase Cloud Functions 管理 AI 驱动的功能：
+// - 个性化习惯建议
+// - 每周洞察和总结
+// - 从完成历史中发现模式
+// - 基于类别的技巧
+// - 可操作的行动项
+// 包含缓存（SharedPreferences）、速率限制和订阅检查。
+// =============================================================================
+
 import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:cloud_functions/cloud_functions.dart';

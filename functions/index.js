@@ -1,3 +1,34 @@
+// =============================================================================
+// index.js — Firebase Cloud Functions (Server-Side AI Logic)
+// Firebase Cloud Functions（服务器端 AI 逻辑）
+//
+// This file contains all server-side Cloud Functions that power the AI features.
+// Each function is called from the Flutter app via FirebaseFunctions.httpsCallable().
+// Uses Google Gemini AI for generating personalized content.
+//
+// Functions:
+// - generateHabitSuggestions: AI-powered habit recommendations (AI 习惯建议)
+// - generateWeeklyInsights: Weekly summary and analysis (每周洞察与分析)
+// - generatePatternDiscovery: Detect patterns in completion data (模式发现)
+// - generateHabitTips: Category-based tips (分类技巧)
+// - generateActionItems: Personalized action items (个性化行动项)
+// - generateHabitScore: Score a habit across 4 dimensions (习惯评分)
+// - generateDailyReview: Daily performance review (每日回顾)
+// - generateHabitInsight: Single habit AI insight (单个习惯洞察)
+// - generateHealthCorrelations: Health-habit correlation analysis (健康关联分析)
+// - submitSupportMessage: Send support emails (提交支持消息)
+//
+// Security: All functions require authentication, validate inputs, sanitize
+// prompts against injection, and enforce subscription-based rate limits.
+//
+// 这个文件包含所有支持 AI 功能的服务器端 Cloud Functions。
+// 每个函数通过 FirebaseFunctions.httpsCallable() 从 Flutter 应用调用。
+// 使用 Google Gemini AI 生成个性化内容。
+//
+// 安全性：所有函数要求身份验证、验证输入、防止提示注入，
+// 并执行基于订阅的速率限制。
+// =============================================================================
+
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { setGlobalOptions } = require("firebase-functions/v2");
 const { defineSecret } = require("firebase-functions/params");
@@ -13,6 +44,7 @@ const SMTP_USER = "xiaostone0125@gmail.com";
 admin.initializeApp();
 
 // Set global options for Gen 2 functions with rate limiting
+// 设置 Gen 2 函数的全局选项和速率限制
 setGlobalOptions({ 
   region: "us-central1",
   maxInstances: 10,        // Limit concurrent executions to prevent abuse

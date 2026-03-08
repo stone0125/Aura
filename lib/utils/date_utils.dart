@@ -1,3 +1,22 @@
+// =============================================================================
+// date_utils.dart — Date Utility Functions
+// 日期工具函数
+//
+// Helper functions for date formatting and comparison:
+// - formatDateId() — ISO 8601 format (YYYY-MM-DD)
+// - formatDateFull() — "Monday, January 15"
+// - formatDateShort() — "Jan 15"
+// - isSameDay(), isToday(), isYesterday()
+// - getStartOfWeek(), getEndOfWeek()
+//
+// 日期格式化和比较的辅助函数：
+// - formatDateId() — ISO 8601 格式（YYYY-MM-DD）
+// - formatDateFull() — "星期一，1月15日"
+// - formatDateShort() — "1月15日"
+// - isSameDay()、isToday()、isYesterday()
+// - getStartOfWeek()、getEndOfWeek()
+// =============================================================================
+
 /// Date utility functions for the habit tracker app
 /// Centralizes date formatting and comparison logic to reduce duplication
 library;

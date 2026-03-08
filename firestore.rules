@@ -1,8 +1,36 @@
+// =============================================================================
+// firestore.rules — Firestore Security Rules
+// Firestore 安全规则
+//
+// Defines access control for all Firestore collections. Key principles:
+// - User data isolation: users can only access their own data
+// - Input validation: habits must have valid name and category
+// - Immutability: history records cannot be updated (only created/deleted)
+// - Server-only writes: usage counters can only be written by admin SDK
+// - Default deny: all unmatched paths are denied access
+//
+// Data structure:
+//   users/{userId}                    — User profile (用户资料)
+//   users/{userId}/habits/{habitId}   — Habits (习惯)
+//   users/{userId}/habits/{id}/history/{date} — Completion records (完成记录)
+//   users/{userId}/dailyReviews/{date} — AI daily reviews (AI 每日回顾)
+//   users/{userId}/habitScores/{id}   — AI habit scores (AI 习惯评分)
+//   users/{userId}/healthCorrelations/{id} — Health analysis (健康分析)
+//
+// 定义所有 Firestore 集合的访问控制。关键原则：
+// - 用户数据隔离：用户只能访问自己的数据
+// - 输入验证：习惯必须有有效的名称和类别
+// - 不可变性：历史记录不能更新（只能创建/删除）
+// - 仅服务器写入：使用量计数器只能由 admin SDK 写入
+// - 默认拒绝：所有未匹配的路径都拒绝访问
+// =============================================================================
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
+
     // Helper function to check if user is authenticated
+    // 辅助函数：检查用户是否已通过身份验证
     function isAuthenticated() {
       return request.auth != null;
     }

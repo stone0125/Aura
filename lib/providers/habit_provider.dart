@@ -1,3 +1,16 @@
+// =============================================================================
+// habit_provider.dart — Habit State Management (Business Logic)
+// 习惯状态管理（业务逻辑）
+//
+// Manages the habit list, real-time Firestore synchronization, streak tracking,
+// and subscription limit checks. Uses ChangeNotifier pattern to notify UI of
+// state changes. Key functions: toggleHabitCompletion(), addHabit(), removeHabit().
+//
+// 管理习惯列表、实时 Firestore 同步、连续记录追踪和订阅限制检查。
+// 使用 ChangeNotifier 模式通知 UI 状态变化。
+// 关键函数：toggleHabitCompletion()、addHabit()、removeHabit()。
+// =============================================================================
+
 import 'package:flutter/material.dart';
 import '../models/habit.dart';
 import '../models/subscription_models.dart';

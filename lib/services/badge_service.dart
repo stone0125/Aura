@@ -1,3 +1,15 @@
+// =============================================================================
+// badge_service.dart — App Icon Badge Service
+// 应用图标角标服务
+//
+// Manages the app icon badge count on iOS. Shows the number of incomplete
+// habits as the badge number. Delegates to NotificationService for the
+// actual iOS badge update. Uses singleton pattern.
+//
+// 管理 iOS 上的应用图标角标数量。将未完成习惯的数量显示为角标数字。
+// 委托 NotificationService 执行实际的 iOS 角标更新。使用单例模式。
+// =============================================================================
+
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
 import 'notification_service.dart';

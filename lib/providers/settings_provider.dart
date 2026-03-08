@@ -1,3 +1,16 @@
+// =============================================================================
+// settings_provider.dart — Settings & User Profile Provider
+// 设置与用户资料 Provider
+//
+// Manages user profile (name, email, avatar), app settings (notifications,
+// theme, AI preferences), and account operations (sign out, delete account).
+// Persists settings to SharedPreferences and syncs profile to Firestore.
+//
+// 管理用户资料（姓名、邮箱、头像）、应用设置（通知、主题、AI 偏好）
+// 和账户操作（登出、删除账户）。将设置持久化到 SharedPreferences，
+// 并将资料同步到 Firestore。
+// =============================================================================
+
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';

@@ -1,3 +1,22 @@
+// =============================================================================
+// notification_service.dart — Notification Service
+// 通知服务
+//
+// Manages both local notifications and Firebase Cloud Messaging (FCM):
+// - Schedule daily habit reminders at user-specified times
+// - Handle push notifications from Firebase
+// - Manage iOS app icon badge count
+// - Daily summary notifications
+// Uses singleton pattern to ensure single instance across the app.
+//
+// 管理本地通知和 Firebase 云消息（FCM）：
+// - 按用户指定时间安排每日习惯提醒
+// - 处理来自 Firebase 的推送通知
+// - 管理 iOS 应用图标角标数量
+// - 每日摘要通知
+// 使用单例模式确保应用中只有一个实例。
+// =============================================================================
+
 import 'dart:async';
 import 'dart:io';
 import 'package:firebase_messaging/firebase_messaging.dart';

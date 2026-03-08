@@ -1,3 +1,15 @@
+// =============================================================================
+// habit_category.dart — Habit Category Enum
+// 习惯类别枚举
+//
+// Defines the 5 habit categories: Health, Learning, Productivity, Mindfulness,
+// and Fitness. Each category has a display name, icon, and gradient colors
+// for both light and dark themes.
+//
+// 定义 5 个习惯类别：健康、学习、生产力、正念和健身。每个类别都有显示名称、
+// 图标以及亮色和暗色主题的渐变颜色。
+// =============================================================================
+
 import 'package:flutter/material.dart';
 import '../config/theme/app_colors.dart';
 

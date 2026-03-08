@@ -1,3 +1,20 @@
+// =============================================================================
+// share_service.dart — Social Sharing Service
+// 社交分享服务
+//
+// Handles sharing achievements and progress via system share sheet:
+// - Share progress summary (days tracked, streaks, completion rate)
+// - Share individual achievements
+// - Share streak milestones (7, 14, 21, 30, 60, 90 days)
+// - Copy stats to clipboard
+//
+// 通过系统分享面板处理成就和进度的分享：
+// - 分享进度摘要（追踪天数、连续记录、完成率）
+// - 分享单个成就
+// - 分享连续记录里程碑（7、14、21、30、60、90 天）
+// - 复制统计数据到剪贴板
+// =============================================================================
+
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';

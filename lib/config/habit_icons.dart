@@ -1,3 +1,14 @@
+// =============================================================================
+// habit_icons.dart — Habit Icon Library
+// 习惯图标库
+//
+// Provides a library of 30+ predefined icons for habits (meditation, running,
+// reading, writing, etc.) and maps each habit category to a default icon.
+//
+// 提供 30 多个预定义的习惯图标（冥想、跑步、阅读、写作等），
+// 并将每个习惯类别映射到默认图标。
+// =============================================================================
+
 import 'package:flutter/material.dart';
 
 /// Available habit icons

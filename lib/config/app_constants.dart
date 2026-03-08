@@ -1,3 +1,11 @@
+// =============================================================================
+// app_constants.dart — App-Wide Constants
+// 应用级常量
+//
+// Defines global constants used across the app (app name, version, etc.).
+// 定义应用中使用的全局常量（应用名称、版本等）。
+// =============================================================================
+
 /// App-wide constants and configuration values
 class AppConstants {
   AppConstants._();

@@ -1,3 +1,22 @@
+// =============================================================================
+// subscription_service.dart — Subscription Service (RevenueCat)
+// 订阅服务（RevenueCat）
+//
+// Manages in-app purchases and subscription tiers via RevenueCat:
+// - Starter (free): 3 AI suggestions/day, 20 reports/month, 5 habits
+// - Growth: 5 suggestions/day, 30 reports/month, 10 habits
+// - Mastery: Unlimited everything
+// Tracks daily AI suggestion usage and monthly report usage with
+// SharedPreferences. Links Firebase Auth users to RevenueCat.
+//
+// 通过 RevenueCat 管理应用内购买和订阅层级：
+// - 入门（免费）：每天 3 个 AI 建议，每月 20 个报告，5 个习惯
+// - 成长：每天 5 个建议，每月 30 个报告，10 个习惯
+// - 精通：无限制
+// 使用 SharedPreferences 追踪每日 AI 建议使用量和每月报告使用量。
+// 将 Firebase Auth 用户链接到 RevenueCat。
+// =============================================================================
+
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:purchases_ui_flutter/purchases_ui_flutter.dart';
 import 'package:flutter/foundation.dart';

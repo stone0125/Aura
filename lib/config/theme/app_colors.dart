@@ -1,3 +1,22 @@
+// =============================================================================
+// app_colors.dart — App Color Definitions
+// 应用颜色定义
+//
+// Defines all colors used throughout the app for both light and dark themes:
+// - Primary colors (coral theme)
+// - Background, surface, and border colors
+// - Text colors (primary, secondary)
+// - Category-specific gradient colors (Health, Learning, Productivity, etc.)
+// - Splash screen gradient colors
+//
+// 定义应用中亮色和暗色主题使用的所有颜色：
+// - 主色调（珊瑚色主题）
+// - 背景、表面和边框颜色
+// - 文本颜色（主要、次要）
+// - 类别特定的渐变颜色（健康、学习、生产力等）
+// - 启动页渐变颜色
+// =============================================================================
+
 import 'package:flutter/material.dart';
 
 /// App color constants for light and dark themes

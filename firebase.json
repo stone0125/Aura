@@ -1,4 +1,6 @@
 {
+    "_comment_en": "Firebase project configuration — defines Firestore rules, Cloud Functions source, and Flutter platform bindings",
+    "_comment_cn": "Firebase 项目配置 — 定义 Firestore 规则、Cloud Functions 源码和 Flutter 平台绑定",
     "firestore": {
         "rules": "firestore.rules",
         "indexes": "firestore.indexes.json"

@@ -1,3 +1,15 @@
+// =============================================================================
+// habit.dart — Habit Data Model
+// 习惯数据模型
+//
+// Defines the Habit class — the core data entity of the app. Each habit has
+// a name, category, streak count, completion status, goal settings, and
+// reminder settings. Uses copyWith pattern for immutable updates.
+//
+// 定义 Habit 类——应用的核心数据实体。每个习惯包含名称、类别、连续天数、
+// 完成状态、目标设置和提醒设置。使用 copyWith 模式实现不可变更新。
+// =============================================================================
+
 import 'package:flutter/material.dart';
 import 'habit_category.dart';
 

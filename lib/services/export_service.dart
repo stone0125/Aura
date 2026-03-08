@@ -1,3 +1,20 @@
+// =============================================================================
+// export_service.dart — Data Export Service
+// 数据导出服务
+//
+// Exports habit data to external file formats:
+// - CSV format (habit summary with streaks and reminders)
+// - JSON format (full backup with completion history)
+// Saves to Downloads (Android) or Documents (iOS), then shares via
+// system share sheet. Uses singleton pattern.
+//
+// 将习惯数据导出为外部文件格式：
+// - CSV 格式（包含连续记录和提醒的习惯摘要）
+// - JSON 格式（包含完成历史的完整备份）
+// 保存到下载文件夹（Android）或文档文件夹（iOS），然后通过
+// 系统分享面板分享。使用单例模式。
+// =============================================================================
+
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
