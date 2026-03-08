@@ -470,22 +470,20 @@ class SettingsProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  /// Delete account — deletes Firebase Auth account first (may throw
-  /// requires-recent-login), then removes Firestore data and signs out
-  /// 删除账户 — 先删除 Firebase Auth 账户（可能抛出 requires-recent-login），
-  /// 然后删除 Firestore 数据并登出
+  /// Delete account — deletes Firebase Auth account first, then Firestore data
+  /// 删除账户 — 先删除 Firebase Auth 账户，然后删除 Firestore 数据
   Future<void> deleteAccount() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
     // 1. Delete the Firebase Auth account FIRST
     //    This may throw requires-recent-login if the session is stale.
-    //    By deleting auth first, user data is preserved on failure so
-    //    the user can re-authenticate and retry.
+    //    By doing this first, we avoid deleting Firestore data only to have
+    //    auth deletion fail (leaving the user with an account but no data).
     await user.delete();
 
-    // 2. Delete all Firestore user data (subcollections + user doc)
-    await _firestoreService.deleteAllUserData();
+    // 2. Delete all Firestore user data (pass userId since auth user is gone)
+    await _firestoreService.deleteAllUserData(forUserId: user.uid);
 
     // 3. Sign out (clears local state)
     await AuthService().signOut();

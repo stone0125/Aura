@@ -12,8 +12,8 @@
 // 来量身定制适合用户实际能力水平的建议。
 // =============================================================================
 
-const { HttpsError } = require("firebase-functions/v2/https");
 const {
+  HttpsError,
   VALID_CATEGORIES,
   getGenAI,
   validateArray,
@@ -22,7 +22,9 @@ const {
   validateNumber,
   checkBurstLimit,
   getUserTier,
-  checkAndRecordUsage,
+  checkUsageLimit,
+  recordUsage,
+  parseGeminiJSON,
 } = require("../helpers");
 
 async function generateHabitSuggestions(request) {
@@ -35,7 +37,7 @@ async function generateHabitSuggestions(request) {
 
   await checkBurstLimit(request.auth.uid, 'suggestions');
   const tier = await getUserTier(request.auth.uid);
-  await checkAndRecordUsage(request.auth.uid, tier, 'suggestion');
+  await checkUsageLimit(request.auth.uid, tier, 'suggestion');
 
   // Input validation
   const { categories, currentHabits, userStats } = request.data || {};
@@ -44,7 +46,8 @@ async function generateHabitSuggestions(request) {
     .map(c => validateCategory(c));
 
   const validatedHabits = validateArray(currentHabits || [], 'currentHabits', 50)
-    .map(h => sanitizeForPrompt(h));
+    .map(h => sanitizeForPrompt(h))
+    .filter(h => h.length > 0);
 
   // Extract user stats for personalization (with defaults)
   const completionRate = validateNumber(userStats?.completionRate ?? 0, 'completionRate', 0, 100);
@@ -104,6 +107,7 @@ async function generateHabitSuggestions(request) {
     Do not include markdown formatting.
   `;
 
+  let returnValue;
   try {
     const result = await model.generateContent(prompt);
     const response = await result.response;
@@ -114,8 +118,7 @@ async function generateHabitSuggestions(request) {
       throw new Error('Gemini returned empty response');
     }
 
-    const jsonStr = text.replace(/```json/g, "").replace(/```/g, "").trim();
-    const parsed = JSON.parse(jsonStr);
+    const parsed = parseGeminiJSON(text);
 
     if (!Array.isArray(parsed)) throw new Error('Expected array, got: ' + typeof parsed);
     if (parsed.length === 0) {
@@ -126,7 +129,7 @@ async function generateHabitSuggestions(request) {
     const VALID_FREQUENCY_TYPES = ['daily', 'weekly'];
     const VALID_GOAL_TYPES = ['none', 'time', 'count'];
     const VALID_IMPACTS = ['High', 'Medium', 'Low'];
-    return parsed.slice(0, 5).map(item => ({
+    returnValue = parsed.slice(0, 5).map(item => ({
       habitName: String(item.habitName || '').substring(0, 100),
       category: VALID_CATEGORIES.includes(item.category) ? item.category : 'health',
       explanation: String(item.explanation || '').substring(0, 500),
@@ -152,9 +155,16 @@ async function generateHabitSuggestions(request) {
         : null,
     }));
   } catch (error) {
-    console.error("Error generating suggestions:", error.message || error);
-    throw new HttpsError("internal", `Failed to generate suggestions: ${error.message || 'Unknown error'}`);
+    console.error(`[generateHabitSuggestions] Error for user ${request.auth.uid}:`, error.message || error);
+    throw new HttpsError("internal", "Failed to generate suggestions. Please try again.");
   }
+
+  try {
+    await recordUsage(request.auth.uid, 'suggestion');
+  } catch (usageError) {
+    console.error(`[generateHabitSuggestions] Failed to record usage for ${request.auth.uid}:`, usageError.message);
+  }
+  return returnValue;
 }
 
 module.exports = generateHabitSuggestions;

@@ -11,15 +11,17 @@
 // 为数据较少的用户提供轻量级回退路径。
 // =============================================================================
 
-const { HttpsError } = require("firebase-functions/v2/https");
 const {
+  HttpsError,
   getGenAI,
   validateArray,
   sanitizeForPrompt,
   checkBurstLimit,
   getUserTier,
-  checkAndRecordUsage,
+  checkUsageLimit,
+  recordUsage,
   VALID_CATEGORIES,
+  parseGeminiJSON,
 } = require("../helpers");
 
 const VALID_PATTERN_TYPES = ['timeOfDay', 'dayOfWeek', 'sequence', 'trigger'];
@@ -35,17 +37,13 @@ async function generatePatternDiscovery(request) {
     );
   }
 
-  await checkBurstLimit(request.auth.uid, 'patterns');
-  const tier = await getUserTier(request.auth.uid);
-  await checkAndRecordUsage(request.auth.uid, tier, 'report');
-
   const { habits } = request.data || {};
   const validatedHabits = validateArray(habits || [], 'habits', 50);
 
   // Collect all completion dates for threshold checks
   let totalCompletions = 0;
   const allDates = [];
-  const habitsDetail = validatedHabits.map(h => {
+  const habitsDetail = validatedHabits.filter(h => h && typeof h === 'object').map(h => {
     const dates = Array.isArray(h.completionDates)
       ? h.completionDates.filter(d => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d))
       : [];
@@ -89,6 +87,11 @@ async function generatePatternDiscovery(request) {
     return { patterns };
   }
 
+  // Rate limits only for AI path (not early returns)
+  await checkBurstLimit(request.auth.uid, 'patterns');
+  const tier = await getUserTier(request.auth.uid);
+  await checkUsageLimit(request.auth.uid, tier, 'report');
+
   const model = getGenAI().getGenerativeModel({ model: "gemini-3-flash-preview" });
 
   const prompt = `
@@ -124,32 +127,37 @@ async function generatePatternDiscovery(request) {
     ]
   `;
 
+  let returnValue;
   try {
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
 
-    const jsonStr = text.replace(/```json/g, "").replace(/```/g, "").trim();
-    const parsed = JSON.parse(jsonStr);
+    const parsed = parseGeminiJSON(text);
 
     if (!Array.isArray(parsed)) {
       throw new Error("Response is not an array");
     }
 
-    const patterns = parsed.slice(0, 4).map(p => ({
+    returnValue = { patterns: parsed.slice(0, 4).map(p => ({
       title: String(p.title || 'Pattern').slice(0, 50),
       description: String(p.description || '').slice(0, 150),
       insight: String(p.insight || '').slice(0, 200),
       type: VALID_PATTERN_TYPES.includes(p.type) ? p.type : 'timeOfDay',
       confidence: Math.min(1.0, Math.max(0.0, Number(p.confidence) || 0.5)),
       iconName: VALID_ICON_NAMES.includes(p.iconName) ? p.iconName : 'insights',
-    }));
-
-    return { patterns };
+    })) };
   } catch (error) {
-    console.error("Error generating pattern discovery:", error.message || error);
-    throw new HttpsError("internal", `Failed to generate pattern discovery: ${error.message || 'Unknown error'}`);
+    console.error(`[generatePatternDiscovery] Error for user ${request.auth.uid}:`, error.message || error);
+    throw new HttpsError("internal", "Failed to generate pattern discovery. Please try again.");
   }
+
+  try {
+    await recordUsage(request.auth.uid, 'report');
+  } catch (usageError) {
+    console.error(`[generatePatternDiscovery] Failed to record usage for ${request.auth.uid}:`, usageError.message);
+  }
+  return returnValue;
 }
 
 module.exports = generatePatternDiscovery;

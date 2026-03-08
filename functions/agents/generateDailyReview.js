@@ -11,8 +11,8 @@
 // 励志信息和明日重点建议。
 // =============================================================================
 
-const { HttpsError } = require("firebase-functions/v2/https");
 const {
+  HttpsError,
   getGenAI,
   validateString,
   validateArray,
@@ -20,8 +20,10 @@ const {
   sanitizeForPrompt,
   checkBurstLimit,
   getUserTier,
-  checkAndRecordUsage,
+  checkUsageLimit,
+  recordUsage,
   VALID_CATEGORIES,
+  parseGeminiJSON,
 } = require("../helpers");
 
 /// Generate a daily performance review with AI coach commentary
@@ -36,7 +38,7 @@ async function generateDailyReview(request) {
 
   await checkBurstLimit(request.auth.uid, 'review');
   const tier = await getUserTier(request.auth.uid);
-  await checkAndRecordUsage(request.auth.uid, tier, 'report');
+  await checkUsageLimit(request.auth.uid, tier, 'report');
 
   const data = request.data || {};
 
@@ -78,7 +80,7 @@ async function generateDailyReview(request) {
     `;
   }
 
-  const habitsDetail = habits.map(h => {
+  const habitsDetail = habits.filter(h => h && typeof h === 'object').map(h => {
     let detail = `- ${sanitizeForPrompt(h.name || '')} (${VALID_CATEGORIES.includes(h.category) ? h.category : 'general'}): ${h.completed ? 'Completed' : 'Incomplete'}, Streak: ${Number(h.streak) || 0}`;
     if (h.goalType && h.goalType !== 'none') {
       detail += `, Goal: ${Number(h.goalValue) || 0} ${sanitizeForPrompt(h.goalUnit || '')} (${h.goalType})`;
@@ -117,7 +119,7 @@ async function generateDailyReview(request) {
     {
       "overallScore": <number 0-100>,
       "scoreChange": <number, difference from previousScore>,
-      "grade": "<A+, A, B+, B, C, D, F>",
+      "grade": "<A+, A, A-, B+, B, B-, C+, C, C-, D, F>",
       "habitScores": [
         {
           "habitId": "<habit id or name>",
@@ -144,17 +146,17 @@ async function generateDailyReview(request) {
     Do not include markdown formatting.
   `;
 
+  let returnValue;
   try {
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
 
-    const jsonStr = text.replace(/```json/g, "").replace(/```/g, "").trim();
-    const parsed = JSON.parse(jsonStr);
+    const parsed = parseGeminiJSON(text);
 
-    const VALID_GRADES = ['A+', 'A', 'B+', 'B', 'C', 'D', 'F'];
+    const VALID_GRADES = ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D', 'F'];
     const VALID_STATUSES = ['completed', 'missed', 'streak_milestone', 'streak_broken'];
-    return {
+    returnValue = {
       overallScore: Math.min(100, Math.max(0, Number(parsed.overallScore) || 0)),
       scoreChange: Math.min(100, Math.max(-100, Number(parsed.scoreChange) || 0)),
       grade: VALID_GRADES.includes(parsed.grade) ? parsed.grade : 'C',
@@ -178,9 +180,16 @@ async function generateDailyReview(request) {
       tomorrowFocus: String(parsed.tomorrowFocus || '').substring(0, 300),
     };
   } catch (error) {
-    console.error("Error generating daily review:", error.message || error);
-    throw new HttpsError("internal", `Failed to generate daily review: ${error.message || 'Unknown error'}`);
+    console.error(`[generateDailyReview] Error for user ${request.auth.uid}:`, error.message || error);
+    throw new HttpsError("internal", "Failed to generate daily review. Please try again.");
   }
+
+  try {
+    await recordUsage(request.auth.uid, 'report');
+  } catch (usageError) {
+    console.error(`[generateDailyReview] Failed to record usage for ${request.auth.uid}:`, usageError.message);
+  }
+  return returnValue;
 }
 
 module.exports = generateDailyReview;

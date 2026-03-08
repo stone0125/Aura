@@ -319,7 +319,7 @@ class AIScoringProvider extends ChangeNotifier {
       final allHistories = await Future.wait(historyFutures);
       for (final history in allHistories) {
         for (final date in history) {
-          final key = '${date.year}-${date.month}-${date.day}';
+          final key = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
           completionsByDate[key] = (completionsByDate[key] ?? 0) + 1;
         }
       }
@@ -328,7 +328,7 @@ class AIScoringProvider extends ChangeNotifier {
       final weeklyTrend = <double>[];
       for (int i = 6; i >= 0; i--) {
         final date = today.subtract(Duration(days: i));
-        final key = '${date.year}-${date.month}-${date.day}';
+        final key = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
         final completed = completionsByDate[key] ?? 0;
         weeklyTrend.add(habits.isNotEmpty ? (completed / habits.length) * 100 : 0);
       }

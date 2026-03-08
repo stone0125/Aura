@@ -19,6 +19,7 @@ import '../services/badge_service.dart';
 import '../services/notification_service.dart';
 import '../services/subscription_service.dart';
 import 'dart:async';
+import '../utils/date_utils.dart' as date_utils;
 
 /// Provider for managing habits data
 /// 管理习惯数据的 Provider
@@ -156,11 +157,12 @@ class HabitProvider with ChangeNotifier {
       final willBeCompleted = !isCompletedToday;
 
       // Simple optimistic update - just flip completion status
-      // The actual streak will be synced from Firestore stream
+      // The actual streak and lastCompletedDate will be synced from Firestore stream
+      // On undo, keep the existing lastCompletedDate to avoid streak reset;
+      // Firestore will set the correct value from history
       final newHabit = oldHabit.copyWith(
         isCompleted: willBeCompleted,
-        lastCompletedDate: willBeCompleted ? DateTime.now() : null,
-        clearLastCompletedDate: !willBeCompleted,
+        lastCompletedDate: willBeCompleted ? DateTime.now() : oldHabit.lastCompletedDate,
       );
       _habits[index] = newHabit;
       notifyListeners();
@@ -183,11 +185,7 @@ class HabitProvider with ChangeNotifier {
   /// 检查习惯今天是否已完成
   bool _isCompletedToday(DateTime? lastCompletedDate) {
     if (lastCompletedDate == null) return false;
-    final now = DateTime.now();
-    final localDate = lastCompletedDate.toLocal();
-    return localDate.year == now.year &&
-        localDate.month == now.month &&
-        localDate.day == now.day;
+    return date_utils.isToday(lastCompletedDate.toLocal());
   }
 
   /// Check if user can add more habits based on subscription tier

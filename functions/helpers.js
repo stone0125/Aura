@@ -18,7 +18,7 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 /// 外部服务的密钥定义
 const smtpPassword = defineSecret("SMTP_PASSWORD");
 const revenueCatApiKey = defineSecret("REVENUECAT_API_KEY");
-const geminiApiKey = defineSecret("_API_KEY");
+const geminiApiKey = defineSecret("GEMINI_API_KEY");
 
 /// SMTP user email for support messages
 /// 用于支持消息的 SMTP 用户邮箱
@@ -115,6 +115,17 @@ function sanitizeEmailInput(str) {
   return str.replace(/[\r\n]/g, ' ').trim();
 }
 
+/// Parse JSON from Gemini AI response text, stripping markdown fences
+/// 解析 Gemini AI 响应文本中的 JSON，去除 markdown 代码块标记
+function parseGeminiJSON(text) {
+  const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
+  try {
+    return JSON.parse(jsonStr);
+  } catch (e) {
+    throw new HttpsError('internal', 'AI returned invalid response. Please try again.');
+  }
+}
+
 // --- Subscription Tier Helpers ---
 // --- 订阅层级辅助函数 ---
 
@@ -145,6 +156,9 @@ async function getUserTier(userId) {
   );
 
   let tier = 'starter';
+  if (!resp.ok) {
+    console.error(`RevenueCat API error: ${resp.status} ${resp.statusText} for user ${userId}`);
+  }
   if (resp.ok) {
     try {
       const data = await resp.json();
@@ -177,9 +191,12 @@ async function getUserTier(userId) {
   return tier;
 }
 
-/// Check usage limits and record usage atomically (prevents race condition bypass)
-/// 检查使用限制并原子性地记录使用量（防止竞态条件绕过）
-async function checkAndRecordUsage(userId, tier, usageType) {
+/// Check usage limits without recording (read-only, non-transactional check).
+/// Two concurrent requests could both pass this check before either calls
+/// recordUsage. The burst limiter (5s cooldown) mitigates this; recordUsage
+/// uses an atomic transaction as the source of truth.
+/// 仅检查使用限制，不记录使用量（只读、非事务性检查）。
+async function checkUsageLimit(userId, tier, usageType) {
   const limits = TIER_LIMITS[tier];
   const limit = usageType === 'suggestion'
     ? limits.maxAISuggestionsPerDay
@@ -191,7 +208,28 @@ async function checkAndRecordUsage(userId, tier, usageType) {
   const now = new Date();
   const periodKey = usageType === 'suggestion'
     ? now.toISOString().split('T')[0]
-    : `${now.getFullYear()}-${now.getMonth()}`;
+    : `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+  const ref = db.collection('users').doc(userId)
+    .collection('usageCounters').doc(`${usageType}_${periodKey}`);
+
+  const doc = await ref.get();
+  const currentCount = doc.exists ? doc.data().count : 0;
+
+  if (currentCount >= limit) {
+    throw new HttpsError('resource-exhausted',
+      `${usageType === 'suggestion' ? 'Daily AI suggestion' : 'Monthly AI report'} limit reached for your plan. Upgrade for more.`);
+  }
+}
+
+/// Record usage after a successful AI call
+/// 在 AI 调用成功后记录使用量
+async function recordUsage(userId, usageType) {
+  const db = admin.firestore();
+  const now = new Date();
+  const periodKey = usageType === 'suggestion'
+    ? now.toISOString().split('T')[0]
+    : `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
   const ref = db.collection('users').doc(userId)
     .collection('usageCounters').doc(`${usageType}_${periodKey}`);
@@ -199,11 +237,6 @@ async function checkAndRecordUsage(userId, tier, usageType) {
   await db.runTransaction(async (transaction) => {
     const doc = await transaction.get(ref);
     const currentCount = doc.exists ? doc.data().count : 0;
-
-    if (currentCount >= limit) {
-      throw new HttpsError('resource-exhausted',
-        `${usageType === 'suggestion' ? 'Daily AI suggestion' : 'Monthly AI report'} limit reached for your plan. Upgrade for more.`);
-    }
 
     transaction.set(ref, {
       count: currentCount + 1,
@@ -233,6 +266,7 @@ async function checkBurstLimit(userId, functionName, cooldownMs = 5000) {
 }
 
 module.exports = {
+  HttpsError,
   smtpPassword,
   revenueCatApiKey,
   geminiApiKey,
@@ -247,7 +281,9 @@ module.exports = {
   validateCategory,
   sanitizeForPrompt,
   sanitizeEmailInput,
+  parseGeminiJSON,
   getUserTier,
-  checkAndRecordUsage,
+  checkUsageLimit,
+  recordUsage,
   checkBurstLimit,
 };

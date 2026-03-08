@@ -239,7 +239,7 @@ class HabitDetailProvider with ChangeNotifier {
 
     // Calculate actual completion rate
     final double completionRate = daysTracked > 0
-        ? (history.length / daysTracked * 100).clamp(0.0, 100.0)
+        ? (uniqueDates.length / daysTracked * 100).clamp(0.0, 100.0)
         : 0.0;
 
     // Calculate best day of week
@@ -261,7 +261,7 @@ class HabitDetailProvider with ChangeNotifier {
     _stats = HabitStats(
       currentStreak: currentStreak,
       longestStreak: longestStreak,
-      totalCompletions: history.length,
+      totalCompletions: uniqueDates.length,
       completionRate: completionRate,
       bestDay: bestDay,
       bestTime: 'Morning', // Would need time data to calculate

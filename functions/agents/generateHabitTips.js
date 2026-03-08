@@ -13,15 +13,17 @@
 // 类别的结构化 JSON 建议：入门、保持一致、克服挑战、高级策略和心态与动力。
 // =============================================================================
 
-const { HttpsError } = require("firebase-functions/v2/https");
 const {
+  HttpsError,
   getGenAI,
   validateArray,
   validateNumber,
   sanitizeForPrompt,
   getUserTier,
-  checkAndRecordUsage,
+  checkUsageLimit,
+  recordUsage,
   checkBurstLimit,
+  parseGeminiJSON,
 } = require("../helpers");
 
 /**
@@ -41,13 +43,14 @@ async function generateHabitTips(request) {
 
   await checkBurstLimit(request.auth.uid, 'tips');
   const tier = await getUserTier(request.auth.uid);
-  await checkAndRecordUsage(request.auth.uid, tier, 'report');
+  await checkUsageLimit(request.auth.uid, tier, 'report');
 
   // Extract user data for personalization (optional)
   const { userHabits, completionRate, bestStreak, totalCompletions } = request.data || {};
 
   const habits = validateArray(userHabits || [], 'userHabits', 50)
-    .map(h => sanitizeForPrompt(h));
+    .map(h => sanitizeForPrompt(h))
+    .filter(h => h.length > 0);
   const rate = validateNumber(completionRate ?? 0, 'completionRate', 0, 100);
   const streak = validateNumber(bestStreak ?? 0, 'bestStreak', 0, 10000);
   const completions = validateNumber(totalCompletions ?? 0, 'totalCompletions', 0, 100000);
@@ -102,17 +105,17 @@ async function generateHabitTips(request) {
     Format as JSON array. Do not include markdown formatting.
   `;
 
+  let returnValue;
   try {
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
 
-    const jsonStr = text.replace(/```json/g, "").replace(/```/g, "").trim();
-    const parsed = JSON.parse(jsonStr);
+    const parsed = parseGeminiJSON(text);
 
     const VALID_TIP_CATEGORIES = ['gettingStarted', 'stayingConsistent', 'overcomingChallenges', 'advancedStrategies', 'mindsetAndMotivation'];
     if (!Array.isArray(parsed)) throw new Error('Expected array');
-    return parsed.slice(0, 20).map(item => ({
+    returnValue = parsed.slice(0, 20).map(item => ({
       title: String(item.title || '').substring(0, 100),
       content: String(item.content || '').substring(0, 500),
       category: VALID_TIP_CATEGORIES.includes(item.category) ? item.category : 'gettingStarted',
@@ -120,9 +123,16 @@ async function generateHabitTips(request) {
       actionable: String(item.actionable || '').substring(0, 300),
     }));
   } catch (error) {
-    console.error("Error generating tips:", error.message || error);
-    throw new HttpsError("internal", `Failed to generate tips: ${error.message || 'Unknown error'}`);
+    console.error(`[generateHabitTips] Error for user ${request.auth.uid}:`, error.message || error);
+    throw new HttpsError("internal", "Failed to generate tips. Please try again.");
   }
+
+  try {
+    await recordUsage(request.auth.uid, 'report');
+  } catch (usageError) {
+    console.error(`[generateHabitTips] Failed to record usage for ${request.auth.uid}:`, usageError.message);
+  }
+  return returnValue;
 }
 
 module.exports = generateHabitTips;

@@ -60,7 +60,8 @@ async function sendDailySummaries(event) {
       }
 
       // Check if it's the user's scheduled notification hour
-      if (userHour === prefs.dailySummaryHour) {
+      const scheduledHour = typeof prefs.dailySummaryHour === 'number' ? prefs.dailySummaryHour : 20;
+      if (userHour === scheduledHour) {
         console.log(`Time match for user: hour ${userHour}`);
         matchingUsers.push({ userDoc, userTimezone, fcmTokens, userHour });
       }
@@ -69,11 +70,6 @@ async function sendDailySummaries(event) {
     // Parallelize habit queries for all matching users
     await Promise.all(matchingUsers.map(async ({ userDoc, userTimezone, fcmTokens, userHour }) => {
       try {
-        const habitsSnapshot = await db.collection('users').doc(userDoc.id)
-          .collection('habits')
-          .get();
-
-        let habitCount = 0;
         let todayLocal;
         try {
           todayLocal = new Date(now.toLocaleString('en-US', { timeZone: userTimezone }));
@@ -82,8 +78,26 @@ async function sendDailySummaries(event) {
           const utc8Offset = 8 * 60 * 60 * 1000;
           todayLocal = new Date(now.getTime() + utc8Offset);
         }
+
+        // Duplicate notification guard
+        const userData = userDoc.data();
+        const todayStr = todayLocal.toISOString().split('T')[0];
+        if (userData.lastDailySummaryDate === todayStr) return;
+
+        const habitsSnapshot = await db.collection('users').doc(userDoc.id)
+          .collection('habits')
+          .get();
+
+        let habitCount = 0;
+        const todayDayOfWeek = todayLocal.getDay(); // 0=Sunday
         for (const habitDoc of habitsSnapshot.docs) {
           const data = habitDoc.data();
+
+          // Skip weekly habits not due today
+          if (data.frequencyType === 'weekly' && Array.isArray(data.weeklyDays)) {
+            if (!data.weeklyDays.includes(todayDayOfWeek)) continue;
+          }
+
           const lastCompleted = data.lastCompletedDate?.toDate();
           if (!lastCompleted) {
             habitCount++;
@@ -132,6 +146,11 @@ async function sendDailySummaries(event) {
           const response = await messaging.sendEachForMulticast(message);
           console.log(`Notification sent: ${response.successCount} success, ${response.failureCount} failed`);
           notificationsSent++;
+
+          // Mark as sent today to prevent duplicates
+          await db.collection('users').doc(userDoc.id).update({
+            lastDailySummaryDate: todayStr,
+          });
 
           // Remove invalid tokens
           if (response.failureCount > 0) {

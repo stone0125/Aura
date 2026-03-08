@@ -233,7 +233,7 @@ class ExportService {
       await NotificationService().show(
         title: 'Export Complete',
         body: 'aura_habits.csv saved to Downloads',
-        payload: filePath,
+        payload: 'export_complete',
       );
       await shareFile(filePath, subject: 'My Habits - CSV Export');
       await AnalyticsService().logDataExported(
@@ -252,7 +252,7 @@ class ExportService {
       await NotificationService().show(
         title: 'Export Complete',
         body: 'aura_habits_backup.json saved to Downloads',
-        payload: filePath,
+        payload: 'export_complete',
       );
       await shareFile(filePath, subject: 'My Habits - Full Backup');
       await AnalyticsService().logDataExported(

@@ -12,15 +12,17 @@
 // 返回类 Pearson 相关系数、最佳条件和可操作的健康-习惯洞察。
 // =============================================================================
 
-const { HttpsError } = require("firebase-functions/v2/https");
 const {
+  HttpsError,
   getGenAI,
   validateArray,
   sanitizeForPrompt,
   checkBurstLimit,
   getUserTier,
-  checkAndRecordUsage,
+  checkUsageLimit,
+  recordUsage,
   VALID_CATEGORIES,
+  parseGeminiJSON,
 } = require("../helpers");
 
 /// Analyze health-habit correlations using AI
@@ -35,7 +37,7 @@ async function generateHealthCorrelations(request) {
 
   await checkBurstLimit(request.auth.uid, 'correlations');
   const tier = await getUserTier(request.auth.uid);
-  await checkAndRecordUsage(request.auth.uid, tier, 'report');
+  await checkUsageLimit(request.auth.uid, tier, 'report');
 
   const data = request.data || {};
 
@@ -61,10 +63,10 @@ async function generateHealthCorrelations(request) {
 
   const healthSummary = {
     days: healthData.length,
-    avgSteps: healthData.reduce((a, b) => a + (b.steps || 0), 0) / healthData.length,
-    avgSleep: healthData.reduce((a, b) => a + (b.sleepHours || 0), 0) / healthData.length,
-    avgHeartRate: healthData.reduce((a, b) => a + (b.heartRate || 0), 0) / healthData.length,
-    avgActiveMinutes: healthData.reduce((a, b) => a + (b.activeMinutes || 0), 0) / healthData.length
+    avgSteps: healthData.reduce((a, b) => a + (Number(b.steps) || 0), 0) / healthData.length,
+    avgSleep: healthData.reduce((a, b) => a + (Number(b.sleepHours) || 0), 0) / healthData.length,
+    avgHeartRate: healthData.reduce((a, b) => a + (Number(b.heartRate) || 0), 0) / healthData.length,
+    avgActiveMinutes: healthData.reduce((a, b) => a + (Number(b.activeMinutes) || 0), 0) / healthData.length
   };
 
   const prompt = `
@@ -129,13 +131,13 @@ async function generateHealthCorrelations(request) {
     Do not include markdown formatting.
   `;
 
+  let returnValue;
   try {
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
 
-    const jsonStr = text.replace(/```json/g, "").replace(/```/g, "").trim();
-    const parsed = JSON.parse(jsonStr);
+    const parsed = parseGeminiJSON(text);
 
     const VALID_IMPACTS = ['strong_positive', 'moderate_positive', 'weak_positive', 'none', 'weak_negative', 'moderate_negative', 'strong_negative'];
     const VALID_METRICS = ['sleep', 'steps', 'heartRate', 'activeMinutes'];
@@ -155,7 +157,7 @@ async function generateHealthCorrelations(request) {
       return result;
     };
 
-    return {
+    returnValue = {
       correlations: Array.isArray(parsed.correlations) ? parsed.correlations.slice(0, 10).map(c => ({
         metric: VALID_METRICS.includes(c.metric) ? c.metric : 'steps',
         impact: VALID_IMPACTS.includes(c.impact) ? c.impact : 'none',
@@ -168,9 +170,16 @@ async function generateHealthCorrelations(request) {
       actionPlan: String(parsed.actionPlan || '').substring(0, 1000),
     };
   } catch (error) {
-    console.error("Error generating health correlations:", error.message || error);
-    throw new HttpsError("internal", `Failed to generate health correlations: ${error.message || 'Unknown error'}`);
+    console.error(`[generateHealthCorrelations] Error for user ${request.auth.uid}:`, error.message || error);
+    throw new HttpsError("internal", "Failed to generate health correlations. Please try again.");
   }
+
+  try {
+    await recordUsage(request.auth.uid, 'report');
+  } catch (usageError) {
+    console.error(`[generateHealthCorrelations] Failed to record usage for ${request.auth.uid}:`, usageError.message);
+  }
+  return returnValue;
 }
 
 module.exports = generateHealthCorrelations;

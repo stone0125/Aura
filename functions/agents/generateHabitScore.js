@@ -11,8 +11,8 @@
 // 分配字母等级（A+ 到 F）并提供优势/劣势分析。
 // =============================================================================
 
-const { HttpsError } = require("firebase-functions/v2/https");
 const {
+  HttpsError,
   getGenAI,
   validateString,
   validateNumber,
@@ -21,7 +21,9 @@ const {
   sanitizeForPrompt,
   checkBurstLimit,
   getUserTier,
-  checkAndRecordUsage,
+  checkUsageLimit,
+  recordUsage,
+  parseGeminiJSON,
 } = require("../helpers");
 
 /// Generate a comprehensive performance score for a single habit
@@ -36,7 +38,7 @@ async function generateHabitScore(request) {
 
   await checkBurstLimit(request.auth.uid, 'score');
   const tier = await getUserTier(request.auth.uid);
-  await checkAndRecordUsage(request.auth.uid, tier, 'report');
+  await checkUsageLimit(request.auth.uid, tier, 'report');
 
   const data = request.data || {};
 
@@ -48,8 +50,12 @@ async function generateHabitScore(request) {
   const totalCompletions = validateNumber(data.totalCompletions ?? 0, 'totalCompletions', 0, 100000);
   const completionHistory = validateArray(data.completionHistory || [], 'completionHistory', 30);
   const healthData = data.healthData || null;
-  const goalType = data.goalType || null;
-  const goalValue = data.goalValue ? Number(data.goalValue) : null;
+  const VALID_GOAL_TYPES = ['none', 'daily', 'weekly', 'monthly'];
+  const rawGoalType = data.goalType || null;
+  const goalType = VALID_GOAL_TYPES.includes(rawGoalType) ? rawGoalType : null;
+  const goalValue = data.goalValue && Number.isFinite(Number(data.goalValue))
+    ? Math.min(10000, Math.max(1, Number(data.goalValue)))
+    : null;
   const goalUnit = data.goalUnit ? sanitizeForPrompt(String(data.goalUnit)).substring(0, 50) : null;
 
   const model = getGenAI().getGenerativeModel({ model: "gemini-3-flash-preview" });
@@ -145,20 +151,20 @@ async function generateHabitScore(request) {
     Do not include markdown formatting.
   `;
 
+  let returnValue;
   try {
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
 
-    const jsonStr = text.replace(/```json/g, "").replace(/```/g, "").trim();
-    const parsed = JSON.parse(jsonStr);
+    const parsed = parseGeminiJSON(text);
 
     const VALID_GRADES = ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D', 'F'];
     const validateBreakdown = (b) => ({
       score: Math.min(100, Math.max(0, Number(b?.score) || 0)),
       analysis: String(b?.analysis || '').substring(0, 500),
     });
-    return {
+    returnValue = {
       overallScore: Math.min(100, Math.max(0, Number(parsed.overallScore) || 0)),
       grade: VALID_GRADES.includes(parsed.grade) ? parsed.grade : 'C',
       breakdown: {
@@ -174,9 +180,16 @@ async function generateHabitScore(request) {
       healthCorrelation: parsed.healthCorrelation ? String(parsed.healthCorrelation).substring(0, 500) : null,
     };
   } catch (error) {
-    console.error("Error generating habit score:", error.message || error);
-    throw new HttpsError("internal", `Failed to generate habit score: ${error.message || 'Unknown error'}`);
+    console.error(`[generateHabitScore] Error for user ${request.auth.uid}:`, error.message || error);
+    throw new HttpsError("internal", "Failed to generate habit score. Please try again.");
   }
+
+  try {
+    await recordUsage(request.auth.uid, 'report');
+  } catch (usageError) {
+    console.error(`[generateHabitScore] Failed to record usage for ${request.auth.uid}:`, usageError.message);
+  }
+  return returnValue;
 }
 
 module.exports = generateHabitScore;

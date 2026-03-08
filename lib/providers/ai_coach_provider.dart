@@ -396,6 +396,9 @@ class AICoachProvider with ChangeNotifier {
       await _cacheData(_suggestionsCacheKey, cacheData);
       _suggestionsError = null;
       _usedFallback = false;
+      if (forceRefresh) {
+        _lastSuggestionRefreshTime = DateTime.now();
+      }
       debugPrint('Loaded ${_suggestions.length} AI suggestions successfully');
       return true;
     } catch (e) {
@@ -410,9 +413,6 @@ class AICoachProvider with ChangeNotifier {
     } finally {
       _inProgressOps.remove('suggestions');
       _isLoadingSuggestions = false;
-      if (forceRefresh) {
-        _lastSuggestionRefreshTime = DateTime.now();
-      }
       notifyListeners();
     }
   }

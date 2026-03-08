@@ -9,16 +9,18 @@
 // 个性化的每日、每周和挑战行动项。
 // =============================================================================
 
-const { HttpsError } = require("firebase-functions/v2/https");
 const {
+  HttpsError,
   getGenAI,
   validateArray,
   validateNumber,
   sanitizeForPrompt,
   getUserTier,
-  checkAndRecordUsage,
+  checkUsageLimit,
+  recordUsage,
   checkBurstLimit,
   VALID_CATEGORIES,
+  parseGeminiJSON,
 } = require("../helpers");
 
 /**
@@ -38,7 +40,7 @@ async function generateActionItems(request) {
 
   await checkBurstLimit(request.auth.uid, 'actions');
   const tier = await getUserTier(request.auth.uid);
-  await checkAndRecordUsage(request.auth.uid, tier, 'report');
+  await checkUsageLimit(request.auth.uid, tier, 'report');
 
   const { habits, completionRate, bestStreak } = request.data || {};
 
@@ -97,18 +99,18 @@ async function generateActionItems(request) {
     Do not include markdown formatting.
   `;
 
+  let returnValue;
   try {
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
 
-    const jsonStr = text.replace(/```json/g, "").replace(/```/g, "").trim();
-    const parsed = JSON.parse(jsonStr);
+    const parsed = parseGeminiJSON(text);
 
     const VALID_ACTION_TYPES = ['daily', 'weekly', 'challenge'];
     const VALID_PRIORITIES = ['high', 'medium', 'low'];
     if (!Array.isArray(parsed)) throw new Error('Expected array');
-    return parsed.slice(0, 10).map(item => ({
+    returnValue = parsed.slice(0, 10).map(item => ({
       title: String(item.title || '').substring(0, 200),
       description: String(item.description || '').substring(0, 500),
       type: VALID_ACTION_TYPES.includes(item.type) ? item.type : 'daily',
@@ -120,9 +122,16 @@ async function generateActionItems(request) {
       metric: String(item.metric || '').substring(0, 200),
     }));
   } catch (error) {
-    console.error("Error generating action items:", error.message || error);
-    throw new HttpsError("internal", `Failed to generate action items: ${error.message || 'Unknown error'}`);
+    console.error(`[generateActionItems] Error for user ${request.auth.uid}:`, error.message || error);
+    throw new HttpsError("internal", "Failed to generate action items. Please try again.");
   }
+
+  try {
+    await recordUsage(request.auth.uid, 'report');
+  } catch (usageError) {
+    console.error(`[generateActionItems] Failed to record usage for ${request.auth.uid}:`, usageError.message);
+  }
+  return returnValue;
 }
 
 module.exports = generateActionItems;

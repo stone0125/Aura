@@ -10,16 +10,18 @@
 // 返回基于数据的专业洞察，包含图标和置信度。
 // =============================================================================
 
-const { HttpsError } = require("firebase-functions/v2/https");
 const {
+  HttpsError,
   getGenAI,
   validateString,
   validateNumber,
   validateCategory,
   sanitizeForPrompt,
   getUserTier,
-  checkAndRecordUsage,
+  checkUsageLimit,
+  recordUsage,
   checkBurstLimit,
+  parseGeminiJSON,
 } = require("../helpers");
 
 async function generateHabitInsight(request) {
@@ -32,22 +34,21 @@ async function generateHabitInsight(request) {
 
   await checkBurstLimit(request.auth.uid, 'habitInsight');
   const tier = await getUserTier(request.auth.uid);
-  await checkAndRecordUsage(request.auth.uid, tier, 'report');
+  await checkUsageLimit(request.auth.uid, tier, 'report');
 
   // Input validation
   const data = request.data || {};
 
   const habitName = sanitizeForPrompt(validateString(data.habitName || '', 'habitName', 100));
   const category = validateCategory(data.category || 'health');
-  const currentStreak = validateNumber(data.currentStreak, 'currentStreak', 0, 10000);
-  const totalCompletions = validateNumber(data.totalCompletions, 'totalCompletions', 0, 100000);
-  const recentDays = validateNumber(data.recentDays, 'recentDays', 0, 7);
+  const currentStreak = validateNumber(data.currentStreak ?? 0, 'currentStreak', 0, 10000);
+  const totalCompletions = validateNumber(data.totalCompletions ?? 0, 'totalCompletions', 0, 100000);
+  const recentDays = validateNumber(data.recentDays ?? 0, 'recentDays', 0, 7);
 
   const model = getGenAI().getGenerativeModel({ model: "gemini-3-flash-preview" });
 
   // Calculate performance metrics
   const recentCompletionRate = recentDays > 0 ? ((recentDays / 7) * 100).toFixed(0) : 0;
-  const avgCompletionsPerWeek = totalCompletions > 0 ? (totalCompletions / Math.max(1, Math.ceil(currentStreak / 7))).toFixed(1) : 0;
 
   const prompt = `
     You are a behavioral analytics specialist. Analyze this habit's performance data and provide a data-driven insight.
@@ -58,7 +59,6 @@ async function generateHabitInsight(request) {
     - Current streak: ${currentStreak} days
     - Total completions: ${totalCompletions}
     - 7-day completion rate: ${recentCompletionRate}% (${recentDays}/7 days)
-    - Avg weekly completions: ${avgCompletionsPerWeek}
 
     ANALYSIS REQUIREMENTS:
     Generate a concise, professional insight (1-2 sentences) that:
@@ -81,24 +81,31 @@ async function generateHabitInsight(request) {
     Do not include markdown formatting.
   `;
 
+  let returnValue;
   try {
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
 
-    const jsonStr = text.replace(/```json/g, "").replace(/```/g, "").trim();
-    const parsed = JSON.parse(jsonStr);
+    const parsed = parseGeminiJSON(text);
 
     const VALID_ICONS = ['trending_up', 'emoji_events', 'psychology', 'timer', 'favorite'];
-    return {
+    returnValue = {
       text: String(parsed.text || '').substring(0, 500),
       icon: VALID_ICONS.includes(parsed.icon) ? parsed.icon : 'psychology',
       confidence: ['high', 'medium'].includes(parsed.confidence) ? parsed.confidence : 'medium',
     };
   } catch (error) {
-    console.error("Error generating habit insight:", error.message || error);
-    throw new HttpsError("internal", `Failed to generate habit insight: ${error.message || 'Unknown error'}`);
+    console.error(`[generateHabitInsight] Error for user ${request.auth.uid}:`, error.message || error);
+    throw new HttpsError("internal", "Failed to generate habit insight. Please try again.");
   }
+
+  try {
+    await recordUsage(request.auth.uid, 'report');
+  } catch (usageError) {
+    console.error(`[generateHabitInsight] Failed to record usage for ${request.auth.uid}:`, usageError.message);
+  }
+  return returnValue;
 }
 
 module.exports = generateHabitInsight;

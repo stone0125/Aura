@@ -11,12 +11,14 @@
 // =============================================================================
 
 const {
+  HttpsError,
   getGenAI,
   sanitizeForPrompt,
   checkBurstLimit,
   getUserTier,
-  checkAndRecordUsage,
-  HttpsError,
+  checkUsageLimit,
+  recordUsage,
+  parseGeminiJSON,
 } = require("../helpers");
 
 async function generateWeeklyInsights(request) {
@@ -29,7 +31,7 @@ async function generateWeeklyInsights(request) {
 
   await checkBurstLimit(request.auth.uid, 'insights');
   const tier = await getUserTier(request.auth.uid);
-  await checkAndRecordUsage(request.auth.uid, tier, 'report');
+  await checkUsageLimit(request.auth.uid, tier, 'report');
 
   // Input validation
   const { weekData } = request.data || {};
@@ -77,13 +79,13 @@ async function generateWeeklyInsights(request) {
     Do not include markdown formatting.
   `;
 
+  let returnValue;
   try {
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
 
-    const jsonStr = text.replace(/```json/g, "").replace(/```/g, "").trim();
-    const parsed = JSON.parse(jsonStr);
+    const parsed = parseGeminiJSON(text);
 
     const VALID_NEXT_STEP_TIMEFRAMES = ['today', 'this week', 'next week'];
     const VALID_NEXT_STEP_PRIORITIES = ['high', 'medium', 'low'];
@@ -95,16 +97,23 @@ async function generateWeeklyInsights(request) {
         }))
       : [];
 
-    return {
+    returnValue = {
       summary: String(parsed.summary || '').substring(0, 1000),
       pattern: String(parsed.pattern || '').substring(0, 500),
       improvement: String(parsed.improvement || '').substring(0, 500),
       nextSteps,
     };
   } catch (error) {
-    console.error("Error generating insights:", error.message || error);
-    throw new HttpsError("internal", `Failed to generate insights: ${error.message || 'Unknown error'}`);
+    console.error(`[generateWeeklyInsights] Error for user ${request.auth.uid}:`, error.message || error);
+    throw new HttpsError("internal", "Failed to generate insights. Please try again.");
   }
+
+  try {
+    await recordUsage(request.auth.uid, 'report');
+  } catch (usageError) {
+    console.error(`[generateWeeklyInsights] Failed to record usage for ${request.auth.uid}:`, usageError.message);
+  }
+  return returnValue;
 }
 
 module.exports = generateWeeklyInsights;

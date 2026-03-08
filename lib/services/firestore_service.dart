@@ -31,6 +31,7 @@ import '../models/settings_models.dart';
 import '../models/ai_scoring_models.dart';
 import '../models/daily_review_models.dart';
 import '../models/health_data_models.dart';
+import '../utils/date_utils.dart' as date_utils;
 
 class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -260,11 +261,7 @@ class FirestoreService {
   /// 检查给定日期是否为今天
   bool _isCompletedToday(DateTime? lastCompletedDate) {
     if (lastCompletedDate == null) return false;
-    final now = DateTime.now();
-    final localDate = lastCompletedDate.toLocal();
-    return localDate.year == now.year &&
-        localDate.month == now.month &&
-        localDate.day == now.day;
+    return date_utils.isToday(lastCompletedDate.toLocal());
   }
 
   /// Add a new habit to Firestore
@@ -410,46 +407,59 @@ class FirestoreService {
     // Determine new state
     final willBeCompleted = !isCompletedToday;
 
-    // Calculate new streak (check if streak should continue or reset)
-    int newStreak = habit.streak;
-    if (willBeCompleted) {
-      // Check if streak should continue (completed yesterday) or reset to 1
-      if (_wasCompletedYesterday(habit.lastCompletedDate)) {
-        // Streak continues - add 1
-        newStreak = habit.streak + 1;
-      } else {
-        // Streak broken (skipped days) - reset to 1
-        newStreak = 1;
-      }
-    } else if (habit.streak > 0) {
-      newStreak = habit.streak - 1;
-    }
-
-    // Create updated habit
-    final updatedHabit = habit.copyWith(
-      isCompleted: willBeCompleted,
-      streak: newStreak,
-      lastCompletedDate: willBeCompleted ? DateTime.now() : null,
-      clearLastCompletedDate: !willBeCompleted,
-    );
-
-    // Atomic batch: update habit + history in one write
     final now = DateTime.now();
     final dateStr =
         "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
 
+    // Calculate new streak and lastCompletedDate
+    int newStreak = habit.streak;
+    DateTime? newLastCompletedDate;
+
+    if (willBeCompleted) {
+      // Completing: set lastCompletedDate to now
+      newLastCompletedDate = now;
+      if (_wasCompletedYesterday(habit.lastCompletedDate)) {
+        newStreak = habit.streak + 1;
+      } else {
+        newStreak = 1;
+      }
+    } else {
+      // Undoing: find the most recent completion before today
+      final previousCompletions = await habitsRef
+          .doc(habit.id)
+          .collection('history')
+          .where(FieldPath.documentId, isLessThan: dateStr)
+          .orderBy(FieldPath.documentId, descending: true)
+          .limit(1)
+          .get();
+
+      if (previousCompletions.docs.isNotEmpty) {
+        final data = previousCompletions.docs.first.data();
+        final ts = data['completedAt'];
+        if (ts is Timestamp) {
+          newLastCompletedDate = ts.toDate();
+        }
+      }
+      // If no previous completion, newLastCompletedDate stays null
+
+      if (habit.streak > 0) {
+        newStreak = habit.streak - 1;
+      }
+    }
+
+    // Atomic batch: update habit + history in one write
     final batch = _db.batch();
     batch.update(habitsRef.doc(habit.id), {
-      'name': updatedHabit.name,
-      'category': updatedHabit.category.name,
-      'streak': updatedHabit.streak,
-      'isCompleted': updatedHabit.isCompleted,
-      'lastCompletedDate': updatedHabit.lastCompletedDate != null
-          ? Timestamp.fromDate(updatedHabit.lastCompletedDate!)
+      'name': habit.name,
+      'category': habit.category.name,
+      'streak': newStreak,
+      'isCompleted': willBeCompleted,
+      'lastCompletedDate': newLastCompletedDate != null
+          ? Timestamp.fromDate(newLastCompletedDate)
           : null,
-      'reminderEnabled': updatedHabit.reminderEnabled,
-      'reminderHour': updatedHabit.reminderTime?.hour,
-      'reminderMinute': updatedHabit.reminderTime?.minute,
+      'reminderEnabled': habit.reminderEnabled,
+      'reminderHour': habit.reminderTime?.hour,
+      'reminderMinute': habit.reminderTime?.minute,
     });
 
     if (willBeCompleted) {
@@ -784,10 +794,12 @@ class FirestoreService {
   /// 从 Firestore 删除所有用户数据（子集合 + 用户文档）。
   /// Subcollection counts are bounded, so client-side batch deletes are safe.
   /// 子集合数量有限，因此客户端批量删除是安全的。
-  Future<void> deleteAllUserData() async {
-    final userId = _userId;
-    final userDoc = _userDoc;
-    if (userId == null || userDoc == null) return;
+  /// Accepts an optional [forUserId] to delete data for a specific user
+  /// (needed when auth user is already deleted).
+  Future<void> deleteAllUserData({String? forUserId}) async {
+    final userId = forUserId ?? _userId;
+    if (userId == null) return;
+    final userDoc = _usersRef.doc(userId);
 
     final List<DocumentReference> toDelete = [];
 

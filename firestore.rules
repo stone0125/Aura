@@ -84,7 +84,7 @@ service cloud.firestore {
         allow read: if isOwner(userId);
         allow create: if isOwner(userId);
         allow update: if isOwner(userId);
-        allow delete: if false;
+        allow delete: if isOwner(userId); // Allow owner to delete (needed for account deletion)
       }
 
       // Habit scores subcollection (AI-generated scores)
@@ -92,7 +92,7 @@ service cloud.firestore {
         allow read: if isOwner(userId);
         allow create: if isOwner(userId);
         allow update: if isOwner(userId);
-        allow delete: if false;
+        allow delete: if isOwner(userId); // Allow owner to delete (needed for account deletion)
 
         match /history/{date} {
           allow read: if isOwner(userId);
@@ -107,23 +107,22 @@ service cloud.firestore {
         allow read: if isOwner(userId);
         allow create: if isOwner(userId);
         allow update: if isOwner(userId);
-        allow delete: if false;
+        allow delete: if isOwner(userId); // Allow owner to delete (needed for account deletion)
       }
 
       // Usage counters subcollection (server-side subscription enforcement)
       match /usageCounters/{counterId} {
         allow read: if isOwner(userId);
-        allow write: if false; // Only server (admin SDK) can write
+        allow create: if false; // Only server (admin SDK) can create
+        allow update: if false; // Only server (admin SDK) can update
+        allow delete: if isOwner(userId); // Allow owner to delete (needed for account deletion)
       }
     }
     
-    // Support messages (submitted via Cloud Function)
+    // Support messages (submitted only via Cloud Function — admin SDK bypasses rules)
+    // 支持消息（仅通过 Cloud Function 提交 — admin SDK 绕过规则）
     match /supportMessages/{messageId} {
-      allow create: if isAuthenticated()
-        && request.resource.data.userId == request.auth.uid
-        && request.resource.data.type in ['contact_support', 'bug_report', 'feature_request']
-        && request.resource.data.status == 'new';
-      allow read, update, delete: if false;
+      allow read, create, update, delete: if false;
     }
 
     // Deny all other access by default

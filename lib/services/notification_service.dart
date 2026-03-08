@@ -161,6 +161,7 @@ class NotificationService {
 
           // Whitelist of safe payload patterns
           if (payload == 'daily_summary' ||
+              payload == 'export_complete' ||
               _isValidHabitId(payload)) {
             // Safe payload - can be used for navigation
             debugPrint('Valid notification payload received');
