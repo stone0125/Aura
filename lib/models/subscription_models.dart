@@ -1,3 +1,18 @@
+// =============================================================================
+// subscription_models.dart — Subscription & Tier Models
+// 订阅与层级模型
+//
+// Models for RevenueCat subscription management. Defines three tiers:
+// Starter (free), Growth, and Mastery — each with different limits on
+// habits, AI features, and export capabilities. Contains SubscriptionTier
+// enum, TierLimits, and UsageInfo for quota tracking.
+//
+// RevenueCat 订阅管理的数据模型。定义三个层级：
+// Starter（免费）、Growth 和 Mastery——每个层级对习惯数量、
+// AI 功能和导出能力有不同限制。包含 SubscriptionTier 枚举、
+// TierLimits 和 UsageInfo（配额追踪）。
+// =============================================================================
+
 /// Subscription tier enumeration
 enum SubscriptionTier {
   starter,

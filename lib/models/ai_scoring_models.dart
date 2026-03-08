@@ -1,4 +1,15 @@
-// AI Scoring models for habit performance analysis
+// =============================================================================
+// ai_scoring_models.dart — AI Scoring Data Models
+// AI 评分数据模型
+//
+// Models for the AI habit scoring system. Each habit is scored across
+// 4 dimensions (0-100): Consistency, Momentum, Resilience, Engagement.
+// Contains ScoreComponent (individual dimension) and HabitScore (aggregate).
+//
+// AI 习惯评分系统的数据模型。每个习惯在 4 个维度（0-100）上评分：
+// 一致性、动力、韧性、参与度。
+// 包含 ScoreComponent（单个维度）和 HabitScore（综合评分）。
+// =============================================================================
 
 /// Individual score component for a dimension of habit performance
 class ScoreComponent {

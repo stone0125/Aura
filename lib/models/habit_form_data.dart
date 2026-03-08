@@ -1,3 +1,16 @@
+// =============================================================================
+// habit_form_data.dart — Habit Creation/Editing Form Data
+// 习惯创建/编辑表单数据
+//
+// Mutable form data class used by the habit creation and editing screens.
+// Holds all user input: name, description, category, icon, frequency type
+// (daily/weekly/custom), goal settings, and reminder configuration.
+//
+// 习惯创建和编辑界面使用的可变表单数据类。
+// 保存所有用户输入：名称、描述、类别、图标、频率类型
+// （每日/每周/自定义）、目标设置和提醒配置。
+// =============================================================================
+
 import 'package:flutter/material.dart';
 import 'habit_category.dart';
 

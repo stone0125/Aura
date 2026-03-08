@@ -1,3 +1,18 @@
+// =============================================================================
+// progress_models.dart — Progress Analytics Data Models
+// 进度分析数据模型
+//
+// Models for the progress/analytics screen. Includes DateRange enum,
+// ProgressStats (overall completion metrics), CategoryStats (per-category
+// breakdown), Achievement badges, TrendData (time-series), and
+// HeatmapData (calendar visualisation). Used by ProgressProvider.
+//
+// 进度/分析界面的数据模型。包括 DateRange 枚举、
+// ProgressStats（整体完成指标）、CategoryStats（按类别细分）、
+// Achievement 徽章、TrendData（时间序列）和
+// HeatmapData（日历可视化）。由 ProgressProvider 使用。
+// =============================================================================
+
 import 'package:flutter/material.dart';
 import 'habit.dart';
 import 'habit_category.dart';

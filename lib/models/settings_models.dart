@@ -1,3 +1,18 @@
+// =============================================================================
+// settings_models.dart — Settings & User Profile Models
+// 设置与用户资料模型
+//
+// Data classes for user settings and profile management. UserProfile stores
+// account info (name, email, avatar, membership). UserSettings holds
+// preferences for theme mode, notifications, and text size.
+// Used by SettingsProvider and the settings screen.
+//
+// 用户设置和资料管理的数据类。UserProfile 存储账户信息
+// （姓名、邮箱、头像、会员状态）。UserSettings 保存
+// 主题模式、通知和字体大小的偏好设置。
+// 由 SettingsProvider 和设置界面使用。
+// =============================================================================
+
 import 'package:flutter/material.dart';
 
 /// User profile data

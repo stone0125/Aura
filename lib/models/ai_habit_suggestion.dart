@@ -1,3 +1,14 @@
+// =============================================================================
+// ai_habit_suggestion.dart — AI Habit Suggestion Model
+// AI 习惯建议模型
+//
+// Lightweight model for AI-suggested habits. Contains habit name, category,
+// explanation, and reason. Used when the AI recommends new habits for the user.
+//
+// AI 建议习惯的轻量级模型。包含习惯名称、类别、解释和原因。
+// 当 AI 为用户推荐新习惯时使用。
+// =============================================================================
+
 import 'habit_category.dart';
 
 /// AI-generated habit suggestion model

@@ -1,3 +1,16 @@
+// =============================================================================
+// ai_coach_models.dart — AI Coach Data Models
+// AI 教练数据模型
+//
+// Data classes for AI coach features: suggestions with impact/effort ratings,
+// weekly summaries, detected behaviour patterns, tips, and action items.
+// Used by AICoachProvider to display AI-generated content on the coach screen.
+//
+// AI 教练功能的数据类：带有影响/努力评级的建议、每周总结、
+// 检测到的行为模式、技巧和行动项。
+// 由 AICoachProvider 使用，在教练界面显示 AI 生成的内容。
+// =============================================================================
+
 import 'package:flutter/material.dart';
 import 'habit_category.dart';
 

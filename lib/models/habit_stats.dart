@@ -1,3 +1,16 @@
+// =============================================================================
+// habit_stats.dart — Habit Statistics Model
+// 习惯统计数据模型
+//
+// Immutable data class holding computed statistics for a single habit:
+// current streak, longest streak, total completions, completion rate,
+// best day of week, and best time of day.
+//
+// 保存单个习惯计算统计数据的不可变数据类：
+// 当前连续天数、最长连续天数、总完成次数、完成率、
+// 最佳星期几和最佳时间段。
+// =============================================================================
+
 /// Habit statistics model
 class HabitStats {
   final int currentStreak;

@@ -1,4 +1,14 @@
-// Daily Review models for AI coach reviews
+// =============================================================================
+// daily_review_models.dart — Daily Review Data Models
+// 每日回顾数据模型
+//
+// Models for AI-generated daily review reports. Contains HabitDayScore
+// (individual habit performance) and DailyReview (full day summary with
+// overall score, highlights, and recommendations).
+//
+// AI 生成的每日回顾报告的数据模型。包含 HabitDayScore（单个习惯表现）
+// 和 DailyReview（包含综合评分、亮点和建议的全天总结）。
+// =============================================================================
 
 /// Individual habit's daily performance score
 class HabitDayScore {
