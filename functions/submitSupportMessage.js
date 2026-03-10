@@ -18,7 +18,7 @@ const {
   VALID_SUPPORT_TYPES,
   SMTP_USER,
   smtpPassword,
-} = require("../helpers");
+} = require("./helpers");
 
 /// Submit a support message and send email notification
 /// 提交支持消息并发送邮件通知

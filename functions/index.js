@@ -20,8 +20,6 @@
 // - generateDailyReview: Daily performance review (每日回顾)
 // - generateHabitInsight: Single habit AI insight (单个习惯洞察)
 // - generateHealthCorrelations: Health-habit correlation analysis (健康关联分析)
-// - submitSupportMessage: Send support emails (提交支持消息)
-// - sendDailySummaries: Scheduled push notifications (定时推送通知)
 // =============================================================================
 
 const { onCall } = require("firebase-functions/v2/https");
@@ -42,8 +40,8 @@ const generatePatternDiscovery = require("./agents/generatePatternDiscovery");
 const generateHabitScore = require("./agents/generateHabitScore");
 const generateDailyReview = require("./agents/generateDailyReview");
 const generateHealthCorrelations = require("./agents/generateHealthCorrelations");
-const submitSupportMessage = require("./agents/submitSupportMessage");
-const sendDailySummariesHandler = require("./agents/sendDailySummaries");
+const submitSupportMessage = require("./submitSupportMessage");
+const sendDailySummariesHandler = require("./sendDailySummaries");
 
 /// Initialize Firebase Admin SDK
 /// 初始化 Firebase Admin SDK
