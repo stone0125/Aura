@@ -1,6 +1,10 @@
 # Claude Code
 .claude/
 
+# Root-level npm (firebase-tools)
+/package.json
+/package-lock.json
+
 # Miscellaneous
 *.class
 *.log
