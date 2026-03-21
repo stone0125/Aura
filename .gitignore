@@ -1,5 +1,25 @@
 # Claude Code
 .claude/
+CLAUDE.md
+
+# Documentation & reports (not app code)
+doc/
+screenshots/
+generate_report.py
+keytool.txt
+delete-account.html
+privacy-policy.html
+play_store_icon_512.png
+
+# Dissertation & evaluation
+overleaf/
+evaluation/
+survey/
+*.xlsx
+hwu_cs_dissertation_2025_new*.pdf
+D1 Marked with feedback.pdf
+Aura Evaluation Survey*
+new app screenshot/
 
 # Root-level npm (firebase-tools)
 /package.json
