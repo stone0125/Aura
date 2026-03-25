@@ -16,7 +16,8 @@ overleaf/
 evaluation/
 survey/
 *.xlsx
-hwu_cs_dissertation_2025_new*.pdf
+hwu*.pdf
+latest_hwu*.pdf
 D1 Marked with feedback.pdf
 Aura Evaluation Survey*
 new app screenshot/

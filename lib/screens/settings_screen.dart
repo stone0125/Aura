@@ -13,6 +13,7 @@ import '../providers/theme_provider.dart';
 import '../providers/progress_provider.dart';
 import '../providers/habit_provider.dart';
 import '../providers/ai_scoring_provider.dart';
+// Future work — subscription/payment features, not included in the dissertation report.
 import '../services/subscription_service.dart';
 import '../models/subscription_models.dart';
 import '../services/export_service.dart';

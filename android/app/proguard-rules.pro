@@ -10,6 +10,7 @@
 -keep class com.google.firebase.** { *; }
 -dontwarn com.google.firebase.**
 
+# Future work — RevenueCat subscription, not included in the dissertation report.
 # Google Play Billing (RevenueCat dependency)
 -keep class com.android.vending.billing.** { *; }
 -keep class com.revenuecat.purchases.** { *; }

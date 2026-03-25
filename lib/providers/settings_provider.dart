@@ -53,11 +53,11 @@ class SettingsProvider with ChangeNotifier {
   void _initAuthListener() {
     _authSubscription = FirebaseAuth.instance.authStateChanges().listen((user) {
       if (user != null) {
-        // Link Firebase user to RevenueCat
+        // Future work — RevenueCat integration, not included in the dissertation report.
         SubscriptionService().loginUser(user.uid);
         initialize();
       } else {
-        // Reset RevenueCat to anonymous (also clears usage quotas)
+        // Future work — RevenueCat integration, not included in the dissertation report.
         SubscriptionService().logoutUser();
         // Reset singleton service state
         BadgeService().resetOnLogout();
@@ -257,7 +257,7 @@ class SettingsProvider with ChangeNotifier {
     }
   }
 
-  /// Upgrade to Pro — presents the RevenueCat paywall
+  /// Future work — RevenueCat paywall, not included in the dissertation report.
   /// 升级到 Pro — 展示 RevenueCat 付费墙
   Future<void> upgradeToPro() async {
     final subscriptionService = SubscriptionService();

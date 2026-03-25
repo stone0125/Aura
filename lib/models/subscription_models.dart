@@ -1,4 +1,6 @@
 // =============================================================================
+// NOTE: This file is for future work and is not included in the dissertation report.
+// =============================================================================
 // subscription_models.dart — Subscription & Tier Models
 // 订阅与层级模型
 //

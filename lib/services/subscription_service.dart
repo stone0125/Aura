@@ -1,4 +1,6 @@
 // =============================================================================
+// NOTE: This file is for future work and is not included in the dissertation report.
+// =============================================================================
 // subscription_service.dart — Subscription Service (RevenueCat)
 // 订阅服务（RevenueCat）
 //
