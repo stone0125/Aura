@@ -12,7 +12,7 @@
 const { HttpsError } = require("firebase-functions/v2/https");
 const { defineSecret } = require("firebase-functions/params");
 const admin = require("firebase-admin");
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+const { GoogleGenerativeAI, SchemaType } = require("@google/generative-ai");
 
 /// Secret definitions for external services
 /// 外部服务的密钥定义
@@ -35,8 +35,8 @@ const VALID_SUPPORT_TYPES = ['contact_support', 'bug_report', 'feature_request']
 /// Subscription tier rate limits
 /// 订阅层级速率限制
 const TIER_LIMITS = {
-  starter: { maxAISuggestionsPerDay: 3, maxAIReportsPerMonth: 20 },
-  growth:  { maxAISuggestionsPerDay: 5, maxAIReportsPerMonth: 30 },
+  starter: { maxAISuggestionsPerDay: -1, maxAIReportsPerMonth: -1 }, // PRESENTATION: was 3 / 20
+  growth:  { maxAISuggestionsPerDay: -1, maxAIReportsPerMonth: -1 }, // PRESENTATION: was 5 / 30
   mastery: { maxAISuggestionsPerDay: -1, maxAIReportsPerMonth: -1 }, // unlimited
 };
 
@@ -115,6 +115,16 @@ function sanitizeEmailInput(str) {
   return str.replace(/[\r\n]/g, ' ').trim();
 }
 
+/// Validate that Gemini returned a non-empty response, throw if empty
+/// 验证 Gemini 返回了非空响应，为空时抛出错误
+function validateGeminiResponse(text, functionName) {
+  if (!text || text.trim().length === 0) {
+    console.error(`[${functionName}] Gemini returned empty text`);
+    throw new HttpsError("internal", "AI service returned empty response. Please try again.");
+  }
+  return text;
+}
+
 /// Parse JSON from Gemini AI response text, stripping markdown fences
 /// 解析 Gemini AI 响应文本中的 JSON，去除 markdown 代码块标记
 function parseGeminiJSON(text) {
@@ -122,6 +132,7 @@ function parseGeminiJSON(text) {
   try {
     return JSON.parse(jsonStr);
   } catch (e) {
+    console.error('parseGeminiJSON failed:', e.message, '| Raw input (first 500 chars):', jsonStr.substring(0, 500));
     throw new HttpsError('internal', 'AI returned invalid response. Please try again.');
   }
 }
@@ -256,7 +267,8 @@ async function checkBurstLimit(userId, functionName, cooldownMs = 5000) {
     const doc = await transaction.get(ref);
     if (doc.exists) {
       const lastRequest = doc.data().timestamp?.toDate();
-      if (lastRequest && (Date.now() - lastRequest.getTime()) < cooldownMs) {
+      const timeSinceLastRequest = lastRequest ? Date.now() - lastRequest.getTime() : Infinity;
+      if (timeSinceLastRequest >= 0 && timeSinceLastRequest < cooldownMs) {
         throw new HttpsError('resource-exhausted',
           'Please wait a few seconds between AI requests.');
       }
@@ -267,6 +279,7 @@ async function checkBurstLimit(userId, functionName, cooldownMs = 5000) {
 
 module.exports = {
   HttpsError,
+  SchemaType,
   smtpPassword,
   revenueCatApiKey,
   geminiApiKey,
@@ -281,6 +294,7 @@ module.exports = {
   validateCategory,
   sanitizeForPrompt,
   sanitizeEmailInput,
+  validateGeminiResponse,
   parseGeminiJSON,
   getUserTier,
   checkUsageLimit,

@@ -1,6 +1,6 @@
-# Claude Code
-.claude/
-CLAUDE.md
+# Claude Code (keep project-level config tracked, exclude local)
+.claude/settings.local.json
+.claude/todos/
 
 # Documentation & reports (not app code)
 doc/
@@ -126,6 +126,9 @@ app.*.map.json
 .env.development
 .env.production
 .env.staging
+*.pem
+*.p8
+*.p12
 doc/api/
 
 # Node.js / Firebase Functions

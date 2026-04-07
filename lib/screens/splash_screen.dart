@@ -36,6 +36,8 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
   bool _initComplete = false;
   bool _minTimeElapsed = false;
   bool _transitioned = false;
+  bool _initError = false;
+  String? _initErrorMessage;
 
   /// Initializes animations and starts app initialization
   /// 初始化动画并开始应用初始化
@@ -48,10 +50,7 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
       vsync: this,
       duration: const Duration(milliseconds: 500),
     );
-    _logoFade = CurvedAnimation(
-      parent: _fadeController,
-      curve: Curves.easeIn,
-    );
+    _logoFade = CurvedAnimation(parent: _fadeController, curve: Curves.easeIn);
     _logoScale = Tween<double>(begin: 0.85, end: 1.0).animate(
       CurvedAnimation(parent: _fadeController, curve: Curves.easeOutBack),
     );
@@ -59,13 +58,13 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
       parent: _fadeController,
       curve: const Interval(0.3, 1.0, curve: Curves.easeIn),
     );
-    _textSlide = Tween<Offset>(
-      begin: const Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _fadeController,
-      curve: const Interval(0.3, 1.0, curve: Curves.easeOut),
-    ));
+    _textSlide = Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero)
+        .animate(
+          CurvedAnimation(
+            parent: _fadeController,
+            curve: const Interval(0.3, 1.0, curve: Curves.easeOut),
+          ),
+        );
 
     // Pulse glow (1500ms, repeating) — starts immediately
     _pulseController = AnimationController(
@@ -98,6 +97,13 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
       ]);
     } catch (e) {
       debugPrint('Splash init error: $e');
+      if (!mounted) return;
+      setState(() {
+        _initError = true;
+        _initErrorMessage =
+            'Something went wrong. Please check your connection and try again.';
+      });
+      return;
     }
 
     _initComplete = true;
@@ -142,8 +148,54 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
       return widget.destinationBuilder();
     }
 
-    final isDark =
-        MediaQuery.platformBrightnessOf(context) == Brightness.dark;
+    final isDark = MediaQuery.platformBrightnessOf(context) == Brightness.dark;
+
+    // Show error UI with retry button if initialization failed
+    // 如果初始化失败，显示带有重试按钮的错误界面
+    if (_initError) {
+      return Scaffold(
+        backgroundColor: isDark
+            ? AppColors.darkBackground
+            : AppColors.lightBackground,
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
+                const SizedBox(height: 16),
+                Text(
+                  'Failed to initialize',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _initErrorMessage ?? 'Unknown error',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: isDark
+                        ? AppColors.darkSecondaryText
+                        : AppColors.lightSecondaryText,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: () {
+                    setState(() {
+                      _initError = false;
+                      _initErrorMessage = null;
+                    });
+                    _initializeApp();
+                  },
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
@@ -152,84 +204,85 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
             ? AppColors.splashDarkGradientStart
             : AppColors.splashGradientStart,
         body: Container(
-            width: double.infinity,
-            height: double.infinity,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: isDark
-                    ? const [
-                        AppColors.splashDarkGradientStart,
-                        AppColors.splashDarkGradientMiddle,
-                        AppColors.splashDarkGradientEnd,
-                      ]
-                    : const [
-                        AppColors.splashGradientStart,
-                        AppColors.splashGradientMiddle,
-                        AppColors.splashGradientEnd,
-                      ],
-              ),
+          width: double.infinity,
+          height: double.infinity,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: isDark
+                  ? const [
+                      AppColors.splashDarkGradientStart,
+                      AppColors.splashDarkGradientMiddle,
+                      AppColors.splashDarkGradientEnd,
+                    ]
+                  : const [
+                      AppColors.splashGradientStart,
+                      AppColors.splashGradientMiddle,
+                      AppColors.splashGradientEnd,
+                    ],
             ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Logo with scale + fade + animated glow
-                AnimatedBuilder(
-                  animation: Listenable.merge([_logoFade, _pulseGlow]),
-                  builder: (context, child) {
-                    return FadeTransition(
-                      opacity: _logoFade,
-                      child: ScaleTransition(
-                        scale: _logoScale,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(28),
-                            boxShadow: [
-                              BoxShadow(
-                                color: (isDark
-                                        ? AppColors.splashDarkGlow
-                                        : AppColors.splashGlow)
-                                    .withValues(alpha: _pulseGlow.value),
-                                blurRadius: 40,
-                                spreadRadius: 10,
-                              ),
-                            ],
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(28),
-                            child: Image.asset(
-                              'assets/icon.png',
-                              width: 120,
-                              height: 120,
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Logo with scale + fade + animated glow
+              AnimatedBuilder(
+                animation: Listenable.merge([_logoFade, _pulseGlow]),
+                builder: (context, child) {
+                  return FadeTransition(
+                    opacity: _logoFade,
+                    child: ScaleTransition(
+                      scale: _logoScale,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(28),
+                          boxShadow: [
+                            BoxShadow(
+                              color:
+                                  (isDark
+                                          ? AppColors.splashDarkGlow
+                                          : AppColors.splashGlow)
+                                      .withValues(alpha: _pulseGlow.value),
+                              blurRadius: 40,
+                              spreadRadius: 10,
                             ),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(28),
+                          child: Image.asset(
+                            'assets/icon.png',
+                            width: 120,
+                            height: 120,
                           ),
                         ),
                       ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 24),
-                // App name with slide-up + fade-in
-                SlideTransition(
-                  position: _textSlide,
-                  child: FadeTransition(
-                    opacity: _textFade,
-                    child: const Text(
-                      'Aura',
-                      style: TextStyle(
-                        fontSize: 36,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        letterSpacing: 2.0,
-                      ),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 24),
+              // App name with slide-up + fade-in
+              SlideTransition(
+                position: _textSlide,
+                child: FadeTransition(
+                  opacity: _textFade,
+                  child: const Text(
+                    'Aura',
+                    style: TextStyle(
+                      fontSize: 36,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      letterSpacing: 2.0,
                     ),
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
+      ),
     );
   }
 }

@@ -14,9 +14,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'config/theme/app_colors.dart';
 import 'config/theme/app_theme.dart';
 import 'providers/theme_provider.dart';
+import 'services/badge_service.dart';
+import 'services/subscription_service.dart';
 import 'providers/habit_provider.dart';
 import 'providers/habit_detail_provider.dart';
 import 'providers/ai_coach_provider.dart';
@@ -35,16 +38,28 @@ import 'screens/email_verification_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Pre-load theme before runApp to prevent flash of wrong theme
+  // 在 runApp 之前预加载主题，防止主题闪烁
+  ThemeMode initialThemeMode = ThemeMode.light;
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final savedTheme = prefs.getString('theme_mode');
+    initialThemeMode = savedTheme == 'dark' ? ThemeMode.dark : ThemeMode.light;
+  } catch (e) {
+    debugPrint('Error loading theme preference: $e');
+  }
+
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(statusBarColor: Colors.transparent),
   );
-  runApp(const MyApp());
+  runApp(MyApp(initialThemeMode: initialThemeMode));
 }
 
 /// Root widget — sets up MultiProvider for state management and MaterialApp
 /// 根组件 — 设置 MultiProvider 进行状态管理并构建 MaterialApp
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final ThemeMode initialThemeMode;
+  const MyApp({super.key, required this.initialThemeMode});
 
   @override
   Widget build(BuildContext context) {
@@ -52,9 +67,11 @@ class MyApp extends StatelessWidget {
     // MultiProvider 用 7 个 Provider 包装应用，实现全局状态管理
     return MultiProvider(
       providers: [
-        // Theme Provider — manages light/dark mode
-        // 主题 Provider — 管理亮色/暗色模式
-        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        // Theme Provider — manages light/dark mode (pre-loaded to avoid flash)
+        // 主题 Provider — 管理亮色/暗色模式（预加载以避免闪烁）
+        ChangeNotifierProvider(
+          create: (_) => ThemeProvider(initialMode: initialThemeMode),
+        ),
 
         // Habit Provider — manages habit list, Firestore sync, streaks
         // 习惯 Provider — 管理习惯列表、Firestore 同步、连续记录
@@ -145,15 +162,29 @@ class _AuthWrapperState extends State<AuthWrapper> {
   /// 登出时清除所有 Provider 数据，防止跨用户数据泄露
   void _clearAllProviderData() {
     if (!mounted) return;
-    try {
-      context.read<HabitProvider>().clearUserData();
-      context.read<AICoachProvider>().clearUserData();
-      context.read<ProgressProvider>().clearUserData();
-      context.read<AIScoringProvider>().clearUserData();
-      context.read<HabitDetailProvider>().clearUserData();
-      context.read<ThemeProvider>().clearUserData();
-    } catch (e) {
-      debugPrint('Error clearing provider data on logout: $e');
+
+    // Clear each provider independently so one failure doesn't skip the rest
+    // 独立清除每个 Provider，防止一个失败导致其余被跳过
+    final clearActions = <String, VoidCallback>{
+      'HabitProvider': () => context.read<HabitProvider>().clearUserData(),
+      'AICoachProvider': () => context.read<AICoachProvider>().clearUserData(),
+      'ProgressProvider': () =>
+          context.read<ProgressProvider>().clearUserData(),
+      'AIScoringProvider': () =>
+          context.read<AIScoringProvider>().clearUserData(),
+      'HabitDetailProvider': () =>
+          context.read<HabitDetailProvider>().clearUserData(),
+      'ThemeProvider': () => context.read<ThemeProvider>().clearUserData(),
+      'BadgeService': () => BadgeService().resetOnLogout(),
+      'SubscriptionService': () => SubscriptionService().logoutUser(),
+    };
+
+    for (final entry in clearActions.entries) {
+      try {
+        entry.value();
+      } catch (e) {
+        debugPrint('Error clearing ${entry.key}: $e');
+      }
     }
   }
 
@@ -182,7 +213,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
         final user = snapshot.data;
         if (user != null) {
           // Gate email/password users behind email verification
-          final needsVerification = !user.emailVerified &&
+          final needsVerification =
+              !user.emailVerified &&
               user.providerData.any((p) => p.providerId == 'password');
           if (needsVerification) {
             return const EmailVerificationScreen();

@@ -15,6 +15,7 @@
 const {
   HttpsError,
   getGenAI,
+  SchemaType,
   validateArray,
   sanitizeForPrompt,
   checkBurstLimit,
@@ -22,8 +23,65 @@ const {
   checkUsageLimit,
   recordUsage,
   VALID_CATEGORIES,
+  validateGeminiResponse,
   parseGeminiJSON,
 } = require("../helpers");
+
+const OPTIMAL_CONDITION_SCHEMA = {
+  type: SchemaType.OBJECT,
+  properties: {
+    min: { type: SchemaType.NUMBER, description: "Minimum optimal value" },
+    max: { type: SchemaType.NUMBER, description: "Maximum optimal value" },
+    description: { type: SchemaType.STRING, description: "Optimal range explanation" },
+  },
+  required: ["min", "max", "description"],
+};
+
+const RESPONSE_SCHEMA = {
+  type: SchemaType.OBJECT,
+  properties: {
+    correlations: {
+      type: SchemaType.ARRAY,
+      items: {
+        type: SchemaType.OBJECT,
+        properties: {
+          metric: {
+            type: SchemaType.STRING,
+            format: "enum",
+            enum: ["sleep", "steps", "heartRate", "activeMinutes"],
+          },
+          impact: {
+            type: SchemaType.STRING,
+            format: "enum",
+            enum: ["strong_positive", "moderate_positive", "weak_positive", "none", "weak_negative", "moderate_negative", "strong_negative"],
+          },
+          correlation: { type: SchemaType.NUMBER, description: "Correlation coefficient -1 to 1" },
+          insight: { type: SchemaType.STRING, description: "1-2 sentence explanation" },
+          recommendation: { type: SchemaType.STRING, description: "Specific recommendation" },
+        },
+        required: ["metric", "impact", "correlation", "insight", "recommendation"],
+      },
+    },
+    optimalConditions: {
+      type: SchemaType.OBJECT,
+      description: "Optimal ranges for all 4 health metrics",
+      properties: {
+        steps: OPTIMAL_CONDITION_SCHEMA,
+        sleep: OPTIMAL_CONDITION_SCHEMA,
+        heartRate: OPTIMAL_CONDITION_SCHEMA,
+        activeMinutes: OPTIMAL_CONDITION_SCHEMA,
+      },
+      required: ["steps", "sleep", "heartRate", "activeMinutes"],
+    },
+    keyFindings: {
+      type: SchemaType.ARRAY,
+      description: "3-5 key findings",
+      items: { type: SchemaType.STRING },
+    },
+    actionPlan: { type: SchemaType.STRING, description: "Comprehensive recommendation paragraph" },
+  },
+  required: ["correlations", "optimalConditions", "keyFindings", "actionPlan"],
+};
 
 /// Analyze health-habit correlations using AI
 /// 使用 AI 分析健康与习惯的关联
@@ -35,8 +93,11 @@ async function generateHealthCorrelations(request) {
     );
   }
 
-  await checkBurstLimit(request.auth.uid, 'correlations');
-  const tier = await getUserTier(request.auth.uid);
+  // Parallelize independent checks to reduce latency
+  const [, tier] = await Promise.all([
+    checkBurstLimit(request.auth.uid, 'correlations'),
+    getUserTier(request.auth.uid),
+  ]);
   await checkUsageLimit(request.auth.uid, tier, 'report');
 
   const data = request.data || {};
@@ -51,7 +112,13 @@ async function generateHealthCorrelations(request) {
     throw new HttpsError('invalid-argument', 'Minimum 7 days of health data required for correlation analysis');
   }
 
-  const model = getGenAI().getGenerativeModel({ model: "gemini-3-flash-preview" });
+  const model = getGenAI().getGenerativeModel({
+    model: "gemini-3-flash-preview",
+    generationConfig: {
+      responseMimeType: "application/json",
+      responseSchema: RESPONSE_SCHEMA,
+    },
+  });
 
   // Prepare data summary (sanitized)
   const habitSummary = habitData.map(h => ({
@@ -92,6 +159,7 @@ async function generateHealthCorrelations(request) {
     2. Identify statistically significant patterns (consider sample size)
     3. Determine optimal conditions for habit completion
     4. Generate actionable insights
+    5. You MUST include all 4 metrics (steps, sleep, heartRate, activeMinutes) in optimalConditions
 
     CORRELATION STRENGTH SCALE:
     - strong_positive: r > 0.5
@@ -122,13 +190,13 @@ async function generateHealthCorrelations(request) {
       "keyFindings": [
         "<finding 1 - most significant insight>",
         "<finding 2>",
-        "<finding 3>"
+        "<finding 3>",
+        "...(3-5 findings total)"
       ],
       "actionPlan": "<comprehensive recommendation paragraph combining all insights>"
     }
 
     Use scientific language. Be honest about confidence levels given sample size.
-    Do not include markdown formatting.
   `;
 
   let returnValue;
@@ -136,29 +204,28 @@ async function generateHealthCorrelations(request) {
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
-
+    validateGeminiResponse(text, "generateHealthCorrelations");
     const parsed = parseGeminiJSON(text);
 
     const VALID_IMPACTS = ['strong_positive', 'moderate_positive', 'weak_positive', 'none', 'weak_negative', 'moderate_negative', 'strong_negative'];
     const VALID_METRICS = ['sleep', 'steps', 'heartRate', 'activeMinutes'];
 
     const sanitizeOptimalConditions = (o) => {
-      if (!o || typeof o !== 'object') return {};
+      if (!o || typeof o !== 'object') o = {};
       const result = {};
       for (const key of VALID_METRICS) {
-        if (o[key] && typeof o[key] === 'object') {
-          result[key] = {
-            min: Number(o[key].min) || 0,
-            max: Number(o[key].max) || 0,
-            description: String(o[key].description || '').substring(0, 300),
-          };
-        }
+        const metric = o[key] && typeof o[key] === 'object' ? o[key] : {};
+        result[key] = {
+          min: Number(metric.min) || 0,
+          max: Number(metric.max) || 0,
+          description: String(metric.description || '').substring(0, 300),
+        };
       }
       return result;
     };
 
     returnValue = {
-      correlations: Array.isArray(parsed.correlations) ? parsed.correlations.slice(0, 10).map(c => ({
+      correlations: Array.isArray(parsed.correlations) ? parsed.correlations.filter(c => c && typeof c === 'object').slice(0, 10).map(c => ({
         metric: VALID_METRICS.includes(c.metric) ? c.metric : 'steps',
         impact: VALID_IMPACTS.includes(c.impact) ? c.impact : 'none',
         correlation: Math.min(1, Math.max(-1, Number(c.correlation) || 0)),
@@ -166,7 +233,7 @@ async function generateHealthCorrelations(request) {
         recommendation: String(c.recommendation || '').substring(0, 500),
       })) : [],
       optimalConditions: sanitizeOptimalConditions(parsed.optimalConditions),
-      keyFindings: Array.isArray(parsed.keyFindings) ? parsed.keyFindings.slice(0, 5).map(f => String(f).substring(0, 500)) : [],
+      keyFindings: Array.isArray(parsed.keyFindings) ? parsed.keyFindings.filter(f => f != null).slice(0, 5).map(f => String(f).substring(0, 500)) : [],
       actionPlan: String(parsed.actionPlan || '').substring(0, 1000),
     };
   } catch (error) {

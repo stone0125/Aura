@@ -17,11 +17,7 @@
 
 /// Subscription tier enumeration
 /// 订阅层级枚举
-enum SubscriptionTier {
-  starter,
-  growth,
-  mastery,
-}
+enum SubscriptionTier { starter, growth, mastery }
 
 /// Extension methods for SubscriptionTier
 /// SubscriptionTier 的扩展方法
@@ -44,9 +40,9 @@ extension SubscriptionTierExtension on SubscriptionTier {
   int get maxHabits {
     switch (this) {
       case SubscriptionTier.starter:
-        return 5;
+        return -1; // PRESENTATION: was 5
       case SubscriptionTier.growth:
-        return 10;
+        return -1; // PRESENTATION: was 10
       case SubscriptionTier.mastery:
         return -1; // Unlimited
     }
@@ -57,9 +53,9 @@ extension SubscriptionTierExtension on SubscriptionTier {
   int get maxAISuggestionsPerDay {
     switch (this) {
       case SubscriptionTier.starter:
-        return 3;
+        return -1; // PRESENTATION: was 3
       case SubscriptionTier.growth:
-        return 5;
+        return -1; // PRESENTATION: was 5
       case SubscriptionTier.mastery:
         return -1; // Unlimited
     }
@@ -70,7 +66,7 @@ extension SubscriptionTierExtension on SubscriptionTier {
   bool get hasTrendCharts {
     switch (this) {
       case SubscriptionTier.starter:
-        return false;
+        return true; // PRESENTATION: was false
       case SubscriptionTier.growth:
       case SubscriptionTier.mastery:
         return true;
@@ -80,13 +76,13 @@ extension SubscriptionTierExtension on SubscriptionTier {
   /// Whether full analytics are available
   /// 完整分析功能是否可用
   bool get hasFullAnalytics {
-    return this == SubscriptionTier.mastery;
+    return true; // PRESENTATION: was (this == SubscriptionTier.mastery)
   }
 
   /// Whether achievements are available
   /// 成就功能是否可用
   bool get hasAchievements {
-    return this == SubscriptionTier.mastery;
+    return true; // PRESENTATION: was (this == SubscriptionTier.mastery)
   }
 
   /// Maximum AI reports per month (insights, scores, reviews, etc.)
@@ -94,9 +90,9 @@ extension SubscriptionTierExtension on SubscriptionTier {
   int get maxAIReportsPerMonth {
     switch (this) {
       case SubscriptionTier.starter:
-        return 20;
+        return -1; // PRESENTATION: was 20
       case SubscriptionTier.growth:
-        return 30;
+        return -1; // PRESENTATION: was 30
       case SubscriptionTier.mastery:
         return -1; // Unlimited
     }

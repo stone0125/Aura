@@ -6,15 +6,25 @@ import '../../providers/habit_provider.dart';
 import '../../providers/ai_coach_provider.dart';
 import '../../config/theme/app_colors.dart';
 import '../../config/theme/ui_constants.dart';
-import '../../screens/habit_creation_screen.dart';
-import '../../screens/home_screen.dart';
 
 /// AI Suggestion Card widget (Live Version)
 /// AI 建议卡片组件（实时版本）
 class AISuggestionCard extends StatefulWidget {
+  /// Callback when user taps "Add" on a suggestion to create a habit
+  /// 用户点击建议上的"添加"按钮创建习惯时的回调
+  final void Function(AICoachSuggestion suggestion) onCreateHabitFromSuggestion;
+
+  /// Callback when user taps "View All Suggestions"
+  /// 用户点击"查看所有建议"时的回调
+  final VoidCallback onViewAllSuggestions;
+
   /// Creates an AI suggestion card widget
   /// 创建 AI 建议卡片组件
-  const AISuggestionCard({super.key});
+  const AISuggestionCard({
+    super.key,
+    required this.onCreateHabitFromSuggestion,
+    required this.onViewAllSuggestions,
+  });
 
   /// Creates the mutable state for this widget
   /// 创建此组件的可变状态
@@ -159,9 +169,10 @@ class _AISuggestionCardState extends State<AISuggestionCard> {
   @override
   Widget build(BuildContext context) {
     // Use Selector to only rebuild when specific fields change
-    final suggestions = context.select<AICoachProvider, List<AICoachSuggestion>>(
-      (provider) => provider.suggestions,
-    );
+    final suggestions = context
+        .select<AICoachProvider, List<AICoachSuggestion>>(
+          (provider) => provider.suggestions,
+        );
     final isLoading = context.select<AICoachProvider, bool>(
       (provider) => provider.isLoadingSuggestions,
     );
@@ -242,8 +253,8 @@ class _AISuggestionCardState extends State<AISuggestionCard> {
                   onTap: isLoading
                       ? null
                       : canRefresh
-                          ? _refreshSuggestions
-                          : _showCooldownTooltip,
+                      ? _refreshSuggestions
+                      : _showCooldownTooltip,
                   borderRadius: UIConstants.borderRadiusLarge,
                   child: Container(
                     key: _refreshButtonKey,
@@ -274,11 +285,15 @@ class _AISuggestionCardState extends State<AISuggestionCard> {
                             Icons.refresh_rounded,
                             color: canRefresh
                                 ? (isDark
-                                    ? AppColors.darkSecondaryText
-                                    : AppColors.lightSecondaryText)
+                                      ? AppColors.darkSecondaryText
+                                      : AppColors.lightSecondaryText)
                                 : (isDark
-                                    ? AppColors.darkSecondaryText.withValues(alpha: 0.3)
-                                    : AppColors.lightSecondaryText.withValues(alpha: 0.3)),
+                                      ? AppColors.darkSecondaryText.withValues(
+                                          alpha: 0.3,
+                                        )
+                                      : AppColors.lightSecondaryText.withValues(
+                                          alpha: 0.3,
+                                        )),
                             size: 18,
                           ),
                   ),
@@ -371,10 +386,7 @@ class _AISuggestionCardState extends State<AISuggestionCard> {
             SizedBox(
               width: 14,
               height: 14,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: coral,
-              ),
+              child: CircularProgressIndicator(strokeWidth: 2, color: coral),
             ),
             const SizedBox(width: 8),
             Text(
@@ -546,14 +558,7 @@ class _AISuggestionCardState extends State<AISuggestionCard> {
                           height: 28,
                           child: ElevatedButton(
                             onPressed: () {
-                              // Navigate to habit creation screen with Live AI Suggestion
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (context) => HabitCreationScreen(
-                                    aiCoachSuggestion: suggestion,
-                                  ),
-                                ),
-                              );
+                              widget.onCreateHabitFromSuggestion(suggestion);
                             },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: isDark
@@ -626,19 +631,13 @@ class _AISuggestionCardState extends State<AISuggestionCard> {
           alignment: Alignment.centerRight,
           child: TextButton(
             onPressed: () {
-              // 1. Set the initial tab on the provider
+              // Set the initial tab on the provider
               Provider.of<AICoachProvider>(
                 context,
                 listen: false,
               ).setTab(AICoachTab.suggestions);
 
-              // 2. Switch to AI Coach tab (index 2)
-              // We find the ancestor HomeScreenState and call switchToTab
-              final homeState = context
-                  .findAncestorStateOfType<HomeScreenState>();
-              if (homeState != null) {
-                homeState.switchToTab(2);
-              }
+              widget.onViewAllSuggestions();
             },
             style: TextButton.styleFrom(
               padding: EdgeInsets.zero,

@@ -45,11 +45,11 @@ class AppTheme {
     ),
 
     // AppBar Theme - Standardized: 20px, w600, elevation 0
-    appBarTheme: AppBarTheme(
+    appBarTheme: const AppBarTheme(
       backgroundColor: AppColors.lightBackground,
       elevation: UIConstants.appBarElevation,
       scrolledUnderElevation: 0,
-      iconTheme: const IconThemeData(color: AppColors.lightPrimaryText),
+      iconTheme: IconThemeData(color: AppColors.lightPrimaryText),
       titleTextStyle: TextStyle(
         color: AppColors.lightPrimaryText,
         fontSize: UIConstants.appBarTitleSize,
@@ -74,14 +74,11 @@ class AppTheme {
         backgroundColor: AppColors.lightCoral,
         foregroundColor: Colors.white,
         elevation: 0,
-        minimumSize: Size(0, UIConstants.buttonHeightPrimary),
+        minimumSize: const Size(0, UIConstants.buttonHeightPrimary),
         shape: RoundedRectangleBorder(
           borderRadius: UIConstants.borderRadiusMedium,
         ),
-        textStyle: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-        ),
+        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
       ),
     ),
 
@@ -89,15 +86,12 @@ class AppTheme {
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         foregroundColor: AppColors.lightCoral,
-        minimumSize: Size(0, UIConstants.buttonHeightSecondary),
+        minimumSize: const Size(0, UIConstants.buttonHeightSecondary),
         side: const BorderSide(color: AppColors.lightBorder, width: 1.5),
         shape: RoundedRectangleBorder(
           borderRadius: UIConstants.borderRadiusMedium,
         ),
-        textStyle: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-        ),
+        textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
       ),
     ),
 
@@ -115,10 +109,7 @@ class AppTheme {
       unselectedItemColor: AppColors.lightSecondaryText,
       type: BottomNavigationBarType.fixed,
       elevation: 8,
-      selectedLabelStyle: TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.w600,
-      ),
+      selectedLabelStyle: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
       unselectedLabelStyle: TextStyle(
         fontSize: 12,
         fontWeight: FontWeight.w400,
@@ -281,11 +272,11 @@ class AppTheme {
     ),
 
     // AppBar Theme - Standardized: 20px, w600, elevation 0
-    appBarTheme: AppBarTheme(
+    appBarTheme: const AppBarTheme(
       backgroundColor: AppColors.darkBackground,
       elevation: UIConstants.appBarElevation,
       scrolledUnderElevation: 0,
-      iconTheme: const IconThemeData(color: AppColors.darkPrimaryText),
+      iconTheme: IconThemeData(color: AppColors.darkPrimaryText),
       titleTextStyle: TextStyle(
         color: AppColors.darkPrimaryText,
         fontSize: UIConstants.appBarTitleSize,
@@ -310,14 +301,11 @@ class AppTheme {
         backgroundColor: AppColors.darkCoral,
         foregroundColor: AppColors.darkBackground,
         elevation: 0,
-        minimumSize: Size(0, UIConstants.buttonHeightPrimary),
+        minimumSize: const Size(0, UIConstants.buttonHeightPrimary),
         shape: RoundedRectangleBorder(
           borderRadius: UIConstants.borderRadiusMedium,
         ),
-        textStyle: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-        ),
+        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
       ),
     ),
 
@@ -325,15 +313,12 @@ class AppTheme {
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         foregroundColor: AppColors.darkCoral,
-        minimumSize: Size(0, UIConstants.buttonHeightSecondary),
+        minimumSize: const Size(0, UIConstants.buttonHeightSecondary),
         side: const BorderSide(color: AppColors.darkBorder, width: 1.5),
         shape: RoundedRectangleBorder(
           borderRadius: UIConstants.borderRadiusMedium,
         ),
-        textStyle: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-        ),
+        textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
       ),
     ),
 
@@ -351,10 +336,7 @@ class AppTheme {
       unselectedItemColor: AppColors.darkSecondaryText,
       type: BottomNavigationBarType.fixed,
       elevation: 8,
-      selectedLabelStyle: TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.w600,
-      ),
+      selectedLabelStyle: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
       unselectedLabelStyle: TextStyle(
         fontSize: 12,
         fontWeight: FontWeight.w400,

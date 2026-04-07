@@ -13,13 +13,48 @@
 const {
   HttpsError,
   getGenAI,
+  SchemaType,
   sanitizeForPrompt,
   checkBurstLimit,
   getUserTier,
   checkUsageLimit,
   recordUsage,
+  validateGeminiResponse,
   parseGeminiJSON,
 } = require("../helpers");
+
+const RESPONSE_SCHEMA = {
+  type: SchemaType.OBJECT,
+  properties: {
+    summary: { type: SchemaType.STRING, description: "Professional analysis of overall weekly performance" },
+    pattern: { type: SchemaType.STRING, description: "One positive behavioral pattern identified" },
+    improvement: { type: SchemaType.STRING, description: "One specific area for optimization" },
+    nextSteps: {
+      type: SchemaType.ARRAY,
+      description: "2-4 specific, actionable next steps",
+      minItems: 2,
+      maxItems: 4,
+      items: {
+        type: SchemaType.OBJECT,
+        properties: {
+          action: { type: SchemaType.STRING, description: "A specific, measurable action" },
+          timeframe: {
+            type: SchemaType.STRING,
+            format: "enum",
+            enum: ["today", "this week", "next week"],
+          },
+          priority: {
+            type: SchemaType.STRING,
+            format: "enum",
+            enum: ["high", "medium", "low"],
+          },
+        },
+        required: ["action", "timeframe", "priority"],
+      },
+    },
+  },
+  required: ["summary", "pattern", "improvement", "nextSteps"],
+};
 
 async function generateWeeklyInsights(request) {
   if (!request.auth) {
@@ -29,8 +64,11 @@ async function generateWeeklyInsights(request) {
     );
   }
 
-  await checkBurstLimit(request.auth.uid, 'insights');
-  const tier = await getUserTier(request.auth.uid);
+  // Parallelize independent checks to reduce latency
+  const [, tier] = await Promise.all([
+    checkBurstLimit(request.auth.uid, 'insights'),
+    getUserTier(request.auth.uid),
+  ]);
   await checkUsageLimit(request.auth.uid, tier, 'report');
 
   // Input validation
@@ -52,12 +90,18 @@ async function generateWeeklyInsights(request) {
     }
   }
 
-  const model = getGenAI().getGenerativeModel({ model: "gemini-3-flash-preview" });
+  const model = getGenAI().getGenerativeModel({
+    model: "gemini-3-flash-preview",
+    generationConfig: {
+      responseMimeType: "application/json",
+      responseSchema: RESPONSE_SCHEMA,
+    },
+  });
 
   const prompt = `
     You are a behavioral data analyst specializing in habit formation. Analyze the following weekly performance data and provide actionable insights.
 
-    WEEKLY DATA:
+    WEEKLY DATA (keys are metric names, values are numeric measurements):
     ${JSON.stringify(sanitizedWeekData)}
 
     ANALYSIS FRAMEWORK:
@@ -76,7 +120,6 @@ async function generateWeeklyInsights(request) {
 
     Use evidence-based language (e.g., "Data shows...", "Your pattern indicates...", "Research suggests...").
     Format as JSON with keys: "summary", "pattern", "improvement", "nextSteps".
-    Do not include markdown formatting.
   `;
 
   let returnValue;
@@ -84,13 +127,13 @@ async function generateWeeklyInsights(request) {
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
-
+    validateGeminiResponse(text, "generateWeeklyInsights");
     const parsed = parseGeminiJSON(text);
 
     const VALID_NEXT_STEP_TIMEFRAMES = ['today', 'this week', 'next week'];
     const VALID_NEXT_STEP_PRIORITIES = ['high', 'medium', 'low'];
     const nextSteps = Array.isArray(parsed.nextSteps)
-      ? parsed.nextSteps.slice(0, 4).map(step => ({
+      ? parsed.nextSteps.filter(step => step && typeof step === 'object').slice(0, 4).map(step => ({
           action: String(step.action || '').substring(0, 300),
           timeframe: VALID_NEXT_STEP_TIMEFRAMES.includes(step.timeframe) ? step.timeframe : 'this week',
           priority: VALID_NEXT_STEP_PRIORITIES.includes(step.priority) ? step.priority : 'medium',

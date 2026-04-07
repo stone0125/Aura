@@ -65,17 +65,17 @@ class _AICoachScreenState extends State<AICoachScreen>
     );
     _animationController.forward();
 
-    // Skeleton pulse animation
+    // Skeleton pulse animation — started on demand when loading, not always
     _skeletonController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),
-    )..repeat(reverse: true);
+    );
 
-    // Usage icon pulse animation (for limit-reached state)
+    // Usage icon pulse animation — started on demand when limit reached
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1000),
-    )..repeat(reverse: true);
+    );
     _pulseAnimation = Tween<double>(begin: 0.85, end: 1.15).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
@@ -273,21 +273,15 @@ class _AICoachScreenState extends State<AICoachScreen>
                     HapticFeedback.lightImpact();
                     context.read<ThemeProvider>().toggleTheme();
                     final newIsDark = !isDark;
-                    context
-                        .read<SettingsProvider>()
-                        .setThemePreference(
-                          newIsDark
-                              ? ThemePreference.dark
-                              : ThemePreference.light,
-                        );
+                    context.read<SettingsProvider>().setThemePreference(
+                      newIsDark ? ThemePreference.dark : ThemePreference.light,
+                    );
                   },
                   borderRadius: BorderRadius.circular(20),
                   child: Container(
                     width: 40,
                     height: 40,
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                    ),
+                    decoration: const BoxDecoration(shape: BoxShape.circle),
                     child: Icon(
                       isDark
                           ? Icons.dark_mode_rounded
@@ -312,9 +306,18 @@ class _AICoachScreenState extends State<AICoachScreen>
   Widget _buildTabNavigation(bool isDark, AICoachProvider coachProvider) {
     final tier = SubscriptionService().currentTier;
     final isUnlimited = tier == SubscriptionTier.mastery;
-    final isAtLimit = !isUnlimited &&
+    final isAtLimit =
+        !isUnlimited &&
         (!coachProvider.canUseAISuggestion || !coachProvider.canUseAIReport);
     final coralColor = isDark ? AppColors.darkCoral : AppColors.lightCoral;
+
+    // Start/stop pulse animation based on limit state
+    if (isAtLimit && !_pulseController.isAnimating) {
+      _pulseController.repeat(reverse: true);
+    } else if (!isAtLimit && _pulseController.isAnimating) {
+      _pulseController.stop();
+      _pulseController.reset();
+    }
 
     final usageIcon = GestureDetector(
       onTap: () => _showUsageBottomSheet(context, isDark, coachProvider),
@@ -328,9 +331,7 @@ class _AICoachScreenState extends State<AICoachScreen>
           shape: BoxShape.circle,
         ),
         child: Icon(
-          isAtLimit
-              ? Icons.warning_amber_rounded
-              : Icons.data_usage_rounded,
+          isAtLimit ? Icons.warning_amber_rounded : Icons.data_usage_rounded,
           color: isAtLimit ? Colors.red : coralColor,
           size: 20,
         ),
@@ -357,70 +358,72 @@ class _AICoachScreenState extends State<AICoachScreen>
                     borderRadius: UIConstants.borderRadiusMedium,
                   ),
                   child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: AICoachTab.values.map((tab) {
-                    final isSelected = coachProvider.currentTab == tab;
-                    final tabColor = isSelected
-                        ? (isDark
-                              ? AppColors.darkPrimaryText
-                              : AppColors.lightPrimaryText)
-                        : (isDark
-                              ? AppColors.darkSecondaryText
-                              : AppColors.lightSecondaryText);
-                    return GestureDetector(
-                      onTap: () {
-                        HapticFeedback.selectionClick();
-                        coachProvider.setTab(tab);
-                        _loadTabData(tab, context);
-                      },
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeOutCubic,
-                        padding: EdgeInsets.symmetric(
-                          horizontal: isSelected ? 14 : 12,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? (isDark
-                                  ? AppColors.darkBorder
-                                  : AppColors.lightSurface)
-                              : Colors.transparent,
-                          borderRadius: UIConstants.borderRadiusSmall,
-                          boxShadow: isSelected
-                              ? [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.05),
-                                    blurRadius: 2,
-                                    offset: const Offset(0, 1),
-                                  ),
-                                ]
-                              : null,
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(tab.icon, size: 20, color: tabColor),
-                            if (isSelected)
-                              Padding(
-                                padding: const EdgeInsets.only(left: 6),
-                                child: Text(
-                                  tab.displayName,
-                                  style: TextStyle(
-                                    color: tabColor,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
+                    mainAxisSize: MainAxisSize.min,
+                    children: AICoachTab.values.map((tab) {
+                      final isSelected = coachProvider.currentTab == tab;
+                      final tabColor = isSelected
+                          ? (isDark
+                                ? AppColors.darkPrimaryText
+                                : AppColors.lightPrimaryText)
+                          : (isDark
+                                ? AppColors.darkSecondaryText
+                                : AppColors.lightSecondaryText);
+                      return GestureDetector(
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          coachProvider.setTab(tab);
+                          _loadTabData(tab, context);
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeOutCubic,
+                          padding: EdgeInsets.symmetric(
+                            horizontal: isSelected ? 14 : 12,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? (isDark
+                                      ? AppColors.darkBorder
+                                      : AppColors.lightSurface)
+                                : Colors.transparent,
+                            borderRadius: UIConstants.borderRadiusSmall,
+                            boxShadow: isSelected
+                                ? [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(
+                                        alpha: 0.05,
+                                      ),
+                                      blurRadius: 2,
+                                      offset: const Offset(0, 1),
+                                    ),
+                                  ]
+                                : null,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(tab.icon, size: 20, color: tabColor),
+                              if (isSelected)
+                                Padding(
+                                  padding: const EdgeInsets.only(left: 6),
+                                  child: Text(
+                                    tab.displayName,
+                                    style: TextStyle(
+                                      color: tabColor,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                 ),
-                              ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                    );
-                  }).toList(),
+                      );
+                    }).toList(),
+                  ),
                 ),
               ),
-            ),
             ),
           ),
           // Usage icon (pulses when at limit)
@@ -455,8 +458,9 @@ class _AICoachScreenState extends State<AICoachScreen>
 
     final maxSuggestions = tier.maxAISuggestionsPerDay;
     final remainingSuggestions = coachProvider.remainingAISuggestions;
-    final usedSuggestions =
-        isUnlimited ? 0 : maxSuggestions - remainingSuggestions;
+    final usedSuggestions = isUnlimited
+        ? 0
+        : maxSuggestions - remainingSuggestions;
 
     final maxReports = tier.maxAIReportsPerMonth;
     final remainingReports = coachProvider.remainingAIReports;
@@ -581,7 +585,9 @@ class _AICoachScreenState extends State<AICoachScreen>
   }) {
     final isAtLimit = !isUnlimited && used >= max;
     final color = isAtLimit ? Colors.red : coralColor;
-    final progress = isUnlimited ? 0.0 : (max > 0 ? (used / max).clamp(0.0, 1.0) : 0.0);
+    final progress = isUnlimited
+        ? 0.0
+        : (max > 0 ? (used / max).clamp(0.0, 1.0) : 0.0);
 
     return Row(
       children: [
@@ -617,8 +623,8 @@ class _AICoachScreenState extends State<AICoachScreen>
                   color: isAtLimit
                       ? Colors.red
                       : (isDark
-                          ? AppColors.darkSecondaryText
-                          : AppColors.lightSecondaryText),
+                            ? AppColors.darkSecondaryText
+                            : AppColors.lightSecondaryText),
                 ),
               ),
               if (!isUnlimited) ...[
@@ -661,7 +667,16 @@ class _AICoachScreenState extends State<AICoachScreen>
   /// 带有下拉刷新和建议卡片的建议标签
   Widget _buildSuggestionsTab(bool isDark, AICoachProvider coachProvider) {
     if (coachProvider.isLoadingSuggestions) {
+      // Start skeleton animation on demand
+      if (!_skeletonController.isAnimating) {
+        _skeletonController.repeat(reverse: true);
+      }
       return _buildSuggestionsLoadingSkeleton(isDark);
+    } else {
+      // Stop skeleton animation when not loading
+      if (_skeletonController.isAnimating) {
+        _skeletonController.stop();
+      }
     }
 
     return RefreshIndicator(
@@ -684,25 +699,41 @@ class _AICoachScreenState extends State<AICoachScreen>
                 ),
               ),
             )
-          : ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-              children: [
-                // Header row with refresh button and rate limit info
-                _buildSuggestionsHeader(isDark, coachProvider),
-                const SizedBox(height: 8),
-                // Fallback banner
-                if (coachProvider.usedFallback)
-                  _buildFallbackBanner(isDark, coachProvider),
-                // Suggestion cards
-                ...coachProvider.suggestions.map(
-                  (suggestion) => _buildSuggestionCard(
-                    isDark,
-                    suggestion,
-                    coachProvider,
-                  ),
-                ),
-              ],
-            ),
+          : _buildSuggestionsList(isDark, coachProvider),
+    );
+  }
+
+  /// Builds the suggestions list using ListView.builder for lazy rendering
+  /// 使用 ListView.builder 构建建议列表以实现懒加载渲染
+  Widget _buildSuggestionsList(bool isDark, AICoachProvider coachProvider) {
+    final suggestions = coachProvider.suggestions;
+    final hasFallback = coachProvider.usedFallback;
+    // Header + optional fallback banner + suggestion cards
+    final headerCount = hasFallback ? 2 : 1;
+    final totalItems = headerCount + suggestions.length;
+
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      itemCount: totalItems,
+      itemBuilder: (context, index) {
+        if (index == 0) {
+          return Column(
+            children: [
+              _buildSuggestionsHeader(isDark, coachProvider),
+              const SizedBox(height: 8),
+            ],
+          );
+        }
+        if (hasFallback && index == 1) {
+          return _buildFallbackBanner(isDark, coachProvider);
+        }
+        final suggestionIndex = index - headerCount;
+        return _buildSuggestionCard(
+          isDark,
+          suggestions[suggestionIndex],
+          coachProvider,
+        );
+      },
     );
   }
 
@@ -729,8 +760,8 @@ class _AICoachScreenState extends State<AICoachScreen>
             onTap: coachProvider.isLoadingSuggestions
                 ? null
                 : coachProvider.canRefreshSuggestions
-                    ? () => _refreshSuggestions(context)
-                    : () => _showCooldownTooltip(context),
+                ? () => _refreshSuggestions(context)
+                : () => _showCooldownTooltip(context),
             borderRadius: BorderRadius.circular(20),
             child: Container(
               key: _refreshButtonKey,
@@ -756,11 +787,15 @@ class _AICoachScreenState extends State<AICoachScreen>
                       Icons.refresh_rounded,
                       color: coachProvider.canRefreshSuggestions
                           ? (isDark
-                              ? AppColors.darkSecondaryText
-                              : AppColors.lightSecondaryText)
+                                ? AppColors.darkSecondaryText
+                                : AppColors.lightSecondaryText)
                           : (isDark
-                              ? AppColors.darkSecondaryText.withValues(alpha: 0.3)
-                              : AppColors.lightSecondaryText.withValues(alpha: 0.3)),
+                                ? AppColors.darkSecondaryText.withValues(
+                                    alpha: 0.3,
+                                  )
+                                : AppColors.lightSecondaryText.withValues(
+                                    alpha: 0.3,
+                                  )),
                       size: 20,
                     ),
             ),
@@ -797,8 +832,7 @@ class _AICoachScreenState extends State<AICoachScreen>
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              coachProvider.suggestionsError ??
-                  'Using default suggestions',
+              coachProvider.suggestionsError ?? 'Using default suggestions',
               style: TextStyle(
                 color: isDark ? Colors.red[300] : Colors.red[700],
                 fontSize: 12,
@@ -817,8 +851,8 @@ class _AICoachScreenState extends State<AICoachScreen>
                 color: coachProvider.canRefreshSuggestions
                     ? (isDark ? AppColors.darkCoral : AppColors.lightCoral)
                     : (isDark
-                        ? AppColors.darkCoral.withValues(alpha: 0.3)
-                        : AppColors.lightCoral.withValues(alpha: 0.3)),
+                          ? AppColors.darkCoral.withValues(alpha: 0.3)
+                          : AppColors.lightCoral.withValues(alpha: 0.3)),
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
                 decoration: TextDecoration.underline,
@@ -1147,27 +1181,34 @@ class _AICoachScreenState extends State<AICoachScreen>
         children: [
           // Outdated banner for weekly summary
           if (coachProvider.weeklySummary != null)
-            Builder(builder: (context) {
-              final habitProvider = context.watch<HabitProvider>();
-              if (!coachProvider.isWeeklySummaryOutdated(habitProvider.habits)) {
-                return const SizedBox.shrink();
-              }
-              return OutdatedReportBanner(
-                isRefreshing: coachProvider.isLoadingInsights,
-                onRefresh: () {
-                  final hp = Provider.of<HabitProvider>(context, listen: false);
-                  final weekData = {
-                    'totalCompletions': hp.totalCount,
-                    'currentStreak': hp.bestStreak,
-                  };
-                  coachProvider.loadInsights(
-                    weekData: weekData,
-                    habits: hp.habits,
-                    forceRefresh: true,
-                  );
-                },
-              );
-            }),
+            Builder(
+              builder: (context) {
+                final habitProvider = context.watch<HabitProvider>();
+                if (!coachProvider.isWeeklySummaryOutdated(
+                  habitProvider.habits,
+                )) {
+                  return const SizedBox.shrink();
+                }
+                return OutdatedReportBanner(
+                  isRefreshing: coachProvider.isLoadingInsights,
+                  onRefresh: () {
+                    final hp = Provider.of<HabitProvider>(
+                      context,
+                      listen: false,
+                    );
+                    final weekData = {
+                      'totalCompletions': hp.totalCount,
+                      'currentStreak': hp.bestStreak,
+                    };
+                    coachProvider.loadInsights(
+                      weekData: weekData,
+                      habits: hp.habits,
+                      forceRefresh: true,
+                    );
+                  },
+                );
+              },
+            ),
 
           // Weekly Summary
           if (coachProvider.weeklySummary != null)
@@ -1654,7 +1695,9 @@ class _AICoachScreenState extends State<AICoachScreen>
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: habitProvider.habits.isEmpty || scoringProvider.isLoadingReview
+              onPressed:
+                  habitProvider.habits.isEmpty ||
+                      scoringProvider.isLoadingReview
                   ? null
                   : () {
                       HapticFeedback.mediumImpact();
@@ -1689,12 +1732,14 @@ class _AICoachScreenState extends State<AICoachScreen>
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
                             color: isDark
-                                ? AppColors.darkBackground.withValues(alpha: 0.7)
+                                ? AppColors.darkBackground.withValues(
+                                    alpha: 0.7,
+                                  )
                                 : Colors.white.withValues(alpha: 0.7),
                           ),
                         ),
                         const SizedBox(width: 10),
-                        Text(
+                        const Text(
                           'Generating...',
                           style: TextStyle(
                             fontSize: 16,
@@ -1723,8 +1768,8 @@ class _AICoachScreenState extends State<AICoachScreen>
     final scoreColor = review.overallScore >= 80
         ? (isDark ? const Color(0xFF66BB6A) : const Color(0xFF4CAF50))
         : review.overallScore >= 60
-            ? (isDark ? const Color(0xFFFFB74D) : const Color(0xFFFF9800))
-            : (isDark ? const Color(0xFFEF5350) : const Color(0xFFF44336));
+        ? (isDark ? const Color(0xFFFFB74D) : const Color(0xFFFF9800))
+        : (isDark ? const Color(0xFFEF5350) : const Color(0xFFF44336));
 
     return Container(
       decoration: BoxDecoration(
@@ -1742,10 +1787,7 @@ class _AICoachScreenState extends State<AICoachScreen>
                 ],
         ),
         borderRadius: UIConstants.borderRadiusLarge,
-        border: Border.all(
-          color: scoreColor.withValues(alpha: 0.3),
-          width: 1,
-        ),
+        border: Border.all(color: scoreColor.withValues(alpha: 0.3), width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1762,10 +1804,7 @@ class _AICoachScreenState extends State<AICoachScreen>
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: scoreColor.withValues(alpha: 0.2),
-                    border: Border.all(
-                      color: scoreColor,
-                      width: 3,
-                    ),
+                    border: Border.all(color: scoreColor, width: 3),
                   ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -1814,11 +1853,11 @@ class _AICoachScreenState extends State<AICoachScreen>
                             size: 16,
                             color: review.scoreChange >= 0
                                 ? (isDark
-                                    ? const Color(0xFF66BB6A)
-                                    : const Color(0xFF4CAF50))
+                                      ? const Color(0xFF66BB6A)
+                                      : const Color(0xFF4CAF50))
                                 : (isDark
-                                    ? const Color(0xFFEF5350)
-                                    : const Color(0xFFF44336)),
+                                      ? const Color(0xFFEF5350)
+                                      : const Color(0xFFF44336)),
                           ),
                           const SizedBox(width: 4),
                           Text(
@@ -1855,9 +1894,7 @@ class _AICoachScreenState extends State<AICoachScreen>
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: isDark
-                    ? AppColors.darkSurface
-                    : AppColors.lightSurface,
+                color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
                 borderRadius: UIConstants.borderRadiusMedium,
               ),
               child: Column(
@@ -2048,8 +2085,10 @@ class _AICoachScreenState extends State<AICoachScreen>
   /// 每个习惯的评分细分区域，支持展开查看详情
   Widget _buildHabitScoreBreakdown(bool isDark, DailyReview review) {
     final habitProvider = Provider.of<HabitProvider>(context, listen: false);
-    final scoringProvider =
-        Provider.of<AIScoringProvider>(context, listen: false);
+    final scoringProvider = Provider.of<AIScoringProvider>(
+      context,
+      listen: false,
+    );
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
@@ -2075,32 +2114,28 @@ class _AICoachScreenState extends State<AICoachScreen>
             const SizedBox(height: 12),
             ...review.habitScores.map((habitScore) {
               final habit = habitProvider.habits
-                  .where((h) =>
-                      h.id == habitScore.habitId ||
-                      h.name == habitScore.habitId)
+                  .where(
+                    (h) =>
+                        h.id == habitScore.habitId ||
+                        h.name == habitScore.habitId,
+                  )
                   .firstOrNull;
               final habitName = habit?.name ?? habitScore.habitId;
               final habitId = habit?.id ?? habitScore.habitId;
               final isExpanded = _expandedHabits.contains(habitId);
 
               final statusIcon = _getStatusIcon(habitScore.status);
-              final statusColor =
-                  _getStatusColor(habitScore.status, isDark);
+              final statusColor = _getStatusColor(habitScore.status, isDark);
               final scoreColor = habitScore.score >= 80
-                  ? (isDark
-                      ? const Color(0xFF66BB6A)
-                      : const Color(0xFF4CAF50))
+                  ? (isDark ? const Color(0xFF66BB6A) : const Color(0xFF4CAF50))
                   : habitScore.score >= 60
-                      ? (isDark
-                          ? const Color(0xFFFFB74D)
-                          : const Color(0xFFFF9800))
-                      : (isDark
-                          ? const Color(0xFFEF5350)
-                          : const Color(0xFFF44336));
+                  ? (isDark ? const Color(0xFFFFB74D) : const Color(0xFFFF9800))
+                  : (isDark
+                        ? const Color(0xFFEF5350)
+                        : const Color(0xFFF44336));
 
               // Look up detailed HabitScore from AIScoringProvider
-              final detailedScore =
-                  scoringProvider.getScoreForHabit(habitId);
+              final detailedScore = scoringProvider.getScoreForHabit(habitId);
 
               return Padding(
                 padding: const EdgeInsets.only(bottom: 6),
@@ -2123,8 +2158,7 @@ class _AICoachScreenState extends State<AICoachScreen>
                         padding: const EdgeInsets.symmetric(vertical: 4),
                         child: Row(
                           children: [
-                            Icon(statusIcon,
-                                size: 16, color: statusColor),
+                            Icon(statusIcon, size: 16, color: statusColor),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
@@ -2146,8 +2180,7 @@ class _AICoachScreenState extends State<AICoachScreen>
                                 vertical: 2,
                               ),
                               decoration: BoxDecoration(
-                                color:
-                                    scoreColor.withValues(alpha: 0.15),
+                                color: scoreColor.withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
@@ -2162,8 +2195,7 @@ class _AICoachScreenState extends State<AICoachScreen>
                             const SizedBox(width: 4),
                             AnimatedRotation(
                               turns: isExpanded ? 0.5 : 0.0,
-                              duration:
-                                  const Duration(milliseconds: 200),
+                              duration: const Duration(milliseconds: 200),
                               child: Icon(
                                 Icons.expand_more_rounded,
                                 size: 18,
@@ -2192,10 +2224,11 @@ class _AICoachScreenState extends State<AICoachScreen>
                     // Divider between items
                     Divider(
                       height: 1,
-                      color: (isDark
-                              ? AppColors.darkSecondaryText
-                              : AppColors.lightSecondaryText)
-                          .withValues(alpha: 0.15),
+                      color:
+                          (isDark
+                                  ? AppColors.darkSecondaryText
+                                  : AppColors.lightSecondaryText)
+                              .withValues(alpha: 0.15),
                     ),
                   ],
                 ),
@@ -2237,26 +2270,50 @@ class _AICoachScreenState extends State<AICoachScreen>
           // 4-dimension breakdown bars (only if detailed score exists)
           if (detailedScore != null) ...[
             _buildDimensionBar(
-                isDark, 'Consistency', detailedScore.breakdown.consistency.score),
+              isDark,
+              'Consistency',
+              detailedScore.breakdown.consistency.score,
+            ),
             _buildDimensionBar(
-                isDark, 'Momentum', detailedScore.breakdown.momentum.score),
+              isDark,
+              'Momentum',
+              detailedScore.breakdown.momentum.score,
+            ),
             _buildDimensionBar(
-                isDark, 'Resilience', detailedScore.breakdown.resilience.score),
+              isDark,
+              'Resilience',
+              detailedScore.breakdown.resilience.score,
+            ),
             _buildDimensionBar(
-                isDark, 'Engagement', detailedScore.breakdown.engagement.score),
+              isDark,
+              'Engagement',
+              detailedScore.breakdown.engagement.score,
+            ),
             const SizedBox(height: 6),
             // Primary strength
             if (detailedScore.primaryStrength.isNotEmpty)
-              _buildInsightRow(isDark, Icons.star_rounded,
-                  const Color(0xFFFFB74D), detailedScore.primaryStrength),
+              _buildInsightRow(
+                isDark,
+                Icons.star_rounded,
+                const Color(0xFFFFB74D),
+                detailedScore.primaryStrength,
+              ),
             // Primary weakness
             if (detailedScore.primaryWeakness.isNotEmpty)
-              _buildInsightRow(isDark, Icons.flag_rounded,
-                  const Color(0xFFEF5350), detailedScore.primaryWeakness),
+              _buildInsightRow(
+                isDark,
+                Icons.flag_rounded,
+                const Color(0xFFEF5350),
+                detailedScore.primaryWeakness,
+              ),
             // Recommendation
             if (detailedScore.recommendation.isNotEmpty)
-              _buildInsightRow(isDark, Icons.lightbulb_outline_rounded,
-                  const Color(0xFF66BB6A), detailedScore.recommendation),
+              _buildInsightRow(
+                isDark,
+                Icons.lightbulb_outline_rounded,
+                const Color(0xFF66BB6A),
+                detailedScore.recommendation,
+              ),
           ],
         ],
       ),
@@ -2269,8 +2326,8 @@ class _AICoachScreenState extends State<AICoachScreen>
     final barColor = score >= 70
         ? (isDark ? const Color(0xFF66BB6A) : const Color(0xFF4CAF50))
         : score >= 50
-            ? (isDark ? const Color(0xFFFFB74D) : const Color(0xFFFF9800))
-            : (isDark ? const Color(0xFFEF5350) : const Color(0xFFF44336));
+        ? (isDark ? const Color(0xFFFFB74D) : const Color(0xFFFF9800))
+        : (isDark ? const Color(0xFFEF5350) : const Color(0xFFF44336));
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 5),
@@ -2295,10 +2352,11 @@ class _AICoachScreenState extends State<AICoachScreen>
               child: LinearProgressIndicator(
                 value: (score / 100.0).clamp(0.0, 1.0),
                 minHeight: 5,
-                backgroundColor: (isDark
-                        ? AppColors.darkSecondaryText
-                        : AppColors.lightSecondaryText)
-                    .withValues(alpha: 0.12),
+                backgroundColor:
+                    (isDark
+                            ? AppColors.darkSecondaryText
+                            : AppColors.lightSecondaryText)
+                        .withValues(alpha: 0.12),
                 valueColor: AlwaysStoppedAnimation<Color>(barColor),
               ),
             ),
@@ -2324,7 +2382,11 @@ class _AICoachScreenState extends State<AICoachScreen>
   /// Small insight row with icon + text
   /// 带有图标和文本的小型洞察行
   Widget _buildInsightRow(
-      bool isDark, IconData icon, Color iconColor, String text) {
+    bool isDark,
+    IconData icon,
+    Color iconColor,
+    String text,
+  ) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: Row(
@@ -2382,8 +2444,10 @@ class _AICoachScreenState extends State<AICoachScreen>
   /// 7-day score trend line chart
   /// 7天评分趋势折线图
   Widget _buildScoreTrendDots(bool isDark) {
-    final scoringProvider =
-        Provider.of<AIScoringProvider>(context, listen: false);
+    final scoringProvider = Provider.of<AIScoringProvider>(
+      context,
+      listen: false,
+    );
     final history = scoringProvider.reviewHistory;
 
     if (history.length < 2) return const SizedBox.shrink();
@@ -2394,8 +2458,7 @@ class _AICoachScreenState extends State<AICoachScreen>
     for (final r in history) {
       if (seenDates.add(r.date)) deduplicated.add(r);
     }
-    final recentReviews =
-        deduplicated.take(7).toList().reversed.toList();
+    final recentReviews = deduplicated.take(7).toList().reversed.toList();
     final scores = recentReviews.map((r) => r.overallScore).toList();
     final dayLabels = recentReviews.map((r) {
       try {
@@ -2406,8 +2469,7 @@ class _AICoachScreenState extends State<AICoachScreen>
       }
     }).toList();
 
-    final lineColor =
-        isDark ? AppColors.darkCoral : AppColors.lightCoral;
+    final lineColor = isDark ? AppColors.darkCoral : AppColors.lightCoral;
     final labelStyle = TextStyle(
       color: isDark
           ? AppColors.darkSecondaryText
@@ -2465,9 +2527,7 @@ class _AICoachScreenState extends State<AICoachScreen>
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isDark
-              ? const Color(0xFF1A2636)
-              : const Color(0xFFE8F5E9),
+          color: isDark ? const Color(0xFF1A2636) : const Color(0xFFE8F5E9),
           borderRadius: UIConstants.borderRadiusSmall,
         ),
         child: Column(
@@ -2579,8 +2639,8 @@ class _AICoachScreenState extends State<AICoachScreen>
     final scoreColor = avgScore >= 80
         ? (isDark ? const Color(0xFF66BB6A) : const Color(0xFF4CAF50))
         : avgScore >= 60
-            ? (isDark ? const Color(0xFFFFB74D) : const Color(0xFFFF9800))
-            : (isDark ? const Color(0xFFEF5350) : const Color(0xFFF44336));
+        ? (isDark ? const Color(0xFFFFB74D) : const Color(0xFFFF9800))
+        : (isDark ? const Color(0xFFEF5350) : const Color(0xFFF44336));
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -2695,7 +2755,9 @@ class _AICoachScreenState extends State<AICoachScreen>
             ],
           ),
           const SizedBox(height: 16),
-          ...correlations.keyFindings.take(3).map(
+          ...correlations.keyFindings
+              .take(3)
+              .map(
                 (finding) => Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Row(
@@ -2881,7 +2943,8 @@ class _AICoachScreenState extends State<AICoachScreen>
               isDark,
               icon: Icons.task_alt_rounded,
               title: 'No action items yet',
-              subtitle: 'Track habits for a few days and we\'ll generate personalized actions',
+              subtitle:
+                  'Track habits for a few days and we\'ll generate personalized actions',
             ),
             const SizedBox(height: 16),
             ElevatedButton.icon(
@@ -2977,28 +3040,43 @@ class _AICoachScreenState extends State<AICoachScreen>
 
           // Daily actions
           if (dailyActions.isNotEmpty) ...[
-            _buildActionGroupHeader(isDark, "Today's Actions", Icons.today_rounded),
+            _buildActionGroupHeader(
+              isDark,
+              "Today's Actions",
+              Icons.today_rounded,
+            ),
             const SizedBox(height: 8),
-            ...dailyActions.map((action) =>
-                _buildActionItemCard(isDark, action, coachProvider)),
+            ...dailyActions.map(
+              (action) => _buildActionItemCard(isDark, action, coachProvider),
+            ),
             const SizedBox(height: 20),
           ],
 
           // Weekly actions
           if (weeklyActions.isNotEmpty) ...[
-            _buildActionGroupHeader(isDark, 'This Week', Icons.date_range_rounded),
+            _buildActionGroupHeader(
+              isDark,
+              'This Week',
+              Icons.date_range_rounded,
+            ),
             const SizedBox(height: 8),
-            ...weeklyActions.map((action) =>
-                _buildActionItemCard(isDark, action, coachProvider)),
+            ...weeklyActions.map(
+              (action) => _buildActionItemCard(isDark, action, coachProvider),
+            ),
             const SizedBox(height: 20),
           ],
 
           // Challenges
           if (challenges.isNotEmpty) ...[
-            _buildActionGroupHeader(isDark, 'Challenges', Icons.emoji_events_rounded),
+            _buildActionGroupHeader(
+              isDark,
+              'Challenges',
+              Icons.emoji_events_rounded,
+            ),
             const SizedBox(height: 8),
-            ...challenges.map((action) =>
-                _buildActionItemCard(isDark, action, coachProvider)),
+            ...challenges.map(
+              (action) => _buildActionItemCard(isDark, action, coachProvider),
+            ),
           ],
 
           const SizedBox(height: 24),
@@ -3050,7 +3128,7 @@ class _AICoachScreenState extends State<AICoachScreen>
         border: Border.all(
           color: action.isCompleted
               ? (isDark ? const Color(0xFF66BB6A) : const Color(0xFF4CAF50))
-                  .withValues(alpha: 0.3)
+                    .withValues(alpha: 0.3)
               : (isDark ? AppColors.darkBorder : AppColors.lightBorder),
           width: 1,
         ),
@@ -3072,17 +3150,17 @@ class _AICoachScreenState extends State<AICoachScreen>
                 shape: BoxShape.circle,
                 color: action.isCompleted
                     ? (isDark
-                        ? const Color(0xFF66BB6A)
-                        : const Color(0xFF4CAF50))
+                          ? const Color(0xFF66BB6A)
+                          : const Color(0xFF4CAF50))
                     : Colors.transparent,
                 border: Border.all(
                   color: action.isCompleted
                       ? (isDark
-                          ? const Color(0xFF66BB6A)
-                          : const Color(0xFF4CAF50))
+                            ? const Color(0xFF66BB6A)
+                            : const Color(0xFF4CAF50))
                       : (isDark
-                          ? AppColors.darkSecondaryText
-                          : AppColors.lightSecondaryText),
+                            ? AppColors.darkSecondaryText
+                            : AppColors.lightSecondaryText),
                   width: 2,
                 ),
               ),
@@ -3153,13 +3231,20 @@ class _AICoachScreenState extends State<AICoachScreen>
                       GestureDetector(
                         onTap: action.relatedHabitId != null
                             ? () {
-                                final habitProvider = Provider.of<HabitProvider>(context, listen: false);
-                                final habit = habitProvider.habits.where((h) => h.id == action.relatedHabitId).firstOrNull;
+                                final habitProvider =
+                                    Provider.of<HabitProvider>(
+                                      context,
+                                      listen: false,
+                                    );
+                                final habit = habitProvider.habits
+                                    .where((h) => h.id == action.relatedHabitId)
+                                    .firstOrNull;
                                 if (habit != null) {
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (_) => HabitDetailScreen(habit: habit),
+                                      builder: (_) =>
+                                          HabitDetailScreen(habit: habit),
                                     ),
                                   );
                                 }
@@ -3171,10 +3256,11 @@ class _AICoachScreenState extends State<AICoachScreen>
                             vertical: 3,
                           ),
                           decoration: BoxDecoration(
-                            color: (isDark
-                                    ? AppColors.darkCoral
-                                    : AppColors.lightCoral)
-                                .withValues(alpha: 0.12),
+                            color:
+                                (isDark
+                                        ? AppColors.darkCoral
+                                        : AppColors.lightCoral)
+                                    .withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Row(
@@ -3294,10 +3380,7 @@ class _AICoachScreenState extends State<AICoachScreen>
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            coral.withValues(alpha: 0.08),
-            pink.withValues(alpha: 0.06),
-          ],
+          colors: [coral.withValues(alpha: 0.08), pink.withValues(alpha: 0.06)],
         ),
         borderRadius: UIConstants.borderRadiusMedium,
       ),
@@ -3356,10 +3439,7 @@ class _AICoachScreenState extends State<AICoachScreen>
           SizedBox(
             width: 18,
             height: 18,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              color: coral,
-            ),
+            child: CircularProgressIndicator(strokeWidth: 2, color: coral),
           ),
         ],
       ),
@@ -3372,49 +3452,52 @@ class _AICoachScreenState extends State<AICoachScreen>
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       children: [
-        _buildAIGeneratingHeader(isDark, 'Generating personalized suggestions...'),
+        _buildAIGeneratingHeader(
+          isDark,
+          'Generating personalized suggestions...',
+        ),
         ...List.generate(3, (index) {
-        return Container(
-          margin: const EdgeInsets.only(bottom: 16),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-            borderRadius: UIConstants.borderRadiusLarge,
-            border: Border.all(
-              color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  _buildSkeletonCircle(isDark, 48),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildSkeletonBox(isDark, 160, 16),
-                        const SizedBox(height: 8),
-                        _buildSkeletonBox(isDark, 100, 12),
-                      ],
-                    ),
-                  ),
-                ],
+          return Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+              borderRadius: UIConstants.borderRadiusLarge,
+              border: Border.all(
+                color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
               ),
-              const SizedBox(height: 16),
-              _buildSkeletonBox(isDark, double.infinity, 1),
-              const SizedBox(height: 16),
-              _buildSkeletonBox(isDark, double.infinity, 14),
-              const SizedBox(height: 8),
-              _buildSkeletonBox(isDark, 200, 14),
-              const SizedBox(height: 12),
-              _buildSkeletonBox(isDark, double.infinity, 60),
-            ],
-          ),
-        );
-      }),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    _buildSkeletonCircle(isDark, 48),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildSkeletonBox(isDark, 160, 16),
+                          const SizedBox(height: 8),
+                          _buildSkeletonBox(isDark, 100, 12),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _buildSkeletonBox(isDark, double.infinity, 1),
+                const SizedBox(height: 16),
+                _buildSkeletonBox(isDark, double.infinity, 14),
+                const SizedBox(height: 8),
+                _buildSkeletonBox(isDark, 200, 14),
+                const SizedBox(height: 12),
+                _buildSkeletonBox(isDark, double.infinity, 60),
+              ],
+            ),
+          );
+        }),
       ],
     );
   }
@@ -3472,37 +3555,42 @@ class _AICoachScreenState extends State<AICoachScreen>
           _buildSkeletonBox(isDark, 140, 18),
           const SizedBox(height: 12),
           // Pattern card skeletons
-          ...List.generate(2, (_) => Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-                borderRadius: UIConstants.borderRadiusMedium,
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildSkeletonCircle(isDark, 40),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildSkeletonBox(isDark, 80, 12),
-                        const SizedBox(height: 8),
-                        _buildSkeletonBox(isDark, 180, 15),
-                        const SizedBox(height: 6),
-                        _buildSkeletonBox(isDark, double.infinity, 13),
-                        const SizedBox(height: 4),
-                        _buildSkeletonBox(isDark, 160, 13),
-                      ],
+          ...List.generate(
+            2,
+            (_) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? AppColors.darkSurface
+                      : AppColors.lightSurface,
+                  borderRadius: UIConstants.borderRadiusMedium,
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildSkeletonCircle(isDark, 40),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildSkeletonBox(isDark, 80, 12),
+                          const SizedBox(height: 8),
+                          _buildSkeletonBox(isDark, 180, 15),
+                          const SizedBox(height: 6),
+                          _buildSkeletonBox(isDark, double.infinity, 13),
+                          const SizedBox(height: 4),
+                          _buildSkeletonBox(isDark, 160, 13),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          )),
+          ),
         ],
       ),
     );
@@ -3787,19 +3875,23 @@ class _AICoachScreenState extends State<AICoachScreen>
 
   /// Loads AI-generated action items based on current habits
   /// 根据当前习惯加载AI生成的行动项
-  Future<void> _loadActionItems(BuildContext context,
-      {bool forceRefresh = false}) async {
+  Future<void> _loadActionItems(
+    BuildContext context, {
+    bool forceRefresh = false,
+  }) async {
     final coachProvider = Provider.of<AICoachProvider>(context, listen: false);
     final habitProvider = Provider.of<HabitProvider>(context, listen: false);
 
     final habitsData = habitProvider.habits
-        .map((h) => {
-              'id': h.id,
-              'name': h.name,
-              'category': h.category.name,
-              'streak': h.streak,
-              'completed': h.isCompleted,
-            })
+        .map(
+          (h) => {
+            'id': h.id,
+            'name': h.name,
+            'category': h.category.name,
+            'streak': h.streak,
+            'completed': h.isCompleted,
+          },
+        )
         .toList();
 
     await coachProvider.loadActionItems(
@@ -3811,9 +3903,9 @@ class _AICoachScreenState extends State<AICoachScreen>
 
     if (forceRefresh && coachProvider.actionsError != null) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(coachProvider.actionsError!)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(coachProvider.actionsError!)));
         coachProvider.clearActionsError();
       }
     }
@@ -3844,7 +3936,10 @@ class _AICoachScreenState extends State<AICoachScreen>
         'totalCompletions': habitProvider.totalCount,
         'currentStreak': habitProvider.bestStreak,
       };
-      coachProvider.loadInsights(weekData: weekData, habits: habitProvider.habits);
+      coachProvider.loadInsights(
+        weekData: weekData,
+        habits: habitProvider.habits,
+      );
       // Also load patterns if not already populated
       if (coachProvider.patterns.isEmpty) {
         _loadPatterns(context);
@@ -3902,7 +3997,6 @@ class _AICoachScreenState extends State<AICoachScreen>
     if (!mounted) return;
     await coachProvider.loadPatterns(habitsData: habitsData);
   }
-
 }
 
 /// Custom painter for the 7-day score trend line chart
@@ -3936,9 +4030,9 @@ class ScoreTrendChartPainter extends CustomPainter {
     const double leftPadding = 24; // room for Y-axis min/max labels
     const double rightPadding = 12;
 
-    final chartLeft = leftPadding;
+    const chartLeft = leftPadding;
     final chartRight = size.width - rightPadding;
-    final chartTop = topPadding;
+    const chartTop = topPadding;
     final chartBottom = size.height - bottomPadding;
     final chartWidth = chartRight - chartLeft;
     final chartHeight = chartBottom - chartTop;
@@ -3956,22 +4050,19 @@ class ScoreTrendChartPainter extends CustomPainter {
       final x = scores.length == 1
           ? chartLeft + chartWidth / 2
           : chartLeft + (i / (scores.length - 1)) * chartWidth;
-      final y =
-          chartBottom - ((scores[i] - yMin) / yRange) * chartHeight;
+      final y = chartBottom - ((scores[i] - yMin) / yRange) * chartHeight;
       points.add(Offset(x, y));
     }
 
     // Draw axis lines
     final axisPaint = Paint()
-      ..color = (isDark
-              ? const Color(0xFFB0BEC5)
-              : const Color(0xFF90A4AE))
+      ..color = (isDark ? const Color(0xFFB0BEC5) : const Color(0xFF90A4AE))
           .withValues(alpha: 0.3)
       ..strokeWidth = 1.0;
 
     // Y-axis (left edge)
     canvas.drawLine(
-      Offset(chartLeft, chartTop),
+      const Offset(chartLeft, chartTop),
       Offset(chartLeft, chartBottom),
       axisPaint,
     );
@@ -3985,13 +4076,14 @@ class ScoreTrendChartPainter extends CustomPainter {
     // Horizontal grid lines (light dashes at midpoint)
     final midY = (chartTop + chartBottom) / 2;
     final gridPaint = Paint()
-      ..color = (isDark
-              ? const Color(0xFFB0BEC5)
-              : const Color(0xFF90A4AE))
+      ..color = (isDark ? const Color(0xFFB0BEC5) : const Color(0xFF90A4AE))
           .withValues(alpha: 0.12)
       ..strokeWidth = 0.5;
     canvas.drawLine(
-        Offset(chartLeft, midY), Offset(chartRight, midY), gridPaint);
+      Offset(chartLeft, midY),
+      Offset(chartRight, midY),
+      gridPaint,
+    );
 
     // Draw gradient fill below the curve
     if (points.length >= 2) {
@@ -4008,15 +4100,17 @@ class ScoreTrendChartPainter extends CustomPainter {
         ..close();
 
       final fillPaint = Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            lineColor.withValues(alpha: 0.18),
-            lineColor.withValues(alpha: 0.0),
-          ],
-        ).createShader(
-            Rect.fromLTRB(chartLeft, chartTop, chartRight, chartBottom));
+        ..shader =
+            LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                lineColor.withValues(alpha: 0.18),
+                lineColor.withValues(alpha: 0.0),
+              ],
+            ).createShader(
+              Rect.fromLTRB(chartLeft, chartTop, chartRight, chartBottom),
+            );
 
       canvas.drawPath(fillPath, fillPaint);
     }
@@ -4047,12 +4141,15 @@ class ScoreTrendChartPainter extends CustomPainter {
       final dotColor = score >= 80
           ? (isDark ? const Color(0xFF66BB6A) : const Color(0xFF4CAF50))
           : score >= 60
-              ? (isDark ? const Color(0xFFFFB74D) : const Color(0xFFFF9800))
-              : (isDark ? const Color(0xFFEF5350) : const Color(0xFFF44336));
+          ? (isDark ? const Color(0xFFFFB74D) : const Color(0xFFFF9800))
+          : (isDark ? const Color(0xFFEF5350) : const Color(0xFFF44336));
 
       // Outer ring
       canvas.drawCircle(
-          pt, 5, Paint()..color = dotColor.withValues(alpha: 0.25));
+        pt,
+        5,
+        Paint()..color = dotColor.withValues(alpha: 0.25),
+      );
       // Inner dot
       canvas.drawCircle(pt, 3.5, Paint()..color = dotColor);
 
@@ -4068,8 +4165,7 @@ class ScoreTrendChartPainter extends CustomPainter {
         ),
         textDirection: TextDirection.ltr,
       )..layout();
-      scoreTp.paint(
-          canvas, Offset(pt.dx - scoreTp.width / 2, pt.dy - 16));
+      scoreTp.paint(canvas, Offset(pt.dx - scoreTp.width / 2, pt.dy - 16));
 
       // Day label below chart
       if (i < dayLabels.length && dayLabels[i].isNotEmpty) {
@@ -4077,8 +4173,7 @@ class ScoreTrendChartPainter extends CustomPainter {
           text: TextSpan(text: dayLabels[i], style: labelStyle),
           textDirection: TextDirection.ltr,
         )..layout();
-        dayTp.paint(canvas,
-            Offset(pt.dx - dayTp.width / 2, chartBottom + 4));
+        dayTp.paint(canvas, Offset(pt.dx - dayTp.width / 2, chartBottom + 4));
       }
     }
 
@@ -4088,17 +4183,19 @@ class ScoreTrendChartPainter extends CustomPainter {
       text: TextSpan(text: '$yMax', style: yAxisStyle),
       textDirection: TextDirection.ltr,
     )..layout();
-    maxTp.paint(canvas,
-        Offset(chartLeft - maxTp.width - 4, chartTop - maxTp.height / 2));
+    maxTp.paint(
+      canvas,
+      Offset(chartLeft - maxTp.width - 4, chartTop - maxTp.height / 2),
+    );
 
     final minTp = TextPainter(
       text: TextSpan(text: '$yMin', style: yAxisStyle),
       textDirection: TextDirection.ltr,
     )..layout();
     minTp.paint(
-        canvas,
-        Offset(chartLeft - minTp.width - 4,
-            chartBottom - minTp.height / 2));
+      canvas,
+      Offset(chartLeft - minTp.width - 4, chartBottom - minTp.height / 2),
+    );
   }
 
   /// Determines whether the chart should repaint when data changes

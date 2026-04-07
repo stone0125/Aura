@@ -35,6 +35,10 @@ class HabitDetailProvider with ChangeNotifier {
   bool _isToggling = false;
   bool _isDisposed = false;
 
+  /// Tracks which habit ID the current AI insight load is for (stale-load guard)
+  /// 跟踪当前 AI 洞察加载对应的习惯 ID（防止过时加载）
+  String? _loadingInsightForHabitId;
+
   /// Get the current habit
   /// 获取当前习惯
   Habit? get habit => _habit;
@@ -148,7 +152,7 @@ class HabitDetailProvider with ChangeNotifier {
       // Calculate Stats
       _calculateStats(history);
     } catch (e) {
-      debugPrint("Error loading habit details: $e");
+      debugPrint('Error loading habit details: $e');
       _errorMessage = 'Failed to load habit data. Please try again.';
     } finally {
       _isLoadingData = false;
@@ -166,11 +170,11 @@ class HabitDetailProvider with ChangeNotifier {
     int longestStreak = 0;
 
     // Sort dates ascending for streak calc
-    var sortedDates = List<DateTime>.from(history);
+    final sortedDates = List<DateTime>.from(history);
     sortedDates.sort((a, b) => a.compareTo(b));
 
     // Normalize to YMD to avoid time issues
-    var uniqueDates = sortedDates
+    final uniqueDates = sortedDates
         .map((d) => DateTime(d.year, d.month, d.day))
         .toSet()
         .toList();
@@ -230,7 +234,8 @@ class HabitDetailProvider with ChangeNotifier {
     }
 
     // Calculate days tracked (from first completion to now)
-    int daysTracked = 1;
+    // 计算追踪天数（从首次完成到现在）
+    int daysTracked = 0;
     if (uniqueDates.isNotEmpty) {
       final firstDate = uniqueDates.first;
       final now = DateTime.now();
@@ -286,6 +291,10 @@ class HabitDetailProvider with ChangeNotifier {
   Future<void> _loadAIInsight() async {
     if (_habit == null) return;
 
+    // Guard against stale loads when user switches habits quickly
+    // 防止用户快速切换习惯时的过时加载
+    _loadingInsightForHabitId = _habit!.id;
+
     // Check monthly AI report limit
     if (!_subscriptionService.canUseAIReport()) {
       _aiInsight = AIInsight(
@@ -329,6 +338,10 @@ class HabitDetailProvider with ChangeNotifier {
         'daysSinceCreation': daysSinceCreation,
       });
 
+      // Stale-load guard: user may have switched habits during the await
+      // 过时加载检查：用户可能在等待期间切换了习惯
+      if (_habit?.id != _loadingInsightForHabitId) return;
+
       // Validate response data
       final data = result.data;
       if (data == null || data is! Map) {
@@ -346,6 +359,9 @@ class HabitDetailProvider with ChangeNotifier {
       await _subscriptionService.recordAIReportUsage();
     } catch (e) {
       debugPrint('Error loading AI insight: $e');
+      // Stale-load guard: don't overwrite new habit's insight with old fallback
+      // 过时加载检查：不要用旧的回退数据覆盖新习惯的洞察
+      if (_habit?.id != _loadingInsightForHabitId) return;
       // Fallback to simple message
       _aiInsight = AIInsight(
         text: 'Keep building your habit!',
@@ -370,7 +386,8 @@ class HabitDetailProvider with ChangeNotifier {
   Future<void> completeHabit() async {
     if (_habit == null || _isToggling) return;
 
-    _isToggling = true;
+    _isToggling = true; // Set IMMEDIATELY, synchronously / 立即同步设置
+    _safeNotifyListeners(); // Update UI to disable button / 更新UI以禁用按钮
     try {
       await _firestoreService.toggleHabitCompletion(
         _habit!,

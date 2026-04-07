@@ -38,6 +38,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
+
   /// Factory constructor returning the singleton instance
   /// 工厂构造函数，返回单例实例
   factory NotificationService() => _instance;
@@ -124,11 +125,15 @@ class NotificationService {
         tz.setLocalLocation(tz.getLocation(timeZoneName));
         debugPrint('Timezone set to: $timeZoneName');
       } catch (_) {
-        debugPrint('WARNING: Invalid timezone name "$timeZoneName", falling back to UTC. Notifications will use UTC times.');
+        debugPrint(
+          'WARNING: Invalid timezone name "$timeZoneName", falling back to UTC. Notifications will use UTC times.',
+        );
         tz.setLocalLocation(tz.getLocation('UTC'));
       }
     } catch (e) {
-      debugPrint('WARNING: Failed to detect timezone, falling back to UTC: $e. Notifications will use UTC times.');
+      debugPrint(
+        'WARNING: Failed to detect timezone, falling back to UTC: $e. Notifications will use UTC times.',
+      );
       tz.setLocalLocation(tz.getLocation('UTC'));
     }
 
@@ -177,7 +182,9 @@ class NotificationService {
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
     // Foreground handler - store subscription for disposal
-    _onMessageSubscription = FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+    _onMessageSubscription = FirebaseMessaging.onMessage.listen((
+      RemoteMessage message,
+    ) {
       debugPrint('Got a message whilst in the foreground!');
       debugPrint('Message data: ${message.data}');
 
@@ -189,19 +196,28 @@ class NotificationService {
       }
     });
 
-    // Get FCM token
+    // Get FCM token (with timeout — hangs on devices without Google Play Services)
     try {
-      final token = await _firebaseMessaging.getToken();
-      debugPrint('FCM Token obtained successfully');
+      final token = await _firebaseMessaging.getToken().timeout(
+        const Duration(seconds: 10),
+        onTimeout: () => null,
+      );
       if (token != null) {
+        debugPrint('FCM Token obtained successfully');
         await FirestoreService().saveDeviceToken(token);
+      } else {
+        debugPrint(
+          'FCM Token not available (no Google Play Services or timeout)',
+        );
       }
     } catch (e) {
       debugPrint('Error getting FCM token: $e');
     }
 
     // Listen for default token refresh - store subscription for disposal
-    _onTokenRefreshSubscription = _firebaseMessaging.onTokenRefresh.listen((token) async {
+    _onTokenRefreshSubscription = _firebaseMessaging.onTokenRefresh.listen((
+      token,
+    ) async {
       debugPrint('FCM Token refreshed');
       await FirestoreService().saveDeviceToken(token);
     });
@@ -231,7 +247,7 @@ class NotificationService {
   Future<void> _requestPermission() async {
     try {
       // 1. Request FCM Permission (iOS prompts here)
-      NotificationSettings settings = await _firebaseMessaging
+      final NotificationSettings settings = await _firebaseMessaging
           .requestPermission(alert: true, badge: true, sound: true);
       debugPrint(
         'User granted FCM permission: ${settings.authorizationStatus}',
@@ -268,8 +284,10 @@ class NotificationService {
       try {
         // On iOS, we update the badge by showing a silent notification with the badge number
         // or by using the notification plugin's iOS-specific badge setting
-        final iosPlugin = _localNotifications.resolvePlatformSpecificImplementation<
-            fln.IOSFlutterLocalNotificationsPlugin>();
+        final iosPlugin = _localNotifications
+            .resolvePlatformSpecificImplementation<
+              fln.IOSFlutterLocalNotificationsPlugin
+            >();
 
         if (iosPlugin != null) {
           // Show a silent notification that only updates the badge
@@ -419,8 +437,8 @@ class NotificationService {
         'Time for: $habitName',
         "Don't forget to complete your habit today! 💪",
         scheduledDate,
-        fln.NotificationDetails(
-          android: const fln.AndroidNotificationDetails(
+        const fln.NotificationDetails(
+          android: fln.AndroidNotificationDetails(
             'habit_reminders',
             'Habit Reminders',
             channelDescription: 'Daily reminders for your habits',
@@ -428,7 +446,7 @@ class NotificationService {
             priority: fln.Priority.high,
             icon: '@mipmap/launcher_icon',
           ),
-          iOS: const fln.DarwinNotificationDetails(
+          iOS: fln.DarwinNotificationDetails(
             presentAlert: true,
             presentBadge: true,
             presentSound: true,
@@ -460,8 +478,8 @@ class NotificationService {
         notificationId,
         title,
         body,
-        fln.NotificationDetails(
-          android: const fln.AndroidNotificationDetails(
+        const fln.NotificationDetails(
+          android: fln.AndroidNotificationDetails(
             'general_notifications',
             'General Notifications',
             channelDescription: 'General app notifications',
@@ -469,7 +487,7 @@ class NotificationService {
             priority: fln.Priority.high,
             icon: '@mipmap/launcher_icon',
           ),
-          iOS: const fln.DarwinNotificationDetails(
+          iOS: fln.DarwinNotificationDetails(
             presentAlert: true,
             presentBadge: true,
             presentSound: true,
@@ -491,8 +509,8 @@ class NotificationService {
         999,
         '🔔 Test Notification',
         'If you see this, notifications are working!',
-        fln.NotificationDetails(
-          android: const fln.AndroidNotificationDetails(
+        const fln.NotificationDetails(
+          android: fln.AndroidNotificationDetails(
             'habit_reminders',
             'Habit Reminders',
             channelDescription: 'Daily reminders for your habits',
@@ -500,7 +518,7 @@ class NotificationService {
             priority: fln.Priority.high,
             icon: '@mipmap/launcher_icon',
           ),
-          iOS: const fln.DarwinNotificationDetails(
+          iOS: fln.DarwinNotificationDetails(
             presentAlert: true,
             presentBadge: true,
             presentSound: true,
@@ -540,8 +558,8 @@ class NotificationService {
         998,
         title,
         body,
-        fln.NotificationDetails(
-          android: const fln.AndroidNotificationDetails(
+        const fln.NotificationDetails(
+          android: fln.AndroidNotificationDetails(
             'daily_summary',
             'Daily Summary',
             channelDescription: 'Daily summary of your habits',
@@ -549,7 +567,7 @@ class NotificationService {
             priority: fln.Priority.high,
             icon: '@mipmap/launcher_icon',
           ),
-          iOS: const fln.DarwinNotificationDetails(
+          iOS: fln.DarwinNotificationDetails(
             presentAlert: true,
             presentBadge: true,
             presentSound: true,
@@ -593,12 +611,14 @@ class NotificationService {
     // Filter habits with reminders enabled and schedule in parallel
     final reminderFutures = habits
         .where((habit) => habit.reminderEnabled && habit.reminderTime != null)
-        .map((habit) => scheduleHabitReminder(
-              habitId: habit.id,
-              habitName: habit.name,
-              hour: habit.reminderTime!.hour,
-              minute: habit.reminderTime!.minute,
-            ))
+        .map(
+          (habit) => scheduleHabitReminder(
+            habitId: habit.id,
+            habitName: habit.name,
+            hour: habit.reminderTime!.hour,
+            minute: habit.reminderTime!.minute,
+          ),
+        )
         .toList();
 
     await Future.wait(reminderFutures);
@@ -641,13 +661,13 @@ class NotificationService {
 
     if (hour < 12) {
       title = 'Good morning! ☀️';
-      body = "Rise and shine! Time to build great habits today.";
+      body = 'Rise and shine! Time to build great habits today.';
     } else if (hour < 17) {
       title = 'Good afternoon! 👋';
-      body = "Check in on your habits. Keep the momentum going!";
+      body = 'Check in on your habits. Keep the momentum going!';
     } else {
       title = 'Good evening! 🌙';
-      body = "How did your habits go today? Take a moment to review.";
+      body = 'How did your habits go today? Take a moment to review.';
     }
 
     try {
@@ -656,8 +676,8 @@ class NotificationService {
         title,
         body,
         scheduledDate,
-        fln.NotificationDetails(
-          android: const fln.AndroidNotificationDetails(
+        const fln.NotificationDetails(
+          android: fln.AndroidNotificationDetails(
             'daily_summary',
             'Daily Summary',
             channelDescription: 'Daily summary of your habits',
@@ -665,7 +685,7 @@ class NotificationService {
             priority: fln.Priority.high,
             icon: '@mipmap/launcher_icon',
           ),
-          iOS: const fln.DarwinNotificationDetails(
+          iOS: fln.DarwinNotificationDetails(
             presentAlert: true,
             presentBadge: true,
             presentSound: true,

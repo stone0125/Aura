@@ -1,0 +1,67 @@
+# Build artifacts
+build/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# Dependencies
+node_modules/
+functions/node_modules/
+
+# Large binary files
+*.pdf
+*.xlsx
+*.pptx
+*.docx
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.ico
+
+# Dissertation & evaluation (not app code)
+overleaf/
+evaluation/
+survey/
+doc/
+new app screenshot/
+superviosr meeting details/
+
+# Generated code
+*.g.dart
+*.freezed.dart
+lib/generated_plugin_registrant.dart
+
+# Platform build directories
+android/app/build/
+android/.gradle/
+ios/Pods/
+macos/Pods/
+ios/.symlinks/
+macos/.symlinks/
+windows/flutter/ephemeral/
+linux/flutter/ephemeral/
+macos/Flutter/ephemeral/
+
+# IDE / OS files
+.idea/
+.vscode/
+.DS_Store
+
+# Python scripts (not app code)
+generate_presentation.py
+generate_report.py
+
+# Coverage & symbols
+coverage/
+app.*.symbols
+app.*.map.json
+
+# Lock files (read pubspec.yaml/package.json instead)
+pubspec.lock
+functions/package-lock.json
+
+# Misc
+*.hprof
+*.class
+Aura_Demo_Presentation.pptx

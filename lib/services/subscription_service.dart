@@ -28,6 +28,7 @@ import '../models/subscription_models.dart';
 
 class SubscriptionService {
   static final SubscriptionService _instance = SubscriptionService._internal();
+
   /// Factory constructor returning the singleton instance
   /// 工厂构造函数，返回单例实例
   factory SubscriptionService() => _instance;
@@ -43,8 +44,14 @@ class SubscriptionService {
 
   // RevenueCat API Keys via --dart-define
   // Run with: flutter run --dart-define=RC_ANDROID_KEY=goog_xxxxx
-  static const _apiKeyAndroid = String.fromEnvironment('RC_ANDROID_KEY', defaultValue: '');
-  static const _apiKeyIOS = String.fromEnvironment('RC_IOS_KEY', defaultValue: '');
+  static const _apiKeyAndroid = String.fromEnvironment(
+    'RC_ANDROID_KEY',
+    defaultValue: '',
+  );
+  static const _apiKeyIOS = String.fromEnvironment(
+    'RC_IOS_KEY',
+    defaultValue: '',
+  );
 
   // Entitlement IDs in RevenueCat dashboard
   static const _entitlementGrowth = 'growth';
@@ -65,6 +72,7 @@ class SubscriptionService {
   /// Get the current subscription tier
   /// 获取当前订阅层级
   SubscriptionTier get currentTier => _currentTier;
+
   /// Check if the user has a paid subscription (Growth or Mastery)
   /// 检查用户是否有付费订阅（成长或精通）
   bool get isPro =>
@@ -184,15 +192,19 @@ class SubscriptionService {
     // --- Real RevenueCat initialization ---
     final apiKey = Platform.isAndroid ? _apiKeyAndroid : _apiKeyIOS;
     if (apiKey.isEmpty) {
-      debugPrint('[RevenueCat] WARNING: No API key provided. '
-          'Run with --dart-define=RC_ANDROID_KEY=goog_xxxxx or RC_IOS_KEY=appl_xxxxx. '
-          'Falling back to Starter tier.');
+      debugPrint(
+        '[RevenueCat] WARNING: No API key provided. '
+        'Run with --dart-define=RC_ANDROID_KEY=goog_xxxxx or RC_IOS_KEY=appl_xxxxx. '
+        'Falling back to Starter tier.',
+      );
       _currentTier = SubscriptionTier.starter;
       return;
     }
 
     try {
-      debugPrint('[RevenueCat] Configuring with ${Platform.isAndroid ? "Android" : "iOS"} key...');
+      debugPrint(
+        '[RevenueCat] Configuring with ${Platform.isAndroid ? "Android" : "iOS"} key...',
+      );
       await Purchases.setLogLevel(LogLevel.debug);
 
       final configuration = PurchasesConfiguration(apiKey);
@@ -221,7 +233,7 @@ class SubscriptionService {
 
     try {
       debugPrint('[RevenueCat] Checking subscription status...');
-      CustomerInfo customerInfo = await Purchases.getCustomerInfo();
+      final CustomerInfo customerInfo = await Purchases.getCustomerInfo();
       _updateTierFromCustomerInfo(customerInfo);
     } catch (e) {
       debugPrint('[RevenueCat] Error checking subscription status: $e');
@@ -298,10 +310,12 @@ class SubscriptionService {
 
     try {
       debugPrint('[RevenueCat] Fetching offerings...');
-      Offerings offerings = await Purchases.getOfferings();
+      final Offerings offerings = await Purchases.getOfferings();
       if (offerings.current != null) {
         final packages = offerings.current!.availablePackages;
-        debugPrint('[RevenueCat] Found ${packages.length} packages in current offering');
+        debugPrint(
+          '[RevenueCat] Found ${packages.length} packages in current offering',
+        );
         return packages;
       }
       debugPrint('[RevenueCat] No current offering available');
@@ -321,7 +335,7 @@ class SubscriptionService {
 
     try {
       debugPrint('[RevenueCat] Purchasing package: ${package.identifier}...');
-      PurchaseResult purchaseResult = await Purchases.purchase(
+      final PurchaseResult purchaseResult = await Purchases.purchase(
         PurchaseParams.package(package),
       );
       _updateTierFromCustomerInfo(purchaseResult.customerInfo);
@@ -343,7 +357,7 @@ class SubscriptionService {
 
     try {
       debugPrint('[RevenueCat] Restoring purchases...');
-      CustomerInfo customerInfo = await Purchases.restorePurchases();
+      final CustomerInfo customerInfo = await Purchases.restorePurchases();
       final previousTier = _currentTier;
       _updateTierFromCustomerInfo(customerInfo);
       final restored = _currentTier != previousTier && isPro;

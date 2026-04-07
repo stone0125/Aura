@@ -72,8 +72,7 @@ class FirestoreService {
     } else {
       await userDoc.update({
         'lastLogin': FieldValue.serverTimestamp(),
-        'tierOverride':
-            kDebugMode ? 'mastery' : FieldValue.delete(),
+        'tierOverride': kDebugMode ? 'mastery' : FieldValue.delete(),
       });
     }
   }
@@ -208,13 +207,13 @@ class FirestoreService {
           final hour = (data['reminderHour'] as num?)?.toInt();
           final minute = (data['reminderMinute'] as num?)?.toInt();
           // Validate bounds: hour must be 0-23, minute must be 0-59
-          if (hour != null && minute != null &&
-              hour >= 0 && hour <= 23 &&
-              minute >= 0 && minute <= 59) {
-            reminderTime = TimeOfDay(
-              hour: hour,
-              minute: minute,
-            );
+          if (hour != null &&
+              minute != null &&
+              hour >= 0 &&
+              hour <= 23 &&
+              minute >= 0 &&
+              minute <= 59) {
+            reminderTime = TimeOfDay(hour: hour, minute: minute);
           }
         }
 
@@ -319,8 +318,10 @@ class FirestoreService {
     final List<DocumentReference> toDelete = [];
 
     // Delete history subcollection docs first (Firestore doesn't cascade-delete)
-    final historySnapshot =
-        await habitsRef.doc(habitId).collection('history').get();
+    final historySnapshot = await habitsRef
+        .doc(habitId)
+        .collection('history')
+        .get();
     for (final doc in historySnapshot.docs) {
       toDelete.add(doc.reference);
     }
@@ -368,7 +369,10 @@ class FirestoreService {
 
   /// Get completion history for a habit (limited to N days for performance)
   /// 获取习惯的完成历史（为提升性能限制天数）
-  Future<List<DateTime>> getHabitHistory(String habitId, {int limitDays = 90}) async {
+  Future<List<DateTime>> getHabitHistory(
+    String habitId, {
+    int limitDays = 90,
+  }) async {
     final habitsRef = _habitsRef;
     if (habitsRef == null) return [];
 
@@ -390,7 +394,7 @@ class FirestoreService {
           .whereType<DateTime>()
           .toList();
     } catch (e) {
-      debugPrint("Error fetching history: $e");
+      debugPrint('Error fetching history: $e');
       return [];
     }
   }
@@ -463,33 +467,21 @@ class FirestoreService {
     });
 
     if (willBeCompleted) {
-      batch.set(
-        habitsRef.doc(habit.id).collection('history').doc(dateStr),
-        {'completedAt': Timestamp.fromDate(now)},
-      );
+      batch.set(habitsRef.doc(habit.id).collection('history').doc(dateStr), {
+        'completedAt': Timestamp.fromDate(now),
+      });
     } else {
-      batch.delete(
-        habitsRef.doc(habit.id).collection('history').doc(dateStr),
-      );
+      batch.delete(habitsRef.doc(habit.id).collection('history').doc(dateStr));
     }
 
     await batch.commit();
   }
 
-  /// Check if habit was completed yesterday
-  /// 检查习惯是否在昨天完成
+  /// Check if habit was completed yesterday (explicit year/month/day comparison to avoid midnight edge cases)
+  /// 检查习惯是否在昨天完成（显式比较年/月/日以避免午夜边界问题）
   bool _wasCompletedYesterday(DateTime? lastCompletedDate) {
     if (lastCompletedDate == null) return false;
-    final now = DateTime.now();
-    final yesterday = DateTime(
-      now.year,
-      now.month,
-      now.day,
-    ).subtract(const Duration(days: 1));
-    final localDate = lastCompletedDate.toLocal();
-    return localDate.year == yesterday.year &&
-        localDate.month == yesterday.month &&
-        localDate.day == yesterday.day;
+    return date_utils.isYesterday(lastCompletedDate.toLocal());
   }
 
   // --- AI Scoring Operations ---
@@ -593,11 +585,11 @@ class FirestoreService {
         .collection('history')
         .doc(dateStr)
         .set({
-      'date': dateStr,
-      'score': score.overallScore,
-      'grade': score.grade,
-      'savedAt': FieldValue.serverTimestamp(),
-    });
+          'date': dateStr,
+          'score': score.overallScore,
+          'grade': score.grade,
+          'savedAt': FieldValue.serverTimestamp(),
+        });
   }
 
   /// Get latest habit score
@@ -678,8 +670,7 @@ class FirestoreService {
     final healthCorrelationsRef = _healthCorrelationsRef;
     if (healthCorrelationsRef == null) return;
 
-    final id =
-        '${analysis.timeRange}_${DateTime.now().millisecondsSinceEpoch}';
+    final id = '${analysis.timeRange}_${DateTime.now().millisecondsSinceEpoch}';
     await healthCorrelationsRef.doc(id).set({
       ...analysis.toJson(),
       'savedAt': FieldValue.serverTimestamp(),
@@ -718,12 +709,13 @@ class FirestoreService {
     String habitId, {
     int days = 30,
   }) async {
+    final safeDays = days.clamp(1, 365);
     final habitsRef = _habitsRef;
     if (habitsRef == null) return [];
 
     try {
       final now = DateTime.now();
-      final startDate = now.subtract(Duration(days: days - 1));
+      final startDate = now.subtract(Duration(days: safeDays - 1));
 
       // Format date strings for range query
       final startDateStr =
@@ -744,7 +736,7 @@ class FirestoreService {
 
       // Build history list from oldest to newest
       final history = <bool>[];
-      for (int i = days - 1; i >= 0; i--) {
+      for (int i = safeDays - 1; i >= 0; i--) {
         final date = now.subtract(Duration(days: i));
         final dateStr =
             '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
@@ -817,8 +809,9 @@ class FirestoreService {
       for (final doc in snapshot.docs) {
         // For habits and habitScores, also delete their nested history subcollection
         if (sub == 'habits' || sub == 'habitScores') {
-          final historySnapshot =
-              await doc.reference.collection('history').get();
+          final historySnapshot = await doc.reference
+              .collection('history')
+              .get();
           for (final histDoc in historySnapshot.docs) {
             toDelete.add(histDoc.reference);
           }

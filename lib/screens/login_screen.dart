@@ -43,7 +43,8 @@ class _LoginScreenState extends State<LoginScreen> {
   /// Handles email/password sign-in or sign-up based on current mode
   /// 根据当前模式处理邮箱/密码登录或注册
   Future<void> _handleEmailAuth() async {
-    if (!_formKey.currentState!.validate()) return;
+    final formState = _formKey.currentState;
+    if (formState == null || !formState.validate()) return;
 
     setState(() => _isLoading = true);
     try {
@@ -88,7 +89,8 @@ class _LoginScreenState extends State<LoginScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text('Password reset email sent. Check your inbox.')),
+            content: Text('Password reset email sent. Check your inbox.'),
+          ),
         );
       }
     } catch (e) {
@@ -113,7 +115,11 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Google sign-in failed. Please use email and password to sign in.')),
+          const SnackBar(
+            content: Text(
+              'Google sign-in failed. Please use email and password to sign in.',
+            ),
+          ),
         );
       }
     } finally {
@@ -130,7 +136,11 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Apple sign-in failed. Please use email and password to sign in.')),
+          const SnackBar(
+            content: Text(
+              'Apple sign-in failed. Please use email and password to sign in.',
+            ),
+          ),
         );
       }
     } finally {
@@ -143,14 +153,18 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final backgroundColor =
-        isDark ? AppColors.darkBackground : AppColors.lightBackground;
-    final textColor =
-        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
-    final secondaryTextColor =
-        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
-    final surfaceColor =
-        isDark ? AppColors.darkSurface : AppColors.lightSurface;
+    final backgroundColor = isDark
+        ? AppColors.darkBackground
+        : AppColors.lightBackground;
+    final textColor = isDark
+        ? AppColors.darkTextPrimary
+        : AppColors.lightTextPrimary;
+    final secondaryTextColor = isDark
+        ? AppColors.darkTextSecondary
+        : AppColors.lightTextSecondary;
+    final surfaceColor = isDark
+        ? AppColors.darkSurface
+        : AppColors.lightSurface;
     final borderColor = isDark ? AppColors.darkBorder : AppColors.lightBorder;
     final coralColor = isDark ? AppColors.darkCoral : AppColors.lightCoral;
 
@@ -165,11 +179,7 @@ class _LoginScreenState extends State<LoginScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 // Logo
-                Image.asset(
-                  'assets/icon.png',
-                  width: 80,
-                  height: 80,
-                ),
+                Image.asset('assets/icon.png', width: 80, height: 80),
                 const SizedBox(height: 16),
                 Text(
                   'Welcome to Aura',
@@ -185,10 +195,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 Text(
                   'Your AI-powered Habit Tracker\n& Routine Planner',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: secondaryTextColor,
-                  ),
+                  style: TextStyle(fontSize: 16, color: secondaryTextColor),
                 ),
                 const SizedBox(height: 32),
 
@@ -205,8 +212,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         decoration: InputDecoration(
                           hintText: 'Email',
                           hintStyle: TextStyle(color: secondaryTextColor),
-                          prefixIcon:
-                              Icon(Icons.email_outlined, color: secondaryTextColor),
+                          prefixIcon: Icon(
+                            Icons.email_outlined,
+                            color: secondaryTextColor,
+                          ),
                           filled: true,
                           fillColor: surfaceColor,
                           border: OutlineInputBorder(
@@ -224,17 +233,19 @@ class _LoginScreenState extends State<LoginScreen> {
                           errorBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                             borderSide: BorderSide(
-                                color: isDark
-                                    ? AppColors.darkRed
-                                    : AppColors.lightRed),
+                              color: isDark
+                                  ? AppColors.darkRed
+                                  : AppColors.lightRed,
+                            ),
                           ),
                         ),
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
                             return 'Please enter your email';
                           }
-                          if (!RegExp(r'^[^@]+@[^@]+\.[^@]+')
-                              .hasMatch(value.trim())) {
+                          if (!RegExp(
+                            r'^[^@]+@[^@]+\.[^@]+',
+                          ).hasMatch(value.trim())) {
                             return 'Please enter a valid email';
                           }
                           return null;
@@ -251,8 +262,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         decoration: InputDecoration(
                           hintText: 'Password',
                           hintStyle: TextStyle(color: secondaryTextColor),
-                          prefixIcon:
-                              Icon(Icons.lock_outlined, color: secondaryTextColor),
+                          prefixIcon: Icon(
+                            Icons.lock_outlined,
+                            color: secondaryTextColor,
+                          ),
                           suffixIcon: IconButton(
                             icon: Icon(
                               _obscurePassword
@@ -261,7 +274,8 @@ class _LoginScreenState extends State<LoginScreen> {
                               color: secondaryTextColor,
                             ),
                             onPressed: () => setState(
-                                () => _obscurePassword = !_obscurePassword),
+                              () => _obscurePassword = !_obscurePassword,
+                            ),
                           ),
                           filled: true,
                           fillColor: surfaceColor,
@@ -280,9 +294,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           errorBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                             borderSide: BorderSide(
-                                color: isDark
-                                    ? AppColors.darkRed
-                                    : AppColors.lightRed),
+                              color: isDark
+                                  ? AppColors.darkRed
+                                  : AppColors.lightRed,
+                            ),
                           ),
                         ),
                         validator: (value) {
@@ -338,7 +353,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: Text(
                       _isSignUp ? 'Sign Up' : 'Sign In',
                       style: const TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.w600),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
 
@@ -447,10 +464,12 @@ class _SocialLoginButton extends StatelessWidget {
     return ElevatedButton(
       onPressed: onPressed,
       style: ElevatedButton.styleFrom(
-        backgroundColor:
-            isDark ? AppColors.darkSurface : AppColors.lightSurface,
-        foregroundColor:
-            isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+        backgroundColor: isDark
+            ? AppColors.darkSurface
+            : AppColors.lightSurface,
+        foregroundColor: isDark
+            ? AppColors.darkTextPrimary
+            : AppColors.lightTextPrimary,
         padding: const EdgeInsets.symmetric(vertical: 16),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),

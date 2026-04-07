@@ -15,6 +15,7 @@ import '../models/progress_models.dart';
 import '../models/habit.dart';
 import '../models/habit_category.dart';
 import '../services/firestore_service.dart';
+import '../utils/date_utils.dart' as date_utils;
 
 /// Provider for managing progress and analytics data
 /// 管理进度和分析数据的 Provider
@@ -36,6 +37,9 @@ class ProgressProvider with ChangeNotifier {
   // Cached achievement lists (invalidated when _achievements changes)
   List<Achievement>? _cachedUnlockedAchievements;
   List<Achievement>? _cachedLockedAchievements;
+
+  // Fingerprint to skip redundant recalculations when habits haven't changed
+  String _lastHabitsFingerprint = '';
 
   /// Get the currently selected date range
   /// 获取当前选中的日期范围
@@ -80,14 +84,18 @@ class ProgressProvider with ChangeNotifier {
   /// Get unlocked achievements (cached, computed once per data change)
   /// 获取已解锁的成就（已缓存，每次数据变化时计算一次）
   List<Achievement> get unlockedAchievements {
-    _cachedUnlockedAchievements ??= _achievements.where((a) => a.isUnlocked).toList();
+    _cachedUnlockedAchievements ??= _achievements
+        .where((a) => a.isUnlocked)
+        .toList();
     return _cachedUnlockedAchievements!;
   }
 
   /// Get locked achievements (cached, computed once per data change)
   /// 获取未解锁的成就（已缓存，每次数据变化时计算一次）
   List<Achievement> get lockedAchievements {
-    _cachedLockedAchievements ??= _achievements.where((a) => !a.isUnlocked).toList();
+    _cachedLockedAchievements ??= _achievements
+        .where((a) => !a.isUnlocked)
+        .toList();
     return _cachedLockedAchievements!;
   }
 
@@ -101,7 +109,13 @@ class ProgressProvider with ChangeNotifier {
   /// Called by ProxyProvider when habits change
   /// 当习惯数据变化时由 ProxyProvider 调用
   void updateHabits(List<Habit> habits) {
-    _habits = habits;
+    _habits = habits; // Always update reference so data stays current
+    // Skip expensive recalculation if stats-relevant fields haven't changed
+    final fingerprint = habits
+        .map((h) => '${h.id}:${h.isCompleted}:${h.streak}:${h.category.name}')
+        .join(',');
+    if (fingerprint == _lastHabitsFingerprint) return;
+    _lastHabitsFingerprint = fingerprint;
     _calculateAllStats();
   }
 
@@ -156,13 +170,21 @@ class ProgressProvider with ChangeNotifier {
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
       final rangeStart = _getRangeStartDate();
-      final startDay = DateTime(rangeStart.year, rangeStart.month, rangeStart.day);
+      final startDay = DateTime(
+        rangeStart.year,
+        rangeStart.month,
+        rangeStart.day,
+      );
 
       int totalPossible = 0;
       int totalCompleted = 0;
 
       // Loop forward from range start to today (inclusive)
-      for (var date = startDay; !date.isAfter(today); date = date.add(const Duration(days: 1))) {
+      for (
+        var date = startDay;
+        !date.isAfter(today);
+        date = date.add(const Duration(days: 1))
+      ) {
         final dateKey = _dateToKey(date);
 
         for (var h in _habits) {
@@ -205,7 +227,7 @@ class ProgressProvider with ChangeNotifier {
 
     _stats = ProgressStats(
       completionRate: completionRate,
-      daysTracked: daysTracked > 0 ? daysTracked : 1,
+      daysTracked: daysTracked > 0 ? daysTracked : 0,
       bestStreak: bestStreak,
       totalHabits: totalHabits,
       completedToday: completedToday,
@@ -216,12 +238,12 @@ class ProgressProvider with ChangeNotifier {
   /// Calculate category breakdown percentages
   /// 计算各类别的占比细分
   void _calculateCategoryBreakdown() {
-    Map<HabitCategory, int> counts = {};
+    final Map<HabitCategory, int> counts = {};
     for (var h in _habits) {
       counts[h.category] = (counts[h.category] ?? 0) + 1;
     }
 
-    int total = _habits.length;
+    final int total = _habits.length;
     _categoryBreakdown = counts.entries.map((e) {
       return CategoryBreakdown(
         category: e.key,
@@ -240,16 +262,16 @@ class ProgressProvider with ChangeNotifier {
   /// Build normalized date cache from habit histories for O(1) date lookups
   /// 从习惯历史构建规范化日期缓存，以实现 O(1) 的日期查找
   void _buildNormalizedHistories() {
-    _normalizedHistories = _habitHistories.map((id, dates) => MapEntry(
-      id,
-      dates.map((d) => '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}').toSet(),
-    ));
+    _normalizedHistories = _habitHistories.map(
+      (id, dates) =>
+          MapEntry(id, dates.map((d) => date_utils.formatDateId(d)).toSet()),
+    );
   }
 
   /// Convert DateTime to normalized string key
   /// 将 DateTime 转换为规范化的字符串键
   String _dateToKey(DateTime date) {
-    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    return date_utils.formatDateId(date);
   }
 
   /// Find the earliest date across all histories and habit createdAt dates
@@ -264,7 +286,8 @@ class ProgressProvider with ChangeNotifier {
       }
     }
     for (var h in _habits) {
-      if (h.createdAt != null && (earliest == null || h.createdAt!.isBefore(earliest))) {
+      if (h.createdAt != null &&
+          (earliest == null || h.createdAt!.isBefore(earliest))) {
         earliest = h.createdAt;
       }
     }
@@ -283,8 +306,14 @@ class ProgressProvider with ChangeNotifier {
   /// Check if a habit existed on a given date (createdAt is null or <= date)
   /// 检查习惯在给定日期是否已存在（createdAt 为 null 或 <= 该日期）
   bool _habitExistedOnDate(Habit habit, DateTime date) {
-    if (habit.createdAt == null) return true; // legacy habit, assume always existed
-    final createdDay = DateTime(habit.createdAt!.year, habit.createdAt!.month, habit.createdAt!.day);
+    if (habit.createdAt == null) {
+      return true; // legacy habit, assume always existed
+    }
+    final createdDay = DateTime(
+      habit.createdAt!.year,
+      habit.createdAt!.month,
+      habit.createdAt!.day,
+    );
     return !createdDay.isAfter(date);
   }
 
@@ -300,9 +329,6 @@ class ProgressProvider with ChangeNotifier {
   /// 初始化进度数据
   Future<void> initialize() async {
     _isLoading = true;
-    // notifyListeners(); // Delay notification or rely on initial state if desirable, but typically yes.
-    // However, if called from initState, avoid notifyListeners immediately if possible or use future.delayed zero.
-    // Safe explicitly here:
     await _fetchAllHistory();
     _recalculateAll();
     _isLoading = false;
@@ -328,14 +354,25 @@ class ProgressProvider with ChangeNotifier {
       // Prune old habit histories for habits that no longer exist
       _pruneOldHistories();
 
-      // Fetch history for current habits (limited to 90 days)
+      // Calculate limit from selected date range (at least 90 days)
+      // 根据选定的日期范围计算限制天数（至少 90 天）
+      final rangeStart = _getRangeStartDate();
+      final now = DateTime.now();
+      final daysToFetch = now.difference(rangeStart).inDays + 1;
+      // Use max of daysToFetch and 90 to ensure we always get at least 90 days
+      final limitDays = daysToFetch > 90 ? daysToFetch : 90;
+
+      // Fetch history for current habits (limited to calculated range)
       // Use individual try-catch to prevent one failure from stopping all fetches
       final futures = _habits.map((h) async {
         try {
-          final history = await _firestoreService.getHabitHistory(h.id);
+          final history = await _firestoreService.getHabitHistory(
+            h.id,
+            limitDays: limitDays,
+          );
           _habitHistories[h.id] = history;
         } catch (e) {
-          debugPrint("Error fetching history for habit ${h.id}: $e");
+          debugPrint('Error fetching history for habit ${h.id}: $e');
           // Keep existing history or set empty list on failure
           _habitHistories[h.id] ??= [];
         }
@@ -346,7 +383,7 @@ class ProgressProvider with ChangeNotifier {
       // Build normalized cache for O(1) lookups
       _buildNormalizedHistories();
     } catch (e) {
-      debugPrint("Error in _fetchAllHistory: $e");
+      debugPrint('Error in _fetchAllHistory: $e');
     }
   }
 
@@ -406,10 +443,18 @@ class ProgressProvider with ChangeNotifier {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final rangeStart = _getRangeStartDate();
-    final startDay = DateTime(rangeStart.year, rangeStart.month, rangeStart.day);
+    final startDay = DateTime(
+      rangeStart.year,
+      rangeStart.month,
+      rangeStart.day,
+    );
 
     _trendData = [];
-    for (var date = startDay; !date.isAfter(today); date = date.add(const Duration(days: 1))) {
+    for (
+      var date = startDay;
+      !date.isAfter(today);
+      date = date.add(const Duration(days: 1))
+    ) {
       final dateKey = _dateToKey(date);
 
       int completed = 0;
@@ -425,10 +470,12 @@ class ProgressProvider with ChangeNotifier {
         }
       }
 
-      _trendData.add(TrendDataPoint(
-        date: date,
-        completionRate: total > 0 ? completed / total : 0.0,
-      ));
+      _trendData.add(
+        TrendDataPoint(
+          date: date,
+          completionRate: total > 0 ? completed / total : 0.0,
+        ),
+      );
     }
   }
 
@@ -438,34 +485,44 @@ class ProgressProvider with ChangeNotifier {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final rangeStart = _getRangeStartDate();
-    final startDay = DateTime(rangeStart.year, rangeStart.month, rangeStart.day);
+    final startDay = DateTime(
+      rangeStart.year,
+      rangeStart.month,
+      rangeStart.day,
+    );
 
     // Build performance data for each habit
-    List<_HabitPerfData> perfData = [];
+    final List<_HabitPerfData> perfData = [];
 
     for (var h in _habits) {
       // Per-habit: effective start is the later of range start or habit creation
       DateTime effectiveStart = startDay;
       if (h.createdAt != null) {
-        final createdDay = DateTime(h.createdAt!.year, h.createdAt!.month, h.createdAt!.day);
+        final createdDay = DateTime(
+          h.createdAt!.year,
+          h.createdAt!.month,
+          h.createdAt!.day,
+        );
         if (createdDay.isAfter(effectiveStart)) {
           effectiveStart = createdDay;
         }
       }
 
       final habitRangeDays = today.difference(effectiveStart).inDays + 1;
-      if (habitRangeDays <= 0) continue; // habit created after today (shouldn't happen)
+      if (habitRangeDays <= 0) {
+        continue; // habit created after today (shouldn't happen)
+      }
 
       final history = _habitHistories[h.id] ?? [];
       // Count completions within the effective range
-      final completionsInRange = history
-          .where((d) {
-            final day = DateTime(d.year, d.month, d.day);
-            return !day.isBefore(effectiveStart) && !day.isAfter(today);
-          })
-          .length;
+      final completionsInRange = history.where((d) {
+        final day = DateTime(d.year, d.month, d.day);
+        return !day.isBefore(effectiveStart) && !day.isAfter(today);
+      }).length;
 
-      final successRate = habitRangeDays > 0 ? completionsInRange / habitRangeDays : 0.0;
+      final successRate = habitRangeDays > 0
+          ? completionsInRange / habitRangeDays
+          : 0.0;
       perfData.add(
         _HabitPerfData(
           habit: h,
@@ -744,17 +801,27 @@ class ProgressProvider with ChangeNotifier {
     if (halfPoint <= 0 || _trendData.length <= halfPoint) return 0.0;
 
     // Calculate first half average with empty list guard
-    final firstHalfData = _trendData.take(halfPoint).map((d) => d.completionRate).toList();
+    final firstHalfData = _trendData
+        .take(halfPoint)
+        .map((d) => d.completionRate)
+        .toList();
     if (firstHalfData.isEmpty) return 0.0;
-    final firstHalfAvg = firstHalfData.reduce((a, b) => a + b) / firstHalfData.length;
+    final firstHalfAvg =
+        firstHalfData.reduce((a, b) => a + b) / firstHalfData.length;
 
     // Calculate second half average with empty list guard
-    final secondHalfData = _trendData.skip(halfPoint).map((d) => d.completionRate).toList();
+    final secondHalfData = _trendData
+        .skip(halfPoint)
+        .map((d) => d.completionRate)
+        .toList();
     if (secondHalfData.isEmpty) return 0.0;
-    final secondHalfAvg = secondHalfData.reduce((a, b) => a + b) / secondHalfData.length;
+    final secondHalfAvg =
+        secondHalfData.reduce((a, b) => a + b) / secondHalfData.length;
 
     // Guard against division by zero
-    if (firstHalfAvg == 0) return secondHalfAvg > 0 ? 100.0 : 0.0;
+    if (firstHalfAvg == 0) {
+      return 0.0; // No baseline to compare against / 没有基线可供比较
+    }
     return ((secondHalfAvg - firstHalfAvg) / firstHalfAvg) * 100;
   }
 }

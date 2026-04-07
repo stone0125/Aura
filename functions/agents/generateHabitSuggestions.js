@@ -16,6 +16,7 @@ const {
   HttpsError,
   VALID_CATEGORIES,
   getGenAI,
+  SchemaType,
   validateArray,
   validateCategory,
   sanitizeForPrompt,
@@ -24,8 +25,54 @@ const {
   getUserTier,
   checkUsageLimit,
   recordUsage,
+  validateGeminiResponse,
   parseGeminiJSON,
 } = require("../helpers");
+
+const RESPONSE_SCHEMA = {
+  type: SchemaType.ARRAY,
+  description: "3 personalized habit recommendations",
+  items: {
+    type: SchemaType.OBJECT,
+    properties: {
+      habitName: { type: SchemaType.STRING, description: "The habit name" },
+      category: {
+        type: SchemaType.STRING,
+        format: "enum",
+        enum: ["health", "learning", "productivity", "mindfulness", "fitness"],
+      },
+      explanation: { type: SchemaType.STRING, description: "What the habit is and how to do it" },
+      reason: { type: SchemaType.STRING, description: "Why this helps the user" },
+      frequencyType: {
+        type: SchemaType.STRING,
+        format: "enum",
+        enum: ["daily", "weekly"],
+      },
+      weeklyDays: {
+        type: SchemaType.ARRAY,
+        nullable: true,
+        description: "Array of day numbers 0-6 (0=Sunday) if frequencyType is weekly, null if daily",
+        items: { type: SchemaType.INTEGER },
+      },
+      goalType: {
+        type: SchemaType.STRING,
+        format: "enum",
+        enum: ["none", "time", "count"],
+      },
+      goalValue: { type: SchemaType.NUMBER, nullable: true, description: "Numeric target if goalType is not none, null otherwise" },
+      goalUnit: { type: SchemaType.STRING, nullable: true, description: "Unit string if goalType is not none, null otherwise" },
+      estimatedMinutes: { type: SchemaType.INTEGER, description: "Realistic daily time commitment in minutes (1-120)" },
+      estimatedImpact: {
+        type: SchemaType.STRING,
+        format: "enum",
+        enum: ["High", "Medium", "Low"],
+      },
+      suggestedReminderHour: { type: SchemaType.INTEGER, nullable: true, description: "0-23 hour for best time, null if no recommendation" },
+      suggestedReminderMinute: { type: SchemaType.INTEGER, nullable: true, description: "0-59 minute, null if no recommendation" },
+    },
+    required: ["habitName", "category", "explanation", "reason", "frequencyType", "goalType", "estimatedMinutes", "estimatedImpact"],
+  },
+};
 
 async function generateHabitSuggestions(request) {
   if (!request.auth) {
@@ -35,8 +82,11 @@ async function generateHabitSuggestions(request) {
     );
   }
 
-  await checkBurstLimit(request.auth.uid, 'suggestions');
-  const tier = await getUserTier(request.auth.uid);
+  // Parallelize independent checks to reduce latency
+  const [, tier] = await Promise.all([
+    checkBurstLimit(request.auth.uid, 'suggestions'),
+    getUserTier(request.auth.uid),
+  ]);
   await checkUsageLimit(request.auth.uid, tier, 'suggestion');
 
   // Input validation
@@ -54,7 +104,13 @@ async function generateHabitSuggestions(request) {
   const bestStreak = validateNumber(userStats?.bestStreak ?? 0, 'bestStreak', 0, 10000);
   const totalHabits = validateNumber(userStats?.totalHabits ?? 0, 'totalHabits', 0, 100);
 
-  const model = getGenAI().getGenerativeModel({ model: "gemini-3-flash-preview" });
+  const model = getGenAI().getGenerativeModel({
+    model: "gemini-3-flash-preview",
+    generationConfig: {
+      responseMimeType: "application/json",
+      responseSchema: RESPONSE_SCHEMA,
+    },
+  });
 
   // Build personalized prompt based on user data
   let userContext = '';
@@ -95,16 +151,15 @@ async function generateHabitSuggestions(request) {
     - "explanation": string (what the habit is and how to do it)
     - "reason": string (why this helps the user)
     - "frequencyType": "daily" or "weekly"
-    - "weeklyDays": array of day numbers [0-6] (0=Sunday) if weekly, null if daily
+    - "weeklyDays": array of day numbers [0-6] (0=Sunday) ONLY if frequencyType is "weekly", otherwise null
     - "goalType": "none", "time", or "count"
-    - "goalValue": numeric target (e.g. 10 for 10 minutes), null if goalType is "none"
-    - "goalUnit": string unit (e.g. "minutes", "pages", "glasses"), null if goalType is "none"
+    - "goalValue": numeric target (e.g. 10 for 10 minutes) ONLY if goalType is "time" or "count", otherwise null
+    - "goalUnit": string unit (e.g. "minutes", "pages", "glasses") ONLY if goalType is "time" or "count", otherwise null
     - "estimatedMinutes": realistic daily time commitment in minutes (1-120)
     - "estimatedImpact": "High", "Medium", or "Low" based on expected life impact
     - "suggestedReminderHour": 0-23 hour for best time to do this habit, null if no recommendation
     - "suggestedReminderMinute": 0-59 minute, null if no recommendation
 
-    Do not include markdown formatting.
   `;
 
   let returnValue;
@@ -113,23 +168,20 @@ async function generateHabitSuggestions(request) {
     const response = await result.response;
     const text = response.text();
 
-    if (!text || text.trim().length === 0) {
-      console.error("Gemini returned empty text for suggestions");
-      throw new Error('Gemini returned empty response');
-    }
+    validateGeminiResponse(text, "generateHabitSuggestions");
 
     const parsed = parseGeminiJSON(text);
 
-    if (!Array.isArray(parsed)) throw new Error('Expected array, got: ' + typeof parsed);
+    if (!Array.isArray(parsed)) throw new HttpsError("internal", "Expected array, got: " + typeof parsed);
     if (parsed.length === 0) {
       console.warn("Gemini returned empty suggestions array");
-      throw new Error('Gemini returned 0 suggestions');
+      throw new HttpsError("internal", "Gemini returned 0 suggestions");
     }
 
     const VALID_FREQUENCY_TYPES = ['daily', 'weekly'];
     const VALID_GOAL_TYPES = ['none', 'time', 'count'];
     const VALID_IMPACTS = ['High', 'Medium', 'Low'];
-    returnValue = parsed.slice(0, 5).map(item => ({
+    returnValue = parsed.filter(item => item && typeof item === 'object').slice(0, 5).map(item => ({
       habitName: String(item.habitName || '').substring(0, 100),
       category: VALID_CATEGORIES.includes(item.category) ? item.category : 'health',
       explanation: String(item.explanation || '').substring(0, 500),

@@ -41,6 +41,7 @@ service cloud.firestore {
     }
     
     // Helper function to validate habit data
+    // Must match VALID_CATEGORIES in functions/helpers.js
     function isValidHabit() {
       let data = request.resource.data;
       return data.keys().hasAll(['name', 'category'])
@@ -48,7 +49,19 @@ service cloud.firestore {
         && data.name.size() > 0
         && data.name.size() <= 100
         && data.category is string
-        && data.category in ['health', 'learning', 'productivity', 'mindfulness', 'fitness'];
+        && data.category in ['health', 'learning', 'productivity', 'mindfulness', 'fitness']
+        // Validate reminder fields if present
+        && (!('reminderHour' in data.keys()) || (data.reminderHour is int && data.reminderHour >= 0 && data.reminderHour <= 23))
+        && (!('reminderMinute' in data.keys()) || (data.reminderMinute is int && data.reminderMinute >= 0 && data.reminderMinute <= 59));
+    }
+
+    // Helper function to validate user profile updates
+    function isValidUserUpdate() {
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      // Block protected fields
+      return !changed.hasAny(['createdAt', 'tierCache', 'isPro'])
+        // Validate healthIntegrationEnabled if being set
+        && (!('healthIntegrationEnabled' in changed) || request.resource.data.healthIntegrationEnabled is bool);
     }
     
     // User documents
@@ -56,9 +69,7 @@ service cloud.firestore {
       // Only the owner can read/write their user document
       allow read: if isOwner(userId);
       allow create: if isOwner(userId);
-      allow update: if isOwner(userId)
-        && (!request.resource.data.diff(resource.data).affectedKeys()
-            .hasAny(['createdAt', 'tierCache', 'isPro']));
+      allow update: if isOwner(userId) && isValidUserUpdate();
       allow delete: if isOwner(userId); // Allow account deletion
       
       // Habits subcollection

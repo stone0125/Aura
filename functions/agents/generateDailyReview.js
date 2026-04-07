@@ -14,6 +14,7 @@
 const {
   HttpsError,
   getGenAI,
+  SchemaType,
   validateString,
   validateArray,
   validateNumber,
@@ -23,8 +24,58 @@ const {
   checkUsageLimit,
   recordUsage,
   VALID_CATEGORIES,
+  validateGeminiResponse,
   parseGeminiJSON,
 } = require("../helpers");
+
+const RESPONSE_SCHEMA = {
+  type: SchemaType.OBJECT,
+  properties: {
+    overallScore: { type: SchemaType.INTEGER, description: "Overall daily score 0-100" },
+    grade: {
+      type: SchemaType.STRING,
+      format: "enum",
+      enum: ["A+", "A", "A-", "B+", "B", "B-", "C+", "C", "C-", "D", "F"],
+    },
+    habitScores: {
+      type: SchemaType.ARRAY,
+      items: {
+        type: SchemaType.OBJECT,
+        properties: {
+          habitId: { type: SchemaType.STRING, description: "Habit identifier" },
+          score: { type: SchemaType.INTEGER, description: "Score 0-100" },
+          status: {
+            type: SchemaType.STRING,
+            format: "enum",
+            enum: ["completed", "missed", "streak_milestone", "streak_broken"],
+          },
+          comment: { type: SchemaType.STRING, description: "Brief personalized observation" },
+        },
+        required: ["habitId", "score", "status", "comment"],
+      },
+    },
+    coachComments: {
+      type: SchemaType.OBJECT,
+      properties: {
+        summary: { type: SchemaType.STRING, description: "2-3 sentence overall analysis" },
+        highlight: { type: SchemaType.STRING, description: "Most notable positive achievement" },
+        concern: { type: SchemaType.STRING, nullable: true, description: "Area needing attention, or null" },
+        actionItem: { type: SchemaType.STRING, description: "Specific recommendation for tomorrow" },
+      },
+      required: ["summary", "highlight", "actionItem"],
+    },
+    healthInsights: {
+      type: SchemaType.OBJECT,
+      properties: {
+        correlation: { type: SchemaType.STRING, nullable: true, description: "Health-habit correlation, null if no data" },
+        recommendation: { type: SchemaType.STRING, nullable: true, description: "Health recommendation, null if no data" },
+      },
+    },
+    motivationalMessage: { type: SchemaType.STRING, description: "Personalized encouragement" },
+    tomorrowFocus: { type: SchemaType.STRING, description: "Specific habit to prioritize tomorrow" },
+  },
+  required: ["overallScore", "grade", "habitScores", "coachComments", "motivationalMessage", "tomorrowFocus"],
+};
 
 /// Generate a daily performance review with AI coach commentary
 /// 生成带 AI 教练评语的每日表现回顾
@@ -36,8 +87,11 @@ async function generateDailyReview(request) {
     );
   }
 
-  await checkBurstLimit(request.auth.uid, 'review');
-  const tier = await getUserTier(request.auth.uid);
+  // Parallelize independent checks to reduce latency
+  const [, tier] = await Promise.all([
+    checkBurstLimit(request.auth.uid, 'review'),
+    getUserTier(request.auth.uid),
+  ]);
   await checkUsageLimit(request.auth.uid, tier, 'report');
 
   const data = request.data || {};
@@ -52,7 +106,13 @@ async function generateDailyReview(request) {
   const healthData = data.healthData || null;
   const previousScore = validateNumber(data.previousScore ?? 0, 'previousScore', 0, 100);
 
-  const model = getGenAI().getGenerativeModel({ model: "gemini-3-flash-preview" });
+  const model = getGenAI().getGenerativeModel({
+    model: "gemini-3-flash-preview",
+    generationConfig: {
+      responseMimeType: "application/json",
+      responseSchema: RESPONSE_SCHEMA,
+    },
+  });
 
   // Calculate summary metrics
   const totalHabits = habits.length;
@@ -65,11 +125,11 @@ async function generateDailyReview(request) {
 
   let healthContext = '';
   if (healthData) {
-    const steps = Number(healthData.steps) || null;
-    const sleepHours = Number(healthData.sleepHours) || null;
+    const steps = healthData.steps != null ? Number(healthData.steps) : null;
+    const sleepHours = healthData.sleepHours != null ? Number(healthData.sleepHours) : null;
     const sleepQuality = sanitizeForPrompt(String(healthData.sleepQuality || '')) || 'N/A';
-    const heartRate = Number(healthData.heartRate) || null;
-    const activeMinutes = Number(healthData.activeMinutes) || null;
+    const heartRate = healthData.heartRate != null ? Number(healthData.heartRate) : null;
+    const activeMinutes = healthData.activeMinutes != null ? Number(healthData.activeMinutes) : null;
     healthContext = `
     TODAY'S HEALTH METRICS:
     - Steps: ${steps ?? 'N/A'}
@@ -118,7 +178,6 @@ async function generateDailyReview(request) {
     Return JSON:
     {
       "overallScore": <number 0-100>,
-      "scoreChange": <number, difference from previousScore>,
       "grade": "<A+, A, A-, B+, B, B-, C+, C, C-, D, F>",
       "habitScores": [
         {
@@ -143,7 +202,6 @@ async function generateDailyReview(request) {
     }
 
     Use professional, data-driven language. Reference specific numbers.
-    Do not include markdown formatting.
   `;
 
   let returnValue;
@@ -151,16 +209,16 @@ async function generateDailyReview(request) {
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
-
+    validateGeminiResponse(text, "generateDailyReview");
     const parsed = parseGeminiJSON(text);
 
     const VALID_GRADES = ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D', 'F'];
     const VALID_STATUSES = ['completed', 'missed', 'streak_milestone', 'streak_broken'];
     returnValue = {
       overallScore: Math.min(100, Math.max(0, Number(parsed.overallScore) || 0)),
-      scoreChange: Math.min(100, Math.max(-100, Number(parsed.scoreChange) || 0)),
+      scoreChange: Math.min(100, Math.max(-100, Math.min(100, Math.max(0, Number(parsed.overallScore) || 0)) - previousScore)),
       grade: VALID_GRADES.includes(parsed.grade) ? parsed.grade : 'C',
-      habitScores: Array.isArray(parsed.habitScores) ? parsed.habitScores.slice(0, 50).map(h => ({
+      habitScores: Array.isArray(parsed.habitScores) ? parsed.habitScores.filter(h => h && typeof h === 'object').slice(0, 50).map(h => ({
         habitId: String(h.habitId || '').substring(0, 100),
         score: Math.min(100, Math.max(0, Number(h.score) || 0)),
         status: VALID_STATUSES.includes(h.status) ? h.status : 'missed',

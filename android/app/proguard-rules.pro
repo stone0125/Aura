@@ -16,8 +16,9 @@
 -keep class com.revenuecat.purchases.** { *; }
 -dontwarn com.revenuecat.purchases.**
 
-# Health Connect
+# Health package (Health Connect API)
 -keep class androidx.health.connect.** { *; }
+-keep class com.google.android.libraries.healthdata.** { *; }
 -dontwarn androidx.health.connect.**
 
 # Kotlin

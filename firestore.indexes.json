@@ -1,4 +1,26 @@
 {
-    "indexes": [],
-    "fieldOverrides": []
+  "indexes": [
+    {
+      "collectionGroup": "dailyReviews",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "date", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "history",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "date", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "healthCorrelations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "savedAt", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
 }

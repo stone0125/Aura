@@ -26,7 +26,11 @@ class HabitCreationScreen extends StatefulWidget {
 
   /// Creates the habit creation/editing screen
   /// 创建习惯创建/编辑屏幕
-  const HabitCreationScreen({super.key, this.aiCoachSuggestion, this.habitToEdit});
+  const HabitCreationScreen({
+    super.key,
+    this.aiCoachSuggestion,
+    this.habitToEdit,
+  });
 
   /// Whether the screen is in editing mode
   /// 屏幕是否处于编辑模式
@@ -103,7 +107,8 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
       // Prefill frequency
       if (suggestion.frequencyType == 'weekly') {
         _formData.frequencyType = FrequencyType.weekly;
-        if (suggestion.weeklyDays != null && suggestion.weeklyDays!.isNotEmpty) {
+        if (suggestion.weeklyDays != null &&
+            suggestion.weeklyDays!.isNotEmpty) {
           _formData.weeklyDays = List<int>.from(suggestion.weeklyDays!);
         }
       } else {
@@ -205,6 +210,7 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
   /// Saves the habit (creates new or updates existing) to the provider
   /// 将习惯保存（创建新的或更新现有的）到提供者
   Future<void> _saveHabit() async {
+    if (_isSaving) return; // Prevent concurrent saves / 防止并发保存
     if (!_validateForm()) {
       // Shake animation would go here
       ScaffoldMessenger.of(context).showSnackBar(
@@ -221,7 +227,10 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
 
     // Store provider references BEFORE any async operations
     final habitProvider = Provider.of<HabitProvider>(context, listen: false);
-    final aiCoachProvider = Provider.of<AICoachProvider>(context, listen: false);
+    final aiCoachProvider = Provider.of<AICoachProvider>(
+      context,
+      listen: false,
+    );
     final scaffoldMessenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
     final isEditing = widget.isEditing;
@@ -238,11 +247,17 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
           name: _formData.name,
           category: _formData.category!,
           goalType: _formData.goalType.name,
-          goalValue: _formData.goalType != GoalType.none ? _formData.goalValue : null,
-          goalUnit: _formData.goalType != GoalType.none ? _formData.goalUnit : null,
+          goalValue: _formData.goalType != GoalType.none
+              ? _formData.goalValue
+              : null,
+          goalUnit: _formData.goalType != GoalType.none
+              ? _formData.goalUnit
+              : null,
           clearGoal: _formData.goalType == GoalType.none,
           reminderEnabled: _formData.reminderEnabled,
-          reminderTime: _formData.reminderEnabled ? _formData.reminderTime : null,
+          reminderTime: _formData.reminderEnabled
+              ? _formData.reminderTime
+              : null,
         );
 
         await habitProvider.updateHabit(updatedHabit);
@@ -270,10 +285,16 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
           streak: 0,
           isCompleted: false,
           goalType: _formData.goalType.name,
-          goalValue: _formData.goalType != GoalType.none ? _formData.goalValue : null,
-          goalUnit: _formData.goalType != GoalType.none ? _formData.goalUnit : null,
+          goalValue: _formData.goalType != GoalType.none
+              ? _formData.goalValue
+              : null,
+          goalUnit: _formData.goalType != GoalType.none
+              ? _formData.goalUnit
+              : null,
           reminderEnabled: _formData.reminderEnabled,
-          reminderTime: _formData.reminderEnabled ? _formData.reminderTime : null,
+          reminderTime: _formData.reminderEnabled
+              ? _formData.reminderTime
+              : null,
         );
 
         await habitProvider.addHabit(habit);
@@ -303,19 +324,20 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
       // Show success message
       final message = isEditing
           ? 'Habit updated!'
-          : (_formData.reminderEnabled ? 'Habit created with reminder!' : 'Habit created!');
+          : (_formData.reminderEnabled
+                ? 'Habit created with reminder!'
+                : 'Habit created!');
       scaffoldMessenger.showSnackBar(
-        SnackBar(
-          content: Text(message),
-          duration: const Duration(seconds: 2),
-        ),
+        SnackBar(content: Text(message), duration: const Duration(seconds: 2)),
       );
     } catch (e) {
       if (!mounted) return;
       setState(() => _isSaving = false);
       scaffoldMessenger.showSnackBar(
         SnackBar(
-          content: Text('Failed to ${isEditing ? 'update' : 'create'} habit: $e'),
+          content: Text(
+            'Failed to ${isEditing ? 'update' : 'create'} habit: $e',
+          ),
           backgroundColor: AppColors.red,
           duration: const Duration(seconds: 3),
         ),
@@ -802,7 +824,9 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
                           _categoryError = null;
                         });
                       },
-                      borderRadius: BorderRadius.circular(UIConstants.radiusXLarge),
+                      borderRadius: BorderRadius.circular(
+                        UIConstants.radiusXLarge,
+                      ),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
                         height: 40,
@@ -811,7 +835,9 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
                           color: isSelected
                               ? gradientColors[0]
                               : Colors.transparent,
-                          borderRadius: BorderRadius.circular(UIConstants.radiusXLarge),
+                          borderRadius: BorderRadius.circular(
+                            UIConstants.radiusXLarge,
+                          ),
                           border: Border.all(
                             color: isSelected
                                 ? Colors.transparent
@@ -1234,8 +1260,8 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
                           type == GoalType.none
                               ? 'None'
                               : type == GoalType.time
-                                  ? 'Time'
-                                  : 'Count',
+                              ? 'Time'
+                              : 'Count',
                           style: TextStyle(
                             color: isSelected
                                 ? (isDark
@@ -1269,14 +1295,22 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
                   child: TextField(
                     keyboardType: TextInputType.number,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    controller: TextEditingController(
-                      text: _formData.goalValue?.toString() ?? '',
-                    )..selection = TextSelection.collapsed(
-                        offset: (_formData.goalValue?.toString() ?? '').length,
-                      ),
+                    controller:
+                        TextEditingController(
+                            text: _formData.goalValue?.toString() ?? '',
+                          )
+                          ..selection = TextSelection.collapsed(
+                            offset:
+                                (_formData.goalValue?.toString() ?? '').length,
+                          ),
                     onChanged: (val) {
+                      final parsed = int.tryParse(val);
                       setState(() {
-                        _formData.goalValue = int.tryParse(val);
+                        // Bound goal value to 1–9999 / 将目标值限制在1-9999范围内
+                        _formData.goalValue =
+                            (parsed != null && parsed > 0 && parsed <= 9999)
+                            ? parsed
+                            : null;
                       });
                     },
                     style: TextStyle(
@@ -1364,7 +1398,10 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
                 Expanded(
                   flex: 2,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: isDark
                           ? AppColors.darkSurfaceVariant
@@ -1389,8 +1426,9 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
                             onPressed: () {
                               setState(() {
                                 final current = _formData.goalValue ?? 1;
-                                _formData.goalValue =
-                                    current > 1 ? current - 1 : 1;
+                                _formData.goalValue = current > 1
+                                    ? current - 1
+                                    : 1;
                               });
                             },
                           ),
@@ -1434,11 +1472,11 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
                 Expanded(
                   flex: 3,
                   child: TextField(
-                    controller: TextEditingController(
-                      text: _formData.goalUnit ?? '',
-                    )..selection = TextSelection.collapsed(
-                        offset: (_formData.goalUnit ?? '').length,
-                      ),
+                    controller:
+                        TextEditingController(text: _formData.goalUnit ?? '')
+                          ..selection = TextSelection.collapsed(
+                            offset: (_formData.goalUnit ?? '').length,
+                          ),
                     onChanged: (val) {
                       setState(() {
                         _formData.goalUnit = val.isEmpty ? null : val;
@@ -1699,7 +1737,9 @@ class _HabitCreationScreenState extends State<HabitCreationScreen> {
               : Text(
                   widget.isEditing
                       ? 'Save Changes'
-                      : (_formData.isAISuggested ? 'Add Habit' : 'Create Habit'),
+                      : (_formData.isAISuggested
+                            ? 'Add Habit'
+                            : 'Create Habit'),
                   style: const TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.w600,

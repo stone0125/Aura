@@ -14,6 +14,7 @@
 const {
   HttpsError,
   getGenAI,
+  SchemaType,
   validateString,
   validateNumber,
   validateCategory,
@@ -23,8 +24,60 @@ const {
   getUserTier,
   checkUsageLimit,
   recordUsage,
+  validateGeminiResponse,
   parseGeminiJSON,
 } = require("../helpers");
+
+const RESPONSE_SCHEMA = {
+  type: SchemaType.OBJECT,
+  properties: {
+    breakdown: {
+      type: SchemaType.OBJECT,
+      description: "Scores for each of the 4 dimensions",
+      properties: {
+        consistency: {
+          type: SchemaType.OBJECT,
+          properties: {
+            score: { type: SchemaType.INTEGER, description: "Score 0-100" },
+            analysis: { type: SchemaType.STRING, description: "1-2 sentence explanation" },
+          },
+          required: ["score", "analysis"],
+        },
+        momentum: {
+          type: SchemaType.OBJECT,
+          properties: {
+            score: { type: SchemaType.INTEGER, description: "Score 0-100" },
+            analysis: { type: SchemaType.STRING, description: "1-2 sentence explanation" },
+          },
+          required: ["score", "analysis"],
+        },
+        resilience: {
+          type: SchemaType.OBJECT,
+          properties: {
+            score: { type: SchemaType.INTEGER, description: "Score 0-100" },
+            analysis: { type: SchemaType.STRING, description: "1-2 sentence explanation" },
+          },
+          required: ["score", "analysis"],
+        },
+        engagement: {
+          type: SchemaType.OBJECT,
+          properties: {
+            score: { type: SchemaType.INTEGER, description: "Score 0-100" },
+            analysis: { type: SchemaType.STRING, description: "1-2 sentence explanation" },
+          },
+          required: ["score", "analysis"],
+        },
+      },
+      required: ["consistency", "momentum", "resilience", "engagement"],
+    },
+    primaryStrength: { type: SchemaType.STRING, description: "Key strength identified" },
+    primaryWeakness: { type: SchemaType.STRING, description: "Area for improvement" },
+    recommendation: { type: SchemaType.STRING, description: "Specific actionable recommendation" },
+    comparisonToAverage: { type: SchemaType.STRING, description: "Percentile estimate" },
+    healthCorrelation: { type: SchemaType.STRING, nullable: true, description: "Health insight if data provided, null otherwise" },
+  },
+  required: ["breakdown", "primaryStrength", "primaryWeakness", "recommendation", "comparisonToAverage"],
+};
 
 /// Generate a comprehensive performance score for a single habit
 /// 为单个习惯生成综合表现评分
@@ -36,14 +89,20 @@ async function generateHabitScore(request) {
     );
   }
 
-  await checkBurstLimit(request.auth.uid, 'score');
-  const tier = await getUserTier(request.auth.uid);
+  // Parallelize independent checks to reduce latency
+  const [, tier] = await Promise.all([
+    checkBurstLimit(request.auth.uid, 'score'),
+    getUserTier(request.auth.uid),
+  ]);
   await checkUsageLimit(request.auth.uid, tier, 'report');
 
   const data = request.data || {};
 
   // Input validation
   const habitName = sanitizeForPrompt(validateString(data.habitName || '', 'habitName', 100));
+  if (!habitName) {
+    throw new HttpsError('invalid-argument', 'habitName must not be empty');
+  }
   const category = validateCategory(data.category || 'health');
   const currentStreak = validateNumber(data.currentStreak ?? 0, 'currentStreak', 0, 10000);
   const longestStreak = validateNumber(data.longestStreak ?? 0, 'longestStreak', 0, 10000);
@@ -58,7 +117,13 @@ async function generateHabitScore(request) {
     : null;
   const goalUnit = data.goalUnit ? sanitizeForPrompt(String(data.goalUnit)).substring(0, 50) : null;
 
-  const model = getGenAI().getGenerativeModel({ model: "gemini-3-flash-preview" });
+  const model = getGenAI().getGenerativeModel({
+    model: "gemini-3-flash-preview",
+    generationConfig: {
+      responseMimeType: "application/json",
+      responseSchema: RESPONSE_SCHEMA,
+    },
+  });
 
   // Calculate derived metrics
   const daysWithHistory = completionHistory.length;
@@ -68,9 +133,9 @@ async function generateHabitScore(request) {
 
   let healthContext = '';
   if (healthData) {
-    const avgSteps = Number(healthData.avgSteps) || null;
-    const avgSleep = Number(healthData.avgSleep) || null;
-    const avgHeartRate = Number(healthData.avgHeartRate) || null;
+    const avgSteps = healthData.avgSteps != null ? Number(healthData.avgSteps) : null;
+    const avgSleep = healthData.avgSleep != null ? Number(healthData.avgSleep) : null;
+    const avgHeartRate = healthData.avgHeartRate != null ? Number(healthData.avgHeartRate) : null;
     healthContext = `
     HEALTH DATA CORRELATION:
     - Average daily steps: ${avgSteps ?? 'N/A'}
@@ -131,10 +196,8 @@ async function generateHabitScore(request) {
     - C+ (73-76), C (70-72), C- (67-69)
     - D (60-66), F (below 60)
 
-    Return JSON with structure:
+    Return JSON with structure (overallScore and grade are computed server-side, do NOT include them):
     {
-      "overallScore": <number 1-100>,
-      "grade": "<letter grade>",
       "breakdown": {
         "consistency": { "score": <number>, "analysis": "<1-2 sentence explanation>" },
         "momentum": { "score": <number>, "analysis": "<1-2 sentence explanation>" },
@@ -148,7 +211,6 @@ async function generateHabitScore(request) {
       "healthCorrelation": "<insight if health data provided, null otherwise>"
     }
 
-    Do not include markdown formatting.
   `;
 
   let returnValue;
@@ -156,23 +218,51 @@ async function generateHabitScore(request) {
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
+    validateGeminiResponse(text, "generateHabitScore");
 
     const parsed = parseGeminiJSON(text);
 
-    const VALID_GRADES = ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D', 'F'];
     const validateBreakdown = (b) => ({
       score: Math.min(100, Math.max(0, Number(b?.score) || 0)),
       analysis: String(b?.analysis || '').substring(0, 500),
     });
+    // Ensure all 4 breakdown fields exist (Dart client expects all of them)
+    const breakdown = parsed.breakdown || {};
+
+    // Compute overallScore from weighted breakdown (server-side, not AI)
+    const validatedBreakdown = {
+      consistency: validateBreakdown(breakdown.consistency),
+      momentum: validateBreakdown(breakdown.momentum),
+      resilience: validateBreakdown(breakdown.resilience),
+      engagement: validateBreakdown(breakdown.engagement),
+    };
+    const computedScore = Math.round(
+      0.40 * validatedBreakdown.consistency.score +
+      0.25 * validatedBreakdown.momentum.score +
+      0.20 * validatedBreakdown.resilience.score +
+      0.15 * validatedBreakdown.engagement.score
+    );
+    const clampedScore = Math.min(100, Math.max(0, computedScore));
+
+    // Derive grade from computed score
+    const GRADE_THRESHOLDS = [
+      [95, 'A+'], [90, 'A'], [87, 'A-'],
+      [83, 'B+'], [80, 'B'], [77, 'B-'],
+      [73, 'C+'], [70, 'C'], [67, 'C-'],
+      [60, 'D'],
+    ];
+    let computedGrade = 'F';
+    for (const [threshold, grade] of GRADE_THRESHOLDS) {
+      if (clampedScore >= threshold) {
+        computedGrade = grade;
+        break;
+      }
+    }
+
     returnValue = {
-      overallScore: Math.min(100, Math.max(0, Number(parsed.overallScore) || 0)),
-      grade: VALID_GRADES.includes(parsed.grade) ? parsed.grade : 'C',
-      breakdown: {
-        consistency: validateBreakdown(parsed.breakdown?.consistency),
-        momentum: validateBreakdown(parsed.breakdown?.momentum),
-        resilience: validateBreakdown(parsed.breakdown?.resilience),
-        engagement: validateBreakdown(parsed.breakdown?.engagement),
-      },
+      overallScore: clampedScore,
+      grade: computedGrade,
+      breakdown: validatedBreakdown,
       primaryStrength: String(parsed.primaryStrength || '').substring(0, 300),
       primaryWeakness: String(parsed.primaryWeakness || '').substring(0, 300),
       recommendation: String(parsed.recommendation || '').substring(0, 500),

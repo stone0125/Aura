@@ -36,6 +36,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 class AICoachProvider with ChangeNotifier {
   final FirebaseFunctions? _firebaseFunctions;
   final SubscriptionService _subscriptionService = SubscriptionService();
+  SharedPreferences? _prefs;
+
+  /// Cached SharedPreferences accessor to avoid repeated getInstance() calls
+  /// 缓存的 SharedPreferences 访问器，避免重复调用 getInstance()
+  Future<SharedPreferences> _getPrefs() async {
+    return _prefs ??= await SharedPreferences.getInstance();
+  }
 
   /// Constructor with optional Firebase Functions injection for testing
   /// 构造函数，可选注入 Firebase Functions 用于测试
@@ -121,7 +128,8 @@ class AICoachProvider with ChangeNotifier {
   bool get canRefreshSuggestions {
     if (_isLoadingSuggestions) return false;
     if (_lastSuggestionRefreshTime == null) return true;
-    return DateTime.now().difference(_lastSuggestionRefreshTime!) >= _refreshCooldown;
+    return DateTime.now().difference(_lastSuggestionRefreshTime!) >=
+        _refreshCooldown;
   }
 
   /// Seconds remaining in cooldown (0 if no cooldown active)
@@ -188,11 +196,12 @@ class AICoachProvider with ChangeNotifier {
   static const String _tipsCacheKey = 'ai_tips_cache';
   static const String _actionsCacheKey = 'ai_actions_cache';
   static const String _patternsCacheKey = 'ai_patterns_cache';
+
   /// Helper to get cached data if valid
   /// 获取有效的缓存数据的辅助方法
   Future<dynamic> _getCachedData(String key) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await _getPrefs();
       final jsonStr = prefs.getString(key);
       if (jsonStr == null) return null;
 
@@ -217,7 +226,7 @@ class AICoachProvider with ChangeNotifier {
   /// 将数据保存到缓存的辅助方法
   Future<void> _cacheData(String key, dynamic data) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await _getPrefs();
       final cache = {
         'timestamp': DateTime.now().toIso8601String(),
         'data': data,
@@ -234,7 +243,7 @@ class AICoachProvider with ChangeNotifier {
   /// 在用户添加或删除习惯时调用
   Future<void> clearSuggestionsCache() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await _getPrefs();
       await prefs.remove(_suggestionsCacheKey);
       _suggestions = [];
       debugPrint('🧹 AI suggestions cache cleared');
@@ -295,33 +304,40 @@ class AICoachProvider with ChangeNotifier {
                 .toList();
             if (_suggestions.isNotEmpty) {
               _isLoadingSuggestions = false;
-              notifyListeners(); // Early return needs notification
-              return true;
+              return true; // finally block will call notifyListeners()
             }
           }
         } catch (e) {
-          debugPrint('Cache validation failed, fetching fresh data: $e');
-          // Continue to fetch fresh data if cache is corrupted
+          debugPrint('Cache validation failed, clearing corrupted cache: $e');
+          try {
+            final prefs = await _getPrefs();
+            await prefs.remove(_suggestionsCacheKey);
+          } catch (_) {}
         }
       }
 
       // 2. Check subscription limits before making API call
-      debugPrint('loadSuggestions: checking subscription (tier=${_subscriptionService.currentTier.displayName}, remaining=${_subscriptionService.getRemainingAISuggestions()})');
+      debugPrint(
+        'loadSuggestions: checking subscription (tier=${_subscriptionService.currentTier.displayName}, remaining=${_subscriptionService.getRemainingAISuggestions()})',
+      );
       if (!_subscriptionService.canUseAISuggestion()) {
         final tier = _subscriptionService.currentTier;
-        debugPrint('loadSuggestions: subscription limit reached (${tier.displayName}, ${tier.maxAISuggestionsPerDay}/day)');
+        debugPrint(
+          'loadSuggestions: subscription limit reached (${tier.displayName}, ${tier.maxAISuggestionsPerDay}/day)',
+        );
         _suggestionsError =
             'Daily AI suggestion limit reached (${tier.maxAISuggestionsPerDay} per day on ${tier.displayName}). '
             'Upgrade for more suggestions.';
         _suggestions = _getDefaultSuggestions();
         _usedFallback = true;
         _isLoadingSuggestions = false;
-        notifyListeners(); // Early return needs notification
-        return false;
+        return false; // finally block will call notifyListeners()
       }
 
       // 3. Fetch from API with user stats for personalization
-      debugPrint('loadSuggestions: calling Cloud Function (categories=${categories.length}, habits=${currentHabits.length})');
+      debugPrint(
+        'loadSuggestions: calling Cloud Function (categories=${categories.length}, habits=${currentHabits.length})',
+      );
       final functions = _firebaseFunctions ?? FirebaseFunctions.instance;
       final callable = functions.httpsCallable('generateHabitSuggestions');
       final result = await callable.call({
@@ -337,51 +353,67 @@ class AICoachProvider with ChangeNotifier {
       // Validate response data structure
       final responseData = result.data;
       if (responseData == null || responseData is! List) {
-        throw FormatException('Invalid response format: expected List');
+        throw const FormatException('Invalid response format: expected List');
       }
       final List<dynamic> data = responseData;
 
-      final parsed = data.asMap().entries.map((entry) {
-        final item = entry.value;
-        final index = entry.key;
-        // Validate each item is a Map
-        if (item == null || item is! Map) {
-          debugPrint('Suggestion item $index is not a Map, skipping');
-          return null;
-        }
-        final map = Map<String, dynamic>.from(item);
-        final category = HabitCategory.values.firstWhere(
-          (e) => e.name == map['category']?.toString().toLowerCase(),
-          orElse: () {
-            debugPrint('Unknown category "${map['category']}", defaulting to health');
-            return HabitCategory.health;
-          },
-        );
-        return AICoachSuggestion(
-          id: '${DateTime.now().millisecondsSinceEpoch}_$index', // Unique ID per item
-          title: map['habitName']?.toString() ?? 'New Habit',
-          description: map['explanation']?.toString() ?? '',
-          whyThisHelps: map['reason']?.toString() ?? '',
-          category: category,
-          icon: HabitIcons.getDefaultIconForCategory(category.name),
-          estimatedImpact: map['estimatedImpact']?.toString() ?? 'Medium',
-          estimatedMinutes: (map['estimatedMinutes'] as num?)?.toInt() ?? 15,
-          suggestedAt: DateTime.now(),
-          frequencyType: map['frequencyType']?.toString() ?? 'daily',
-          weeklyDays: map['weeklyDays'] is List
-              ? List<int>.from((map['weeklyDays'] as List).map((e) => (e as num?)?.toInt() ?? 0))
-              : null,
-          goalType: map['goalType']?.toString() ?? 'none',
-          goalValue: (map['goalValue'] as num?)?.toInt(),
-          goalUnit: map['goalUnit']?.toString(),
-          suggestedReminderHour: (map['suggestedReminderHour'] as num?)?.toInt(),
-          suggestedReminderMinute: (map['suggestedReminderMinute'] as num?)?.toInt(),
-        );
-      }).whereType<AICoachSuggestion>().toList();
+      final parsed = data
+          .asMap()
+          .entries
+          .map((entry) {
+            final item = entry.value;
+            final index = entry.key;
+            // Validate each item is a Map
+            if (item == null || item is! Map) {
+              debugPrint('Suggestion item $index is not a Map, skipping');
+              return null;
+            }
+            final map = Map<String, dynamic>.from(item);
+            final category = HabitCategory.values.firstWhere(
+              (e) => e.name == map['category']?.toString().toLowerCase(),
+              orElse: () {
+                debugPrint(
+                  'Unknown category "${map['category']}", defaulting to health',
+                );
+                return HabitCategory.health;
+              },
+            );
+            return AICoachSuggestion(
+              id: '${DateTime.now().millisecondsSinceEpoch}_$index', // Unique ID per item
+              title: map['habitName']?.toString() ?? 'New Habit',
+              description: map['explanation']?.toString() ?? '',
+              whyThisHelps: map['reason']?.toString() ?? '',
+              category: category,
+              icon: HabitIcons.getDefaultIconForCategory(category.name),
+              estimatedImpact: map['estimatedImpact']?.toString() ?? 'Medium',
+              estimatedMinutes:
+                  (map['estimatedMinutes'] as num?)?.toInt() ?? 15,
+              suggestedAt: DateTime.now(),
+              frequencyType: map['frequencyType']?.toString() ?? 'daily',
+              weeklyDays: map['weeklyDays'] is List
+                  ? List<int>.from(
+                      (map['weeklyDays'] as List).map(
+                        (e) => (e as num?)?.toInt() ?? 0,
+                      ),
+                    )
+                  : null,
+              goalType: map['goalType']?.toString() ?? 'none',
+              goalValue: (map['goalValue'] as num?)?.toInt(),
+              goalUnit: map['goalUnit']?.toString(),
+              suggestedReminderHour: (map['suggestedReminderHour'] as num?)
+                  ?.toInt(),
+              suggestedReminderMinute: (map['suggestedReminderMinute'] as num?)
+                  ?.toInt(),
+            );
+          })
+          .whereType<AICoachSuggestion>()
+          .toList();
 
       // Guard: if API returned empty results, fall back to defaults
       if (parsed.isEmpty) {
-        debugPrint('Cloud Function returned empty suggestions array — using defaults');
+        debugPrint(
+          'Cloud Function returned empty suggestions array — using defaults',
+        );
         _suggestions = _getDefaultSuggestions();
         _suggestionsError = 'AI returned no suggestions. Showing defaults.';
         _usedFallback = true;
@@ -506,8 +538,7 @@ class AICoachProvider with ChangeNotifier {
         // Check monthly AI report limit
         if (!_subscriptionService.canUseAIReport()) {
           _isLoadingInsights = false;
-          notifyListeners();
-          return;
+          return; // finally block will call notifyListeners()
         }
 
         final functions = _firebaseFunctions ?? FirebaseFunctions.instance;
@@ -515,7 +546,7 @@ class AICoachProvider with ChangeNotifier {
         final result = await callable.call({'weekData': weekData});
         final rawData = result.data;
         if (rawData == null || rawData is! Map) {
-          throw FormatException('Invalid insights response');
+          throw const FormatException('Invalid insights response');
         }
         data = Map<String, dynamic>.from(rawData);
 
@@ -541,11 +572,18 @@ class AICoachProvider with ChangeNotifier {
             .toList();
       }
 
+      final int totalCompletions = (weekData['totalCompletions'] as int?) ?? 0;
+      // Target = number of habits × 7 days in a week
+      final int targetCompletions = habits.length * 7;
+      final double completionRate = targetCompletions > 0
+          ? (totalCompletions / targetCompletions).clamp(0.0, 1.0)
+          : 0.0;
+
       _weeklySummary = WeeklyAISummary(
         weekRange: 'Current Week',
-        totalCompletions: weekData['totalCompletions'] ?? 0,
-        targetCompletions: 0, // Calculate or pass
-        completionRate: 0.0, // Calculate
+        totalCompletions: totalCompletions,
+        targetCompletions: targetCompletions,
+        completionRate: completionRate,
         currentStreak: weekData['currentStreak'] ?? 0,
         topCategory: 'General',
         insight: data['summary'] ?? 'Keep going!',
@@ -593,8 +631,7 @@ class AICoachProvider with ChangeNotifier {
                 .toList();
             if (cached.isNotEmpty) {
               _patterns = cached;
-              notifyListeners();
-              return;
+              return; // finally block will call notifyListeners()
             }
           }
         } catch (e) {
@@ -604,8 +641,7 @@ class AICoachProvider with ChangeNotifier {
 
       // 2. Check monthly AI report limit
       if (!_subscriptionService.canUseAIReport()) {
-        notifyListeners();
-        return;
+        return; // finally block will call notifyListeners()
       }
 
       // 3. Call Cloud Function
@@ -615,32 +651,36 @@ class AICoachProvider with ChangeNotifier {
 
       final responseData = result.data;
       if (responseData == null || responseData is! Map) {
-        throw FormatException('Invalid pattern discovery response');
+        throw const FormatException('Invalid pattern discovery response');
       }
       final data = Map<String, dynamic>.from(responseData);
 
       // Check for insufficient data reason
       if (data['reason'] == 'insufficient_data') {
         _patterns = [];
-        notifyListeners();
-        return;
+        return; // finally block will call notifyListeners()
       }
 
       final rawPatterns = data['patterns'];
       if (rawPatterns == null || rawPatterns is! List) {
         _patterns = [];
-        notifyListeners();
-        return;
+        return; // finally block will call notifyListeners()
       }
 
-      _patterns = rawPatterns.asMap().entries.map((entry) {
-        final item = entry.value;
-        if (item == null || item is! Map) return null;
-        final map = Map<String, dynamic>.from(item);
-        map['id'] = 'pattern_${DateTime.now().millisecondsSinceEpoch}_${entry.key}';
-        map['discoveredAt'] = DateTime.now().toIso8601String();
-        return AIPattern.fromJson(map);
-      }).whereType<AIPattern>().toList();
+      _patterns = rawPatterns
+          .asMap()
+          .entries
+          .map((entry) {
+            final item = entry.value;
+            if (item == null || item is! Map) return null;
+            final map = Map<String, dynamic>.from(item);
+            map['id'] =
+                'pattern_${DateTime.now().millisecondsSinceEpoch}_${entry.key}';
+            map['discoveredAt'] = DateTime.now().toIso8601String();
+            return AIPattern.fromJson(map);
+          })
+          .whereType<AIPattern>()
+          .toList();
 
       // Record usage after successful API call
       await _subscriptionService.recordAIReportUsage();
@@ -692,8 +732,7 @@ class AICoachProvider with ChangeNotifier {
             if (allTips.isNotEmpty) {
               _bucketTips(allTips);
               _isLoadingTips = false;
-              notifyListeners();
-              return;
+              return; // finally block will call notifyListeners()
             }
           }
         } catch (e) {
@@ -705,8 +744,7 @@ class AICoachProvider with ChangeNotifier {
       // 2. Check monthly AI report limit
       if (!_subscriptionService.canUseAIReport()) {
         _isLoadingTips = false;
-        notifyListeners();
-        return;
+        return; // finally block will call notifyListeners()
       }
 
       // 3. Fetch from API with user data for personalization
@@ -722,7 +760,9 @@ class AICoachProvider with ChangeNotifier {
       // Validate response data structure
       final responseData = result.data;
       if (responseData == null || responseData is! List) {
-        throw FormatException('Invalid tips response format: expected List');
+        throw const FormatException(
+          'Invalid tips response format: expected List',
+        );
       }
       final List<dynamic> data = responseData;
       final List<AITip> allTips = [];
@@ -811,7 +851,8 @@ class AICoachProvider with ChangeNotifier {
                 .map((item) {
                   try {
                     return AIActionItem.fromJson(
-                        Map<String, dynamic>.from(item));
+                      Map<String, dynamic>.from(item),
+                    );
                   } catch (e) {
                     return null;
                   }
@@ -822,8 +863,7 @@ class AICoachProvider with ChangeNotifier {
             if (items.isNotEmpty) {
               _actionItems = items;
               _isLoadingActions = false;
-              notifyListeners();
-              return;
+              return; // finally block will call notifyListeners()
             }
           }
         } catch (e) {
@@ -833,10 +873,10 @@ class AICoachProvider with ChangeNotifier {
 
       // 2. Check monthly AI report limit
       if (!_subscriptionService.canUseAIReport()) {
-        _actionsError = 'Monthly AI report limit reached. Upgrade for more reports.';
+        _actionsError =
+            'Monthly AI report limit reached. Upgrade for more reports.';
         _isLoadingActions = false;
-        notifyListeners();
-        return;
+        return; // finally block will call notifyListeners()
       }
 
       // 3. Call Cloud Function
@@ -850,25 +890,29 @@ class AICoachProvider with ChangeNotifier {
 
       final responseData = result.data;
       if (responseData == null || responseData is! List) {
-        throw FormatException('Invalid action items response');
+        throw const FormatException('Invalid action items response');
       }
 
-      _actionItems = responseData.map((item) {
-        if (item == null || item is! Map) return null;
-        final map = Map<String, dynamic>.from(item);
-        return AIActionItem(
-          id: DateTime.now().millisecondsSinceEpoch.toString() +
-              (map['title']?.hashCode ?? 0).toString(),
-          title: map['title']?.toString() ?? 'Action Item',
-          description: map['description']?.toString() ?? '',
-          type: _parseActionType(map['type']?.toString()),
-          priority: _parseActionPriority(map['priority']?.toString()),
-          relatedHabit: map['relatedHabit']?.toString(),
-          relatedHabitId: map['relatedHabitId']?.toString(),
-          metric: map['metric']?.toString(),
-          createdAt: DateTime.now(),
-        );
-      }).whereType<AIActionItem>().toList();
+      _actionItems = responseData
+          .map((item) {
+            if (item == null || item is! Map) return null;
+            final map = Map<String, dynamic>.from(item);
+            return AIActionItem(
+              id:
+                  DateTime.now().millisecondsSinceEpoch.toString() +
+                  (map['title']?.hashCode ?? 0).toString(),
+              title: map['title']?.toString() ?? 'Action Item',
+              description: map['description']?.toString() ?? '',
+              type: _parseActionType(map['type']?.toString()),
+              priority: _parseActionPriority(map['priority']?.toString()),
+              relatedHabit: map['relatedHabit']?.toString(),
+              relatedHabitId: map['relatedHabitId']?.toString(),
+              metric: map['metric']?.toString(),
+              createdAt: DateTime.now(),
+            );
+          })
+          .whereType<AIActionItem>()
+          .toList();
 
       // Record usage after successful API call
       await _subscriptionService.recordAIReportUsage();
@@ -1040,14 +1084,22 @@ class AICoachProvider with ChangeNotifier {
     _lastSuggestionRefreshTime = null;
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_suggestionsCacheKey);
-      await prefs.remove(_insightsCacheKey);
-      await prefs.remove(_tipsCacheKey);
-      await prefs.remove(_actionsCacheKey);
-      await prefs.remove(_patternsCacheKey);
+      final prefs = await _getPrefs();
+      for (final key in [
+        _suggestionsCacheKey,
+        _insightsCacheKey,
+        _tipsCacheKey,
+        _actionsCacheKey,
+        _patternsCacheKey,
+      ]) {
+        try {
+          await prefs.remove(key);
+        } catch (e) {
+          debugPrint('Failed to clear cache key $key: $e');
+        }
+      }
     } catch (e) {
-      debugPrint('Error clearing AI coach caches: $e');
+      debugPrint('Error getting SharedPreferences: $e');
     }
 
     notifyListeners();

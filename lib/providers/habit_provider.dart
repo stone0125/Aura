@@ -146,8 +146,9 @@ class HabitProvider with ChangeNotifier {
     final index = _habits.indexWhere((h) => h.id == habitId);
     if (index == -1) return false;
 
-    // Mark as toggling to prevent concurrent operations
+    // Mark as toggling and immediately notify to disable UI button
     _togglingHabits.add(habitId);
+    notifyListeners();
     final oldHabit = _habits[index];
 
     try {
@@ -162,7 +163,9 @@ class HabitProvider with ChangeNotifier {
       // Firestore will set the correct value from history
       final newHabit = oldHabit.copyWith(
         isCompleted: willBeCompleted,
-        lastCompletedDate: willBeCompleted ? DateTime.now() : oldHabit.lastCompletedDate,
+        lastCompletedDate: willBeCompleted
+            ? DateTime.now()
+            : oldHabit.lastCompletedDate,
       );
       _habits[index] = newHabit;
       notifyListeners();

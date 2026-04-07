@@ -28,6 +28,7 @@ import 'notification_service.dart';
 /// Service for exporting habit data to various formats
 class ExportService {
   static final ExportService _instance = ExportService._internal();
+
   /// Factory constructor returning the singleton instance
   /// 工厂构造函数，返回单例实例
   factory ExportService() => _instance;
@@ -110,7 +111,9 @@ class ExportService {
         return null;
       }
 
-      debugPrint('Exported ${habits.length} habits to CSV: ${file.path} ($writtenLength bytes)');
+      debugPrint(
+        'Exported ${habits.length} habits to CSV: ${file.path} ($writtenLength bytes)',
+      );
       return file.path;
     } catch (e) {
       debugPrint('Error exporting to CSV: $e');
@@ -123,7 +126,9 @@ class ExportService {
   Future<String?> exportToJSON(List<Habit> habits) async {
     try {
       // Fetch all histories in parallel (fixes N+1 query pattern)
-      final historyFutures = habits.map((h) => _firestoreService.getHabitHistory(h.id)).toList();
+      final historyFutures = habits
+          .map((h) => _firestoreService.getHabitHistory(h.id))
+          .toList();
       final allHistories = await Future.wait(historyFutures);
 
       // Build habits with history
@@ -203,7 +208,9 @@ class ExportService {
         return null;
       }
 
-      debugPrint('Exported ${habits.length} habits to JSON: ${file.path} ($writtenLength bytes)');
+      debugPrint(
+        'Exported ${habits.length} habits to JSON: ${file.path} ($writtenLength bytes)',
+      );
       return file.path;
     } catch (e) {
       debugPrint('Error exporting to JSON: $e');
@@ -267,10 +274,24 @@ class ExportService {
   /// Handles double quotes, newlines, and commas
   /// 处理双引号、换行符和逗号
   String _escapeCSV(String value) {
+    // Prevent CSV formula injection: prefix formula characters with single quote
+    // 防止 CSV 公式注入：用单引号前缀公式字符
+    var sanitized = value;
+    if (sanitized.startsWith('=') ||
+        sanitized.startsWith('+') ||
+        sanitized.startsWith('-') ||
+        sanitized.startsWith('@') ||
+        sanitized.startsWith('\t') ||
+        sanitized.startsWith('\r')) {
+      sanitized = "'$sanitized";
+    }
     // Replace double quotes with escaped double quotes
-    var escaped = value.replaceAll('"', '""');
+    var escaped = sanitized.replaceAll('"', '""');
     // If value contains special characters, wrap in quotes
-    if (escaped.contains(',') || escaped.contains('\n') || escaped.contains('\r') || escaped.contains('"')) {
+    if (escaped.contains(',') ||
+        escaped.contains('\n') ||
+        escaped.contains('\r') ||
+        escaped.contains('"')) {
       escaped = '"$escaped"';
     }
     return escaped;

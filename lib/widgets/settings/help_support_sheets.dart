@@ -308,6 +308,7 @@ Widget _buildFormField(
   required String label,
   required TextEditingController controller,
   int maxLines = 1,
+  int? maxLength,
   String? hintText,
   String? errorText,
 }) {
@@ -330,6 +331,7 @@ Widget _buildFormField(
         TextField(
           controller: controller,
           maxLines: maxLines,
+          maxLength: maxLength,
           style: TextStyle(
             fontSize: 14,
             color: isDark
@@ -423,8 +425,9 @@ Widget _buildDropdownField(
             child: DropdownButton<String>(
               value: value,
               isExpanded: true,
-              dropdownColor:
-                  isDark ? AppColors.darkSurfaceVariant : AppColors.lightSurface,
+              dropdownColor: isDark
+                  ? AppColors.darkSurfaceVariant
+                  : AppColors.lightSurface,
               style: TextStyle(
                 fontSize: 14,
                 color: isDark
@@ -438,10 +441,9 @@ Widget _buildDropdownField(
                     : AppColors.lightSecondaryText,
               ),
               items: items
-                  .map((item) => DropdownMenuItem(
-                        value: item,
-                        child: Text(item),
-                      ))
+                  .map(
+                    (item) => DropdownMenuItem(value: item, child: Text(item)),
+                  )
                   .toList(),
               onChanged: onChanged,
             ),
@@ -484,10 +486,7 @@ Widget _buildSubmitButton(
             )
           : Text(
               label,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
     ),
   );
@@ -585,13 +584,17 @@ Widget _buildFAQTile(bool isDark, _FAQItem item) {
         style: TextStyle(
           fontSize: 15,
           fontWeight: FontWeight.w500,
-          color: isDark ? AppColors.darkPrimaryText : AppColors.lightPrimaryText,
+          color: isDark
+              ? AppColors.darkPrimaryText
+              : AppColors.lightPrimaryText,
         ),
       ),
-      iconColor:
-          isDark ? AppColors.darkSecondaryText : AppColors.lightSecondaryText,
-      collapsedIconColor:
-          isDark ? AppColors.darkSecondaryText : AppColors.lightSecondaryText,
+      iconColor: isDark
+          ? AppColors.darkSecondaryText
+          : AppColors.lightSecondaryText,
+      collapsedIconColor: isDark
+          ? AppColors.darkSecondaryText
+          : AppColors.lightSecondaryText,
       children: [
         Text(
           item.answer,
@@ -614,9 +617,7 @@ Widget _buildStillNeedHelp(BuildContext context, bool isDark) {
   return Container(
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
-      color: isDark
-          ? AppColors.darkSurfaceVariant
-          : AppColors.lightBackground,
+      color: isDark ? AppColors.darkSurfaceVariant : AppColors.lightBackground,
       borderRadius: UIConstants.borderRadiusMedium,
       border: Border.all(
         color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
@@ -655,8 +656,9 @@ Widget _buildStillNeedHelp(BuildContext context, bool isDark) {
             icon: const Icon(Icons.support_agent_rounded, size: 18),
             label: const Text('Contact Support'),
             style: OutlinedButton.styleFrom(
-              foregroundColor:
-                  isDark ? AppColors.darkCoral : AppColors.lightCoral,
+              foregroundColor: isDark
+                  ? AppColors.darkCoral
+                  : AppColors.lightCoral,
               side: BorderSide(
                 color: isDark ? AppColors.darkCoral : AppColors.lightCoral,
               ),
@@ -1121,6 +1123,7 @@ class _ContactSupportSheetState extends State<_ContactSupportSheet> {
   String _category = 'General';
   bool _submitted = false;
   bool _isSubmitting = false;
+  DateTime? _lastSubmitTime; // Rate limit cooldown / 速率限制冷却
 
   static const _categories = [
     'General',
@@ -1142,11 +1145,20 @@ class _ContactSupportSheetState extends State<_ContactSupportSheet> {
   /// Validates and submits the support message via Firebase Cloud Functions
   /// 验证并通过 Firebase Cloud Functions 提交支持消息
   Future<void> _submit() async {
-    setState(() => _submitted = true);
-    if (_subjectController.text.trim().isEmpty ||
-        _messageController.text.trim().isEmpty) {
+    // Rate limit: 5 second cooldown between submissions / 速率限制：提交间隔5秒冷却
+    if (_lastSubmitTime != null &&
+        DateTime.now().difference(_lastSubmitTime!) <
+            const Duration(seconds: 5)) {
       return;
     }
+    setState(() => _submitted = true);
+    final trimmedSubject = _subjectController.text.trim();
+    final trimmedMessage = _messageController.text.trim();
+    if (trimmedSubject.isEmpty || trimmedMessage.isEmpty) {
+      return;
+    }
+    // Guard against oversized messages / 防止消息过长
+    if (trimmedMessage.length > 2000) return;
 
     setState(() => _isSubmitting = true);
 
@@ -1154,12 +1166,14 @@ class _ContactSupportSheetState extends State<_ContactSupportSheet> {
       await FirebaseFunctions.instance
           .httpsCallable('submitSupportMessage')
           .call({
-        'type': 'contact_support',
-        'subject': _subjectController.text.trim(),
-        'message': _messageController.text.trim(),
-        'category': _category,
-      });
+            'type': 'contact_support',
+            'subject': trimmedSubject,
+            'message': trimmedMessage,
+            'category': _category,
+          });
 
+      _lastSubmitTime =
+          DateTime.now(); // Record successful submission time / 记录成功提交时间
       if (!mounted) return;
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1169,7 +1183,9 @@ class _ContactSupportSheetState extends State<_ContactSupportSheet> {
       if (!mounted) return;
       setState(() => _isSubmitting = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to send message. Please try again.')),
+        const SnackBar(
+          content: Text('Failed to send message. Please try again.'),
+        ),
       );
     }
   }
@@ -1212,8 +1228,8 @@ class _ContactSupportSheetState extends State<_ContactSupportSheet> {
                       label: 'Subject',
                       controller: _subjectController,
                       hintText: 'Brief description of your issue',
-                      errorText: _submitted &&
-                              _subjectController.text.trim().isEmpty
+                      errorText:
+                          _submitted && _subjectController.text.trim().isEmpty
                           ? 'Subject is required'
                           : null,
                     ),
@@ -1222,9 +1238,10 @@ class _ContactSupportSheetState extends State<_ContactSupportSheet> {
                       label: 'Message',
                       controller: _messageController,
                       maxLines: 6,
+                      maxLength: 2000,
                       hintText: 'Describe your issue in detail...',
-                      errorText: _submitted &&
-                              _messageController.text.trim().isEmpty
+                      errorText:
+                          _submitted && _messageController.text.trim().isEmpty
                           ? 'Message is required'
                           : null,
                     ),
@@ -1274,6 +1291,7 @@ class _ReportBugSheetState extends State<_ReportBugSheet> {
   bool _submitted = false;
   bool _isSubmitting = false;
   String _deviceInfo = 'Loading device info...';
+  DateTime? _lastSubmitTime; // Rate limit cooldown / 速率限制冷却
 
   /// Initializes state and loads device information
   /// 初始化状态并加载设备信息
@@ -1327,7 +1345,8 @@ class _ReportBugSheetState extends State<_ReportBugSheet> {
     } catch (_) {
       if (mounted) {
         setState(() {
-          _deviceInfo = 'App: ${AppConstants.appName} v${AppConstants.appVersion}\n'
+          _deviceInfo =
+              'App: ${AppConstants.appName} v${AppConstants.appVersion}\n'
               'Platform: ${Platform.operatingSystem}';
         });
       }
@@ -1337,28 +1356,42 @@ class _ReportBugSheetState extends State<_ReportBugSheet> {
   /// Validates and submits the bug report via Firebase Cloud Functions
   /// 验证并通过 Firebase Cloud Functions 提交错误报告
   Future<void> _submit() async {
-    setState(() => _submitted = true);
-    if (_titleController.text.trim().isEmpty ||
-        _descriptionController.text.trim().isEmpty) {
+    // Rate limit: 5 second cooldown between submissions / 速率限制：提交间隔5秒冷却
+    if (_lastSubmitTime != null &&
+        DateTime.now().difference(_lastSubmitTime!) <
+            const Duration(seconds: 5)) {
       return;
     }
+    setState(() => _submitted = true);
+    final trimmedTitle = _titleController.text.trim();
+    final trimmedDescription = _descriptionController.text.trim();
+    if (trimmedTitle.isEmpty || trimmedDescription.isEmpty) {
+      return;
+    }
+    // Guard against oversized messages / 防止消息过长
+    if (trimmedDescription.length > 2000) return;
 
     setState(() => _isSubmitting = true);
 
-    final messageBody = 'Bug Description:\n${_descriptionController.text.trim()}\n\n'
-        'Steps to Reproduce:\n${_stepsController.text.trim().isNotEmpty ? _stepsController.text.trim() : "N/A"}\n\n'
-        'Expected Behavior:\n${_expectedController.text.trim().isNotEmpty ? _expectedController.text.trim() : "N/A"}';
+    final trimmedSteps = _stepsController.text.trim();
+    final trimmedExpected = _expectedController.text.trim();
+    final messageBody =
+        'Bug Description:\n$trimmedDescription\n\n'
+        'Steps to Reproduce:\n${trimmedSteps.isNotEmpty ? trimmedSteps : "N/A"}\n\n'
+        'Expected Behavior:\n${trimmedExpected.isNotEmpty ? trimmedExpected : "N/A"}';
 
     try {
       await FirebaseFunctions.instance
           .httpsCallable('submitSupportMessage')
           .call({
-        'type': 'bug_report',
-        'subject': _titleController.text.trim(),
-        'message': messageBody,
-        'deviceInfo': _deviceInfo,
-      });
+            'type': 'bug_report',
+            'subject': trimmedTitle,
+            'message': messageBody,
+            'deviceInfo': _deviceInfo,
+          });
 
+      _lastSubmitTime =
+          DateTime.now(); // Record successful submission time / 记录成功提交时间
       if (!mounted) return;
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1368,7 +1401,9 @@ class _ReportBugSheetState extends State<_ReportBugSheet> {
       if (!mounted) return;
       setState(() => _isSubmitting = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to submit bug report. Please try again.')),
+        const SnackBar(
+          content: Text('Failed to submit bug report. Please try again.'),
+        ),
       );
     }
   }
@@ -1404,16 +1439,18 @@ class _ReportBugSheetState extends State<_ReportBugSheet> {
                       hintText: 'Short description of the bug',
                       errorText:
                           _submitted && _titleController.text.trim().isEmpty
-                              ? 'Title is required'
-                              : null,
+                          ? 'Title is required'
+                          : null,
                     ),
                     _buildFormField(
                       isDark,
                       label: 'Description',
                       controller: _descriptionController,
                       maxLines: 4,
+                      maxLength: 2000,
                       hintText: 'What happened?',
-                      errorText: _submitted &&
+                      errorText:
+                          _submitted &&
                               _descriptionController.text.trim().isEmpty
                           ? 'Description is required'
                           : null,
@@ -1525,6 +1562,7 @@ class _RequestFeatureSheetState extends State<_RequestFeatureSheet> {
   String _category = 'Habit Tracking';
   bool _submitted = false;
   bool _isSubmitting = false;
+  DateTime? _lastSubmitTime; // Rate limit cooldown / 速率限制冷却
 
   static const _categories = [
     'Habit Tracking',
@@ -1548,27 +1586,40 @@ class _RequestFeatureSheetState extends State<_RequestFeatureSheet> {
   /// Validates and submits the feature request via Firebase Cloud Functions
   /// 验证并通过 Firebase Cloud Functions 提交功能请求
   Future<void> _submit() async {
-    setState(() => _submitted = true);
-    if (_titleController.text.trim().isEmpty ||
-        _descriptionController.text.trim().isEmpty) {
+    // Rate limit: 5 second cooldown between submissions / 速率限制：提交间隔5秒冷却
+    if (_lastSubmitTime != null &&
+        DateTime.now().difference(_lastSubmitTime!) <
+            const Duration(seconds: 5)) {
       return;
     }
+    setState(() => _submitted = true);
+    final trimmedTitle = _titleController.text.trim();
+    final trimmedDescription = _descriptionController.text.trim();
+    if (trimmedTitle.isEmpty || trimmedDescription.isEmpty) {
+      return;
+    }
+    // Guard against oversized messages / 防止消息过长
+    if (trimmedDescription.length > 2000) return;
 
     setState(() => _isSubmitting = true);
 
-    final messageBody = 'Feature Description:\n${_descriptionController.text.trim()}\n\n'
-        'Use Case:\n${_useCaseController.text.trim().isNotEmpty ? _useCaseController.text.trim() : "N/A"}';
+    final trimmedUseCase = _useCaseController.text.trim();
+    final messageBody =
+        'Feature Description:\n$trimmedDescription\n\n'
+        'Use Case:\n${trimmedUseCase.isNotEmpty ? trimmedUseCase : "N/A"}';
 
     try {
       await FirebaseFunctions.instance
           .httpsCallable('submitSupportMessage')
           .call({
-        'type': 'feature_request',
-        'subject': _titleController.text.trim(),
-        'message': messageBody,
-        'category': _category,
-      });
+            'type': 'feature_request',
+            'subject': trimmedTitle,
+            'message': messageBody,
+            'category': _category,
+          });
 
+      _lastSubmitTime =
+          DateTime.now(); // Record successful submission time / 记录成功提交时间
       if (!mounted) return;
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1578,7 +1629,9 @@ class _RequestFeatureSheetState extends State<_RequestFeatureSheet> {
       if (!mounted) return;
       setState(() => _isSubmitting = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to submit feature request. Please try again.')),
+        const SnackBar(
+          content: Text('Failed to submit feature request. Please try again.'),
+        ),
       );
     }
   }
@@ -1614,16 +1667,18 @@ class _RequestFeatureSheetState extends State<_RequestFeatureSheet> {
                       hintText: 'Short name for the feature',
                       errorText:
                           _submitted && _titleController.text.trim().isEmpty
-                              ? 'Title is required'
-                              : null,
+                          ? 'Title is required'
+                          : null,
                     ),
                     _buildFormField(
                       isDark,
                       label: 'Description',
                       controller: _descriptionController,
                       maxLines: 5,
+                      maxLength: 2000,
                       hintText: 'Describe the feature you\'d like to see...',
-                      errorText: _submitted &&
+                      errorText:
+                          _submitted &&
                               _descriptionController.text.trim().isEmpty
                           ? 'Description is required'
                           : null,

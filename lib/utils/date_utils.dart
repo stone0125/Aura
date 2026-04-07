@@ -177,7 +177,12 @@ bool isToday(DateTime date) {
 /// Checks if the given date is yesterday
 /// 检查给定日期是否为昨天
 bool isYesterday(DateTime date) {
-  final yesterday = DateTime.now().subtract(const Duration(days: 1));
+  final now = DateTime.now();
+  final yesterday = DateTime(
+    now.year,
+    now.month,
+    now.day,
+  ).subtract(const Duration(days: 1));
   return isSameDay(date, yesterday);
 }
 

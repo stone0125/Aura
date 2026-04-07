@@ -73,7 +73,9 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
         child: AnimatedBuilder(
           animation: _scrollController,
           builder: (context, child) {
-            final scrollOffset = _scrollController.hasClients ? _scrollController.offset : 0.0;
+            final scrollOffset = _scrollController.hasClients
+                ? _scrollController.offset
+                : 0.0;
             final appBarOpacity = (scrollOffset / 100).clamp(0.0, 1.0);
             final titleOpacity = ((scrollOffset - 80) / 20).clamp(0.0, 1.0);
             return _buildAppBar(isDark, appBarOpacity, titleOpacity);
@@ -178,9 +180,8 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
           onPressed: () {
             Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (context) => HabitCreationScreen(
-                  habitToEdit: widget.habit,
-                ),
+                builder: (context) =>
+                    HabitCreationScreen(habitToEdit: widget.habit),
               ),
             );
           },
@@ -234,7 +235,9 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            SizedBox(height: MediaQuery.of(context).padding.top + kToolbarHeight),
+            SizedBox(
+              height: MediaQuery.of(context).padding.top + kToolbarHeight,
+            ),
             // Category Icon
             Container(
               width: 80,
@@ -296,7 +299,8 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
                 fontWeight: FontWeight.w400,
               ),
             ),
-            if (widget.habit.reminderEnabled && widget.habit.reminderTime != null) ...[
+            if (widget.habit.reminderEnabled &&
+                widget.habit.reminderTime != null) ...[
               const SizedBox(height: 6),
               Row(
                 mainAxisSize: MainAxisSize.min,
@@ -328,7 +332,10 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
               runSpacing: 8,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: isDark ? 0.15 : 0.2),
                     border: Border.all(
@@ -345,13 +352,21 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
                     ),
                   ),
                 ),
-                if (widget.habit.goalType != 'none' && widget.habit.goalValue != null)
+                if (widget.habit.goalType != 'none' &&
+                    widget.habit.goalValue != null)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 12,
+                    ),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: isDark ? 0.15 : 0.2),
+                      color: Colors.white.withValues(
+                        alpha: isDark ? 0.15 : 0.2,
+                      ),
                       border: Border.all(
-                        color: Colors.white.withValues(alpha: isDark ? 0.2 : 0.3),
+                        color: Colors.white.withValues(
+                          alpha: isDark ? 0.2 : 0.3,
+                        ),
                       ),
                       borderRadius: UIConstants.borderRadiusMedium,
                     ),
@@ -363,13 +378,17 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
                               ? Icons.timer_outlined
                               : Icons.flag_outlined,
                           size: 14,
-                          color: isDark ? AppColors.darkPrimaryText : Colors.white,
+                          color: isDark
+                              ? AppColors.darkPrimaryText
+                              : Colors.white,
                         ),
                         const SizedBox(width: 6),
                         Text(
                           '${widget.habit.goalValue} ${widget.habit.goalUnit ?? ''}',
                           style: TextStyle(
-                            color: isDark ? AppColors.darkPrimaryText : Colors.white,
+                            color: isDark
+                                ? AppColors.darkPrimaryText
+                                : Colors.white,
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
                           ),
@@ -470,10 +489,7 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
             SizedBox(
               width: 16,
               height: 16,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: coral,
-              ),
+              child: CircularProgressIndicator(strokeWidth: 2, color: coral),
             ),
             const SizedBox(width: 8),
             Text(
@@ -512,9 +528,7 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
   /// 构建带有分析和提示的AI洞察内容
   Widget _buildAIInsightContent(bool isDark, AIInsight insight) {
     final textStyle = TextStyle(
-      color: isDark
-          ? AppColors.darkPrimaryText
-          : AppColors.lightPrimaryText,
+      color: isDark ? AppColors.darkPrimaryText : AppColors.lightPrimaryText,
       fontSize: 15,
       height: 1.5,
     );
@@ -547,14 +561,17 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
             if (isOverflowing) ...[
               const SizedBox(height: 12),
               GestureDetector(
-                onTap: () => setState(() => _isInsightExpanded = !_isInsightExpanded),
+                onTap: () =>
+                    setState(() => _isInsightExpanded = !_isInsightExpanded),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       _isInsightExpanded ? 'Show Less' : 'Show More',
                       style: TextStyle(
-                        color: isDark ? AppColors.darkCoral : AppColors.lightCoral,
+                        color: isDark
+                            ? AppColors.darkCoral
+                            : AppColors.lightCoral,
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
                       ),
@@ -565,7 +582,9 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
                           ? Icons.keyboard_arrow_up_rounded
                           : Icons.keyboard_arrow_down_rounded,
                       size: 18,
-                      color: isDark ? AppColors.darkCoral : AppColors.lightCoral,
+                      color: isDark
+                          ? AppColors.darkCoral
+                          : AppColors.lightCoral,
                     ),
                   ],
                 ),
@@ -642,13 +661,15 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
                   ? _formatTimeOfDay(widget.habit.reminderTime!)
                   : 'Not set',
               style: TextStyle(
-                color: widget.habit.reminderEnabled && widget.habit.reminderTime != null
+                color:
+                    widget.habit.reminderEnabled &&
+                        widget.habit.reminderTime != null
                     ? (isDark
-                        ? AppColors.darkPrimaryText
-                        : AppColors.lightPrimaryText)
+                          ? AppColors.darkPrimaryText
+                          : AppColors.lightPrimaryText)
                     : (isDark
-                        ? AppColors.darkSecondaryText
-                        : AppColors.lightSecondaryText),
+                          ? AppColors.darkSecondaryText
+                          : AppColors.lightSecondaryText),
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
               ),
@@ -1135,8 +1156,14 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
             ),
             child: RepaintBoundary(
               child: LineChart(
-                _buildChartData(isDark, provider.completions, _selectedTimeRange),
-                duration: const Duration(milliseconds: 250), // Animation duration
+                _buildChartData(
+                  isDark,
+                  provider.completions,
+                  _selectedTimeRange,
+                ),
+                duration: const Duration(
+                  milliseconds: 250,
+                ), // Animation duration
               ),
             ),
           ),
@@ -1264,7 +1291,7 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
     TimeRange range,
   ) {
     final now = DateTime.now();
-    List<FlSpot> spots = [];
+    final List<FlSpot> spots = [];
 
     // Pre-calculate completed dates for O(1) lookup
     // Format: "YYYY-MM-DD"
@@ -1468,9 +1495,9 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
                   ),
                   elevation: 4,
                 ),
-                child: Row(
+                child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
+                  children: [
                     Icon(Icons.check_rounded, size: 24),
                     SizedBox(width: 8),
                     Text(

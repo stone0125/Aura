@@ -182,9 +182,9 @@ class _MotivationalQuoteCardState extends State<MotivationalQuoteCard> {
                       child: ShaderMask(
                         shaderCallback: (bounds) =>
                             accentGradient.createShader(bounds),
-                        child: Text(
+                        child: const Text(
                           '“',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: Colors.white,
                             fontSize: 56,
                             height: 1,
@@ -202,9 +202,9 @@ class _MotivationalQuoteCardState extends State<MotivationalQuoteCard> {
                       child: ShaderMask(
                         shaderCallback: (bounds) =>
                             accentGradient.createShader(bounds),
-                        child: Text(
+                        child: const Text(
                           '”',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: Colors.white,
                             fontSize: 56,
                             height: 1,

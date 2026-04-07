@@ -21,6 +21,7 @@ import '../providers/ai_coach_provider.dart';
 import '../services/firestore_service.dart';
 import '../services/health_service.dart';
 import '../services/subscription_service.dart';
+import '../utils/date_utils.dart' as date_utils;
 
 /// Provider for AI scoring, daily reviews, and health correlations
 /// AI 评分、每日回顾和健康关联分析的 Provider
@@ -134,8 +135,8 @@ class AIScoringProvider extends ChangeNotifier {
 
     try {
       // Load health integration status
-      _healthIntegrationEnabled =
-          await _firestoreService.getHealthIntegrationEnabled();
+      _healthIntegrationEnabled = await _firestoreService
+          .getHealthIntegrationEnabled();
 
       // Initialize health service if enabled
       if (_healthIntegrationEnabled) {
@@ -148,9 +149,7 @@ class AIScoringProvider extends ChangeNotifier {
       _cachedOverallAverageScore = null; // Invalidate cache
 
       // Load today's review if exists
-      final today = DateTime.now();
-      final todayStr =
-          '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+      final todayStr = date_utils.formatDateId(DateTime.now());
       _todaysReview = await _firestoreService.getDailyReview(todayStr);
 
       // Load recent review history
@@ -158,8 +157,8 @@ class AIScoringProvider extends ChangeNotifier {
 
       // Load latest health correlations
       if (_healthIntegrationEnabled) {
-        _healthCorrelations =
-            await _firestoreService.getLatestHealthCorrelation();
+        _healthCorrelations = await _firestoreService
+            .getLatestHealthCorrelation();
         _healthSummary = await _healthService.getHealthSummary(days: 7);
       }
 
@@ -176,101 +175,109 @@ class AIScoringProvider extends ChangeNotifier {
   /// Generate score for a single habit
   /// 为单个习惯生成评分
   Future<HabitScore?> generateHabitScore(Habit habit) async {
-    if (_inProgressOps.contains('score')) return _habitScores[habit.id];
-    _inProgressOps.add('score');
-    try {
-    // Check monthly AI report limit
-    if (!_subscriptionService.canUseAIReport()) {
-      _errorMessage = 'Monthly AI report limit reached. Upgrade for more reports.';
-      notifyListeners();
-      return null;
+    if (_inProgressOps.contains('score_${habit.id}')) {
+      return _habitScores[habit.id];
     }
-
-    _isLoadingScore = true;
-    _errorMessage = null;
-    notifyListeners();
-
+    _inProgressOps.add('score_${habit.id}');
     try {
-      // Get completion history
-      final history = await _firestoreService.getCompletionHistoryForScoring(
-        habit.id,
-        days: 30,
-      );
+      // Check monthly AI report limit
+      if (!_subscriptionService.canUseAIReport()) {
+        _errorMessage =
+            'Monthly AI report limit reached. Upgrade for more reports.';
+        notifyListeners();
+        return null;
+      }
 
-      // Get longest streak from history (simplified calculation)
-      int longestStreak = habit.streak;
-      int currentCount = 0;
-      for (final completed in history) {
-        if (completed) {
-          currentCount++;
-          if (currentCount > longestStreak) {
-            longestStreak = currentCount;
+      _isLoadingScore = true;
+      _errorMessage = null;
+      notifyListeners();
+
+      try {
+        // Get completion history
+        final history = await _firestoreService.getCompletionHistoryForScoring(
+          habit.id,
+          days: 30,
+        );
+
+        // Get longest streak from history (simplified calculation)
+        int longestStreak = habit.streak;
+        int currentCount = 0;
+        for (final completed in history) {
+          if (completed) {
+            currentCount++;
+            if (currentCount > longestStreak) {
+              longestStreak = currentCount;
+            }
+          } else {
+            currentCount = 0;
           }
-        } else {
-          currentCount = 0;
         }
+
+        // Prepare health data if available
+        Map<String, dynamic>? healthData;
+        if (_healthIntegrationEnabled && _healthSummary != null) {
+          healthData = {
+            'avgSteps': _healthSummary!.avgSteps.isFinite
+                ? _healthSummary!.avgSteps.toInt()
+                : 0,
+            'avgSleep': _healthSummary!.avgSleepHours.isFinite
+                ? _healthSummary!.avgSleepHours
+                : 0.0,
+            'avgHeartRate': _healthSummary!.avgHeartRate.isFinite
+                ? _healthSummary!.avgHeartRate.toInt()
+                : 0,
+          };
+        }
+
+        // Call Cloud Function
+        final callable = _functions.httpsCallable('generateHabitScore');
+        final result = await callable.call({
+          'habitName': habit.name,
+          'category': habit.category.name,
+          'currentStreak': habit.streak,
+          'longestStreak': longestStreak,
+          'totalCompletions': history.where((h) => h).length,
+          'completionHistory': history,
+          'healthData': healthData,
+          'goalType': habit.goalType,
+          'goalValue': habit.goalValue,
+          'goalUnit': habit.goalUnit,
+        });
+
+        // Validate response data type before casting
+        final responseData = result.data;
+        if (responseData == null || responseData is! Map) {
+          throw FormatException(
+            'Invalid habit score response: expected Map, got ${responseData.runtimeType}',
+          );
+        }
+        final responseMap = Map<String, dynamic>.from(responseData);
+
+        // Parse response
+        final score = HabitScore.fromJson(responseMap, habitId: habit.id);
+
+        // Record usage after successful API call
+        await _subscriptionService.recordAIReportUsage();
+
+        // Save to Firestore
+        await _firestoreService.saveHabitScore(score);
+
+        // Update local state
+        _habitScores[habit.id] = score;
+        _cachedOverallAverageScore = null; // Invalidate cache
+
+        _isLoadingScore = false;
+        notifyListeners();
+        return score;
+      } catch (e) {
+        debugPrint('Error generating habit score: $e');
+        _errorMessage = 'Failed to generate habit score';
+        _isLoadingScore = false;
+        notifyListeners();
+        return null;
       }
-
-      // Prepare health data if available
-      Map<String, dynamic>? healthData;
-      if (_healthIntegrationEnabled && _healthSummary != null) {
-        healthData = {
-          'avgSteps': _healthSummary!.avgSteps.toInt(),
-          'avgSleep': _healthSummary!.avgSleepHours,
-          'avgHeartRate': _healthSummary!.avgHeartRate.toInt(),
-        };
-      }
-
-      // Call Cloud Function
-      final callable = _functions.httpsCallable('generateHabitScore');
-      final result = await callable.call({
-        'habitName': habit.name,
-        'category': habit.category.name,
-        'currentStreak': habit.streak,
-        'longestStreak': longestStreak,
-        'totalCompletions': history.where((h) => h).length,
-        'completionHistory': history,
-        'healthData': healthData,
-        'goalType': habit.goalType,
-        'goalValue': habit.goalValue,
-        'goalUnit': habit.goalUnit,
-      });
-
-      // Validate response data type before casting
-      final responseData = result.data;
-      if (responseData == null || responseData is! Map) {
-        throw FormatException('Invalid habit score response: expected Map, got ${responseData.runtimeType}');
-      }
-      final responseMap = Map<String, dynamic>.from(responseData);
-
-      // Parse response
-      final score = HabitScore.fromJson(
-        responseMap,
-        habitId: habit.id,
-      );
-
-      // Record usage after successful API call
-      await _subscriptionService.recordAIReportUsage();
-
-      // Save to Firestore
-      await _firestoreService.saveHabitScore(score);
-
-      // Update local state
-      _habitScores[habit.id] = score;
-      _cachedOverallAverageScore = null; // Invalidate cache
-
-      _isLoadingScore = false;
-      notifyListeners();
-      return score;
-    } catch (e) {
-      debugPrint('Error generating habit score: $e');
-      _errorMessage = 'Failed to generate habit score';
-      _isLoadingScore = false;
-      notifyListeners();
-      return null;
-    }
     } finally {
-      _inProgressOps.remove('score');
+      _inProgressOps.remove('score_${habit.id}');
     }
   }
 
@@ -279,28 +286,37 @@ class AIScoringProvider extends ChangeNotifier {
   Future<DailyReview?> generateDailyReview(List<Habit> habits) async {
     if (habits.isEmpty) return null;
     if (_inProgressOps.contains('review')) return _todaysReview;
-    _inProgressOps.add('review');
-    try {
 
-    // Check monthly AI report limit
-    if (!_subscriptionService.canUseAIReport()) {
-      _errorMessage = 'Monthly AI report limit reached. Upgrade for more reports.';
-      notifyListeners();
-      return null;
+    // Check if today's review already exists to avoid duplicate API calls
+    // 检查今日回顾是否已存在，以避免重复的 API 调用
+    final today = DateTime.now();
+    final todayStr = date_utils.formatDateId(today);
+    if (_todaysReview != null && _todaysReview!.date == todayStr) {
+      debugPrint(
+        'generateDailyReview: today\'s review already exists, skipping',
+      );
+      return _todaysReview;
     }
 
-    _isLoadingReview = true;
-    _errorMessage = null;
-    notifyListeners();
-
+    _inProgressOps.add('review');
     try {
-      final today = DateTime.now();
-      final todayStr =
-          '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+      // Check monthly AI report limit
+      if (!_subscriptionService.canUseAIReport()) {
+        _errorMessage =
+            'Monthly AI report limit reached. Upgrade for more reports.';
+        notifyListeners();
+        return null;
+      }
 
-      // Prepare habit data
-      final habitData = habits
-          .map((h) => {
+      _isLoadingReview = true;
+      _errorMessage = null;
+      notifyListeners();
+
+      try {
+        // Prepare habit data
+        final habitData = habits
+            .map(
+              (h) => {
                 'id': h.id,
                 'name': h.name,
                 'category': h.category.name,
@@ -309,91 +325,99 @@ class AIScoringProvider extends ChangeNotifier {
                 'goalType': h.goalType,
                 'goalValue': h.goalValue,
                 'goalUnit': h.goalUnit,
-              })
-          .toList();
+              },
+            )
+            .toList();
 
-      // Fetch actual completion history for the 7-day range from Firestore
-      final completionsByDate = <String, int>{};
-      final historyFutures = habits.map((h) =>
-          _firestoreService.getHabitHistory(h.id, limitDays: 7)).toList();
-      final allHistories = await Future.wait(historyFutures);
-      for (final history in allHistories) {
-        for (final date in history) {
-          final key = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-          completionsByDate[key] = (completionsByDate[key] ?? 0) + 1;
+        // Fetch actual completion history for the 7-day range from Firestore
+        final completionsByDate = <String, int>{};
+        final historyFutures = habits
+            .map((h) => _firestoreService.getHabitHistory(h.id, limitDays: 7))
+            .toList();
+        final allHistories = await Future.wait(historyFutures);
+        for (final history in allHistories) {
+          for (final date in history) {
+            final key = date_utils.formatDateId(date);
+            completionsByDate[key] = (completionsByDate[key] ?? 0) + 1;
+          }
         }
-      }
 
-      // Get weekly trend (last 7 days completion rates) from real history data
-      final weeklyTrend = <double>[];
-      for (int i = 6; i >= 0; i--) {
-        final date = today.subtract(Duration(days: i));
-        final key = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-        final completed = completionsByDate[key] ?? 0;
-        weeklyTrend.add(habits.isNotEmpty ? (completed / habits.length) * 100 : 0);
-      }
-
-      // Prepare health data if available
-      Map<String, dynamic>? healthData;
-      if (_healthIntegrationEnabled) {
-        final todaysHealth = await _healthService.getTodaysHealthData();
-        if (todaysHealth != null && todaysHealth.hasData) {
-          healthData = todaysHealth.toJson();
+        // Get weekly trend (last 7 days completion rates) from real history data
+        final weeklyTrend = <double>[];
+        for (int i = 6; i >= 0; i--) {
+          final date = today.subtract(Duration(days: i));
+          final key = date_utils.formatDateId(date);
+          final completed = completionsByDate[key] ?? 0;
+          weeklyTrend.add(
+            habits.isNotEmpty ? (completed / habits.length) * 100 : 0,
+          );
         }
+
+        // Prepare health data if available
+        Map<String, dynamic>? healthData;
+        if (_healthIntegrationEnabled) {
+          final todaysHealth = await _healthService.getTodaysHealthData();
+          if (todaysHealth != null && todaysHealth.hasData) {
+            healthData = todaysHealth.toJson();
+          }
+        }
+
+        // Get previous score
+        final previousReview = _reviewHistory.isNotEmpty
+            ? _reviewHistory.first
+            : null;
+        final previousScore = previousReview?.overallScore ?? 0;
+
+        // Call Cloud Function
+        final callable = _functions.httpsCallable('generateDailyReview');
+        final result = await callable.call({
+          'date': todayStr,
+          'habits': habitData,
+          'weeklyTrend': weeklyTrend,
+          'healthData': healthData,
+          'previousScore': previousScore,
+        });
+
+        // Validate response data type before casting
+        final responseData = result.data;
+        if (responseData == null || responseData is! Map) {
+          throw FormatException(
+            'Invalid daily review response: expected Map, got ${responseData.runtimeType}',
+          );
+        }
+        final responseMap = Map<String, dynamic>.from(responseData);
+
+        // Capture completion snapshot at generation time
+        responseMap['completionSnapshot'] =
+            AICoachProvider.buildCompletionSnapshot(habits);
+
+        // Parse response
+        final review = DailyReview.fromJson(responseMap);
+
+        // Record usage after successful API call
+        await _subscriptionService.recordAIReportUsage();
+
+        // Save to Firestore
+        await _firestoreService.saveDailyReview(review);
+
+        // Update local state — replace existing entry for same date
+        _todaysReview = review;
+        _reviewHistory.removeWhere((r) => r.date == review.date);
+        _reviewHistory.insert(0, review);
+        if (_reviewHistory.length > 30) {
+          _reviewHistory.removeLast();
+        }
+
+        _isLoadingReview = false;
+        notifyListeners();
+        return review;
+      } catch (e) {
+        debugPrint('Error generating daily review: $e');
+        _errorMessage = 'Failed to generate daily review';
+        _isLoadingReview = false;
+        notifyListeners();
+        return null;
       }
-
-      // Get previous score
-      final previousReview = _reviewHistory.isNotEmpty ? _reviewHistory.first : null;
-      final previousScore = previousReview?.overallScore ?? 0;
-
-      // Call Cloud Function
-      final callable = _functions.httpsCallable('generateDailyReview');
-      final result = await callable.call({
-        'date': todayStr,
-        'habits': habitData,
-        'weeklyTrend': weeklyTrend,
-        'healthData': healthData,
-        'previousScore': previousScore,
-      });
-
-      // Validate response data type before casting
-      final responseData = result.data;
-      if (responseData == null || responseData is! Map) {
-        throw FormatException('Invalid daily review response: expected Map, got ${responseData.runtimeType}');
-      }
-      final responseMap = Map<String, dynamic>.from(responseData);
-
-      // Capture completion snapshot at generation time
-      responseMap['completionSnapshot'] =
-          AICoachProvider.buildCompletionSnapshot(habits);
-
-      // Parse response
-      final review = DailyReview.fromJson(responseMap);
-
-      // Record usage after successful API call
-      await _subscriptionService.recordAIReportUsage();
-
-      // Save to Firestore
-      await _firestoreService.saveDailyReview(review);
-
-      // Update local state — replace existing entry for same date
-      _todaysReview = review;
-      _reviewHistory.removeWhere((r) => r.date == review.date);
-      _reviewHistory.insert(0, review);
-      if (_reviewHistory.length > 30) {
-        _reviewHistory.removeLast();
-      }
-
-      _isLoadingReview = false;
-      notifyListeners();
-      return review;
-    } catch (e) {
-      debugPrint('Error generating daily review: $e');
-      _errorMessage = 'Failed to generate daily review';
-      _isLoadingReview = false;
-      notifyListeners();
-      return null;
-    }
     } finally {
       _inProgressOps.remove('review');
     }
@@ -408,119 +432,132 @@ class AIScoringProvider extends ChangeNotifier {
     if (_inProgressOps.contains('correlations')) return _healthCorrelations;
     _inProgressOps.add('correlations');
     try {
-    if (!_healthIntegrationEnabled) {
-      _errorMessage = 'Health integration is not enabled';
-      notifyListeners();
-      return null;
-    }
-
-    // Check monthly AI report limit
-    if (!_subscriptionService.canUseAIReport()) {
-      _errorMessage = 'Monthly AI report limit reached. Upgrade for more reports.';
-      notifyListeners();
-      return null;
-    }
-
-    _isLoadingCorrelations = true;
-    _errorMessage = null;
-    notifyListeners();
-
-    try {
-      // Get health data
-      final days = timeRange == '7d' ? 7 : timeRange == '90d' ? 90 : 30;
-      final healthData = await _healthService.prepareHealthDataForAnalysis(days: days);
-
-      if (healthData.length < 7) {
-        _errorMessage = 'Not enough health data for analysis (need at least 7 days)';
-        _isLoadingCorrelations = false;
+      if (!_healthIntegrationEnabled) {
+        _errorMessage = 'Health integration is not enabled';
         notifyListeners();
         return null;
       }
 
-      // Fetch all histories in parallel (fixes N+1 query pattern)
-      final historyFutures = habits.map((h) => _firestoreService.getHabitHistory(h.id)).toList();
-      final allHistories = await Future.wait(historyFutures);
-
-      // Build date -> completion count map for day-aligned health data
-      final dateCompletionCount = <String, int>{};
-      for (int i = 0; i < habits.length; i++) {
-        final history = allHistories[i];
-        for (final d in history) {
-          final dateStr = '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
-          dateCompletionCount[dateStr] = (dateCompletionCount[dateStr] ?? 0) + 1;
-        }
+      // Check monthly AI report limit
+      if (!_subscriptionService.canUseAIReport()) {
+        _errorMessage =
+            'Monthly AI report limit reached. Upgrade for more reports.';
+        notifyListeners();
+        return null;
       }
 
-      // Prepare habit data with completion dates
-      final habitData = <Map<String, dynamic>>[];
-      for (int i = 0; i < habits.length; i++) {
-        final habit = habits[i];
-        final history = allHistories[i];
-        final completionDates = history
-            .map((d) =>
-                '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}')
+      _isLoadingCorrelations = true;
+      _errorMessage = null;
+      notifyListeners();
+
+      try {
+        // Get health data
+        final days = timeRange == '7d'
+            ? 7
+            : timeRange == '90d'
+            ? 90
+            : 30;
+        final healthData = await _healthService.prepareHealthDataForAnalysis(
+          days: days,
+        );
+
+        if (healthData.length < 7) {
+          _errorMessage =
+              'Not enough health data for analysis (need at least 7 days)';
+          _isLoadingCorrelations = false;
+          notifyListeners();
+          return null;
+        }
+
+        // Fetch all histories in parallel (fixes N+1 query pattern)
+        final historyFutures = habits
+            .map((h) => _firestoreService.getHabitHistory(h.id))
             .toList();
+        final allHistories = await Future.wait(historyFutures);
 
-        final completedInRange = completionDates.length;
-        final avgRate = days > 0 ? (completedInRange / days) * 100 : 0;
-
-        habitData.add({
-          'name': habit.name,
-          'category': habit.category.name,
-          'completionDates': completionDates,
-          'avgCompletionRate': avgRate,
-        });
-      }
-
-      // Enrich health data with daily habit completion rate
-      final totalHabits = habits.length;
-      final enrichedHealthData = healthData.map((entry) {
-        final map = Map<String, dynamic>.from(entry as Map);
-        final dateStr = map['date']?.toString();
-        if (dateStr != null && totalHabits > 0) {
-          final completed = dateCompletionCount[dateStr] ?? 0;
-          map['dailyCompletionRate'] = ((completed / totalHabits) * 100).round();
+        // Build date -> completion count map for day-aligned health data
+        final dateCompletionCount = <String, int>{};
+        for (int i = 0; i < habits.length; i++) {
+          final history = allHistories[i];
+          for (final d in history) {
+            final dateStr = date_utils.formatDateId(d);
+            dateCompletionCount[dateStr] =
+                (dateCompletionCount[dateStr] ?? 0) + 1;
+          }
         }
-        return map;
-      }).toList();
 
-      // Call Cloud Function
-      final callable = _functions.httpsCallable('generateHealthCorrelations');
-      final result = await callable.call({
-        'timeRange': timeRange,
-        'habitData': habitData,
-        'healthData': enrichedHealthData,
-      });
+        // Prepare habit data with completion dates
+        final habitData = <Map<String, dynamic>>[];
+        for (int i = 0; i < habits.length; i++) {
+          final habit = habits[i];
+          final history = allHistories[i];
+          final completionDates = history
+              .map((d) => date_utils.formatDateId(d))
+              .toList();
 
-      // Validate response data type before casting
-      final responseData = result.data;
-      if (responseData == null || responseData is! Map) {
-        throw FormatException('Invalid health correlations response: expected Map, got ${responseData.runtimeType}');
+          final completedInRange = completionDates.length;
+          final avgRate = days > 0 ? (completedInRange / days) * 100 : 0;
+
+          habitData.add({
+            'name': habit.name,
+            'category': habit.category.name,
+            'completionDates': completionDates,
+            'avgCompletionRate': avgRate,
+          });
+        }
+
+        // Enrich health data with daily habit completion rate
+        final totalHabits = habits.length;
+        final enrichedHealthData = healthData.map((entry) {
+          final map = Map<String, dynamic>.from(entry as Map);
+          final dateStr = map['date']?.toString();
+          if (dateStr != null && totalHabits > 0) {
+            final completed = dateCompletionCount[dateStr] ?? 0;
+            map['dailyCompletionRate'] = ((completed / totalHabits) * 100)
+                .round();
+          }
+          return map;
+        }).toList();
+
+        // Call Cloud Function
+        final callable = _functions.httpsCallable('generateHealthCorrelations');
+        final result = await callable.call({
+          'timeRange': timeRange,
+          'habitData': habitData,
+          'healthData': enrichedHealthData,
+        });
+
+        // Validate response data type before casting
+        final responseData = result.data;
+        if (responseData == null || responseData is! Map) {
+          throw FormatException(
+            'Invalid health correlations response: expected Map, got ${responseData.runtimeType}',
+          );
+        }
+        final responseMap = Map<String, dynamic>.from(responseData);
+
+        // Parse response
+        final analysis = HealthCorrelationAnalysis.fromJson(responseMap);
+
+        // Record usage after successful API call
+        await _subscriptionService.recordAIReportUsage();
+
+        // Save to Firestore
+        await _firestoreService.saveHealthCorrelation(analysis);
+
+        // Update local state
+        _healthCorrelations = analysis;
+
+        _isLoadingCorrelations = false;
+        notifyListeners();
+        return analysis;
+      } catch (e) {
+        debugPrint('Error generating health correlations: $e');
+        _errorMessage = 'Failed to generate health correlations';
+        _isLoadingCorrelations = false;
+        notifyListeners();
+        return null;
       }
-      final responseMap = Map<String, dynamic>.from(responseData);
-
-      // Parse response
-      final analysis = HealthCorrelationAnalysis.fromJson(responseMap);
-
-      // Record usage after successful API call
-      await _subscriptionService.recordAIReportUsage();
-
-      // Save to Firestore
-      await _firestoreService.saveHealthCorrelation(analysis);
-
-      // Update local state
-      _healthCorrelations = analysis;
-
-      _isLoadingCorrelations = false;
-      notifyListeners();
-      return analysis;
-    } catch (e) {
-      debugPrint('Error generating health correlations: $e');
-      _errorMessage = 'Failed to generate health correlations';
-      _isLoadingCorrelations = false;
-      notifyListeners();
-      return null;
-    }
     } finally {
       _inProgressOps.remove('correlations');
     }

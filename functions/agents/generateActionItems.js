@@ -12,6 +12,7 @@
 const {
   HttpsError,
   getGenAI,
+  SchemaType,
   validateArray,
   validateNumber,
   sanitizeForPrompt,
@@ -20,8 +21,35 @@ const {
   recordUsage,
   checkBurstLimit,
   VALID_CATEGORIES,
+  validateGeminiResponse,
   parseGeminiJSON,
 } = require("../helpers");
+
+const RESPONSE_SCHEMA = {
+  type: SchemaType.ARRAY,
+  description: "5-7 personalized action items",
+  items: {
+    type: SchemaType.OBJECT,
+    properties: {
+      title: { type: SchemaType.STRING, description: "Specific actionable title" },
+      description: { type: SchemaType.STRING, description: "Why this matters, 1-2 sentences" },
+      type: {
+        type: SchemaType.STRING,
+        format: "enum",
+        enum: ["daily", "weekly", "challenge"],
+      },
+      priority: {
+        type: SchemaType.STRING,
+        format: "enum",
+        enum: ["high", "medium", "low"],
+      },
+      relatedHabit: { type: SchemaType.STRING, nullable: true, description: "Name of related habit or null" },
+      relatedHabitId: { type: SchemaType.STRING, nullable: true, description: "Exact ID from [ID:xxx] tags in habit data, or null" },
+      metric: { type: SchemaType.STRING, description: "Specific measurable target" },
+    },
+    required: ["title", "description", "type", "priority", "metric"],
+  },
+};
 
 /**
  * Generate personalized action items based on user habit data.
@@ -38,8 +66,11 @@ async function generateActionItems(request) {
     );
   }
 
-  await checkBurstLimit(request.auth.uid, 'actions');
-  const tier = await getUserTier(request.auth.uid);
+  // Parallelize independent checks to reduce latency
+  const [, tier] = await Promise.all([
+    checkBurstLimit(request.auth.uid, 'actions'),
+    getUserTier(request.auth.uid),
+  ]);
   await checkUsageLimit(request.auth.uid, tier, 'report');
 
   const { habits, completionRate, bestStreak } = request.data || {};
@@ -48,7 +79,13 @@ async function generateActionItems(request) {
   const rate = validateNumber(completionRate ?? 0, 'completionRate', 0, 100);
   const streak = validateNumber(bestStreak ?? 0, 'bestStreak', 0, 10000);
 
-  const model = getGenAI().getGenerativeModel({ model: "gemini-3-flash-preview" });
+  const model = getGenAI().getGenerativeModel({
+    model: "gemini-3-flash-preview",
+    generationConfig: {
+      responseMimeType: "application/json",
+      responseSchema: RESPONSE_SCHEMA,
+    },
+  });
 
   const habitsDetail = validatedHabits.filter(h => h && typeof h === 'object').map(h =>
     `- [ID:${sanitizeForPrompt(h.id || '')}] ${sanitizeForPrompt(h.name || '')} (${VALID_CATEGORIES.includes(h.category) ? h.category : 'general'}): streak ${Number(h.streak) || 0}, ${h.completed ? 'completed' : 'incomplete'}`
@@ -83,6 +120,8 @@ async function generateActionItems(request) {
     ${rate >= 80 ? 'Include advanced optimization and stretch goals.' : ''}
     ${streak < 3 ? 'Emphasize streak building and habit anchoring.' : ''}
 
+    IMPORTANT: For relatedHabitId, use the exact ID value from the [ID:xxx] tags shown in the habit list above. If no habit is related, use null.
+
     Format as JSON array:
     [
       {
@@ -95,8 +134,6 @@ async function generateActionItems(request) {
         "metric": "<specific measurable target>"
       }
     ]
-
-    Do not include markdown formatting.
   `;
 
   let returnValue;
@@ -104,13 +141,13 @@ async function generateActionItems(request) {
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
-
+    validateGeminiResponse(text, "generateActionItems");
     const parsed = parseGeminiJSON(text);
 
     const VALID_ACTION_TYPES = ['daily', 'weekly', 'challenge'];
     const VALID_PRIORITIES = ['high', 'medium', 'low'];
-    if (!Array.isArray(parsed)) throw new Error('Expected array');
-    returnValue = parsed.slice(0, 10).map(item => ({
+    if (!Array.isArray(parsed)) throw new HttpsError("internal", "Expected array");
+    returnValue = parsed.filter(item => item && typeof item === 'object').slice(0, 10).map(item => ({
       title: String(item.title || '').substring(0, 200),
       description: String(item.description || '').substring(0, 500),
       type: VALID_ACTION_TYPES.includes(item.type) ? item.type : 'daily',

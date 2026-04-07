@@ -18,6 +18,7 @@ import 'dart:io';
 /// Service to manage app icon badge count (iOS only via NotificationService)
 class BadgeService {
   static final BadgeService _instance = BadgeService._internal();
+
   /// Factory constructor returning the singleton instance
   /// 工厂构造函数，返回单例实例
   factory BadgeService() => _instance;
@@ -27,7 +28,8 @@ class BadgeService {
   BadgeService._internal();
 
   bool _badgeEnabled = true;
-  static const String _badgeEnabledKey = 'badge_enabled';
+  static const String _badgeEnabledKey =
+      'badgeEnabled'; // Must match SettingsProvider key
   int _lastBadgeCount = 0;
   bool _isSupported = false;
 

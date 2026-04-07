@@ -16,6 +16,7 @@
 const {
   HttpsError,
   getGenAI,
+  SchemaType,
   validateArray,
   validateNumber,
   sanitizeForPrompt,
@@ -23,8 +24,33 @@ const {
   checkUsageLimit,
   recordUsage,
   checkBurstLimit,
+  validateGeminiResponse,
   parseGeminiJSON,
 } = require("../helpers");
+
+const RESPONSE_SCHEMA = {
+  type: SchemaType.ARRAY,
+  description: "15 evidence-based coaching insights organized by skill level",
+  items: {
+    type: SchemaType.OBJECT,
+    properties: {
+      title: { type: SchemaType.STRING, description: "Concise, action-oriented title (max 6 words)" },
+      content: { type: SchemaType.STRING, description: "Evidence-based explanation citing behavioral principles (2-3 sentences)" },
+      category: {
+        type: SchemaType.STRING,
+        format: "enum",
+        enum: ["gettingStarted", "stayingConsistent", "overcomingChallenges", "advancedStrategies", "mindsetAndMotivation"],
+      },
+      keyPoints: {
+        type: SchemaType.ARRAY,
+        description: "3 specific, measurable takeaways",
+        items: { type: SchemaType.STRING },
+      },
+      actionable: { type: SchemaType.STRING, description: "One concrete next step with timeframe" },
+    },
+    required: ["title", "content", "category", "keyPoints", "actionable"],
+  },
+};
 
 /**
  * Generate personalized, evidence-based habit tips for the authenticated user.
@@ -41,8 +67,11 @@ async function generateHabitTips(request) {
     );
   }
 
-  await checkBurstLimit(request.auth.uid, 'tips');
-  const tier = await getUserTier(request.auth.uid);
+  // Parallelize independent checks to reduce latency
+  const [, tier] = await Promise.all([
+    checkBurstLimit(request.auth.uid, 'tips'),
+    getUserTier(request.auth.uid),
+  ]);
   await checkUsageLimit(request.auth.uid, tier, 'report');
 
   // Extract user data for personalization (optional)
@@ -55,7 +84,13 @@ async function generateHabitTips(request) {
   const streak = validateNumber(bestStreak ?? 0, 'bestStreak', 0, 10000);
   const completions = validateNumber(totalCompletions ?? 0, 'totalCompletions', 0, 100000);
 
-  const model = getGenAI().getGenerativeModel({ model: "gemini-3-flash-preview" });
+  const model = getGenAI().getGenerativeModel({
+    model: "gemini-3-flash-preview",
+    generationConfig: {
+      responseMimeType: "application/json",
+      responseSchema: RESPONSE_SCHEMA,
+    },
+  });
 
   // Build personalized context if user has enough data
   let personalizationContext = '';
@@ -98,11 +133,11 @@ async function generateHabitTips(request) {
     - "title": Concise, action-oriented title (max 6 words)
     - "content": Evidence-based explanation citing behavioral principles (2-3 sentences)
     - "category": one of ["gettingStarted", "stayingConsistent", "overcomingChallenges", "advancedStrategies", "mindsetAndMotivation"]
-    - "keyPoints": 3 specific, measurable takeaways
+    - "keyPoints": Array of 3 strings — specific, measurable takeaways
     - "actionable": One concrete next step with timeframe (e.g., "This week, try...")
 
     Use professional, scientific language while remaining accessible.
-    Format as JSON array. Do not include markdown formatting.
+    Format as JSON array.
   `;
 
   let returnValue;
@@ -110,12 +145,12 @@ async function generateHabitTips(request) {
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
-
+    validateGeminiResponse(text, "generateHabitTips");
     const parsed = parseGeminiJSON(text);
 
     const VALID_TIP_CATEGORIES = ['gettingStarted', 'stayingConsistent', 'overcomingChallenges', 'advancedStrategies', 'mindsetAndMotivation'];
-    if (!Array.isArray(parsed)) throw new Error('Expected array');
-    returnValue = parsed.slice(0, 20).map(item => ({
+    if (!Array.isArray(parsed)) throw new HttpsError("internal", "Expected array");
+    returnValue = parsed.filter(item => item && typeof item === 'object').slice(0, 20).map(item => ({
       title: String(item.title || '').substring(0, 100),
       content: String(item.content || '').substring(0, 500),
       category: VALID_TIP_CATEGORIES.includes(item.category) ? item.category : 'gettingStarted',

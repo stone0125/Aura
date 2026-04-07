@@ -14,6 +14,7 @@
 const {
   HttpsError,
   getGenAI,
+  SchemaType,
   validateArray,
   sanitizeForPrompt,
   checkBurstLimit,
@@ -21,11 +22,39 @@ const {
   checkUsageLimit,
   recordUsage,
   VALID_CATEGORIES,
+  validateGeminiResponse,
   parseGeminiJSON,
 } = require("../helpers");
 
 const VALID_PATTERN_TYPES = ['timeOfDay', 'dayOfWeek', 'sequence', 'trigger'];
 const VALID_ICON_NAMES = ['schedule', 'wb_sunny', 'nightlight', 'calendar_today', 'weekend', 'link', 'repeat', 'bolt', 'insights'];
+
+const RESPONSE_SCHEMA = {
+  type: SchemaType.ARRAY,
+  description: "2-4 behavioral patterns discovered from habit data",
+  minItems: 2,
+  maxItems: 4,
+  items: {
+    type: SchemaType.OBJECT,
+    properties: {
+      title: { type: SchemaType.STRING, description: "Short descriptive title (max 50 chars)" },
+      description: { type: SchemaType.STRING, description: "One sentence explanation (max 150 chars)" },
+      insight: { type: SchemaType.STRING, description: "Actionable advice based on this pattern (max 200 chars)" },
+      type: {
+        type: SchemaType.STRING,
+        format: "enum",
+        enum: ["timeOfDay", "dayOfWeek", "sequence", "trigger"],
+      },
+      confidence: { type: SchemaType.NUMBER, description: "0.0 to 1.0 based on data strength" },
+      iconName: {
+        type: SchemaType.STRING,
+        format: "enum",
+        enum: ["schedule", "wb_sunny", "nightlight", "calendar_today", "weekend", "link", "repeat", "bolt", "insights"],
+      },
+    },
+    required: ["title", "description", "insight", "type", "confidence", "iconName"],
+  },
+};
 
 /// Discover behavioral patterns from habit completion data
 /// 从习惯完成数据中发现行为模式
@@ -88,11 +117,20 @@ async function generatePatternDiscovery(request) {
   }
 
   // Rate limits only for AI path (not early returns)
-  await checkBurstLimit(request.auth.uid, 'patterns');
-  const tier = await getUserTier(request.auth.uid);
+  // Parallelize independent checks to reduce latency
+  const [, tier] = await Promise.all([
+    checkBurstLimit(request.auth.uid, 'patterns'),
+    getUserTier(request.auth.uid),
+  ]);
   await checkUsageLimit(request.auth.uid, tier, 'report');
 
-  const model = getGenAI().getGenerativeModel({ model: "gemini-3-flash-preview" });
+  const model = getGenAI().getGenerativeModel({
+    model: "gemini-3-flash-preview",
+    generationConfig: {
+      responseMimeType: "application/json",
+      responseSchema: RESPONSE_SCHEMA,
+    },
+  });
 
   const prompt = `
     You are a behavioral analytics engine. Analyze the user's habit completion data and discover 2-4 behavioral patterns.
@@ -112,9 +150,9 @@ async function generatePatternDiscovery(request) {
     - insight: Actionable advice based on this pattern (max 200 chars)
     - type: One of "timeOfDay", "dayOfWeek", "sequence", "trigger"
     - confidence: 0.0 to 1.0 based on data strength
-    - iconName: One of "schedule", "wb_sunny", "nightlight", "calendar_today", "weekend", "link", "repeat", "bolt"
+    - iconName: One of "schedule", "wb_sunny", "nightlight", "calendar_today", "weekend", "link", "repeat", "bolt", "insights"
 
-    Format as JSON array. Do not include markdown formatting.
+    Format as JSON array.
     [
       {
         "title": "<short title>",
@@ -132,14 +170,14 @@ async function generatePatternDiscovery(request) {
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
-
+    validateGeminiResponse(text, "generatePatternDiscovery");
     const parsed = parseGeminiJSON(text);
 
     if (!Array.isArray(parsed)) {
-      throw new Error("Response is not an array");
+      throw new HttpsError("internal", "Response is not an array");
     }
 
-    returnValue = { patterns: parsed.slice(0, 4).map(p => ({
+    returnValue = { patterns: parsed.filter(p => p && typeof p === 'object').slice(0, 4).map(p => ({
       title: String(p.title || 'Pattern').slice(0, 50),
       description: String(p.description || '').slice(0, 150),
       insight: String(p.insight || '').slice(0, 200),

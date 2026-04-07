@@ -11,6 +11,7 @@ import '../widgets/home/summary_stats_card.dart';
 import '../widgets/home/habit_list.dart';
 import '../config/theme/app_colors.dart';
 import 'habit_creation_screen.dart';
+import 'habit_detail_screen.dart';
 import 'ai_coach_screen.dart';
 import 'progress_screen.dart';
 import 'settings_screen.dart';
@@ -68,6 +69,9 @@ class HomeScreenState extends State<HomeScreen> {
   /// Sets up listeners to preload AI suggestions, tips, and insights
   /// 设置监听器以预加载AI建议、提示和洞察
   void _setupAIPreloading() {
+    if (!mounted) {
+      return; // Guard against post-frame callback after dispose / 防止销毁后的回调
+    }
     _habitProvider = Provider.of<HabitProvider>(context, listen: false);
     _progressProvider = Provider.of<ProgressProvider>(context, listen: false);
 
@@ -119,7 +123,8 @@ class HomeScreenState extends State<HomeScreen> {
           userHabits: habitNames,
           completionRate: _habitProvider!.completionRate * 100,
           bestStreak: _habitProvider!.bestStreak,
-          totalCompletions: combinedStreaks, // approximation: sum of current streaks
+          totalCompletions:
+              combinedStreaks, // approximation: sum of current streaks
         );
       }
     }
@@ -148,7 +153,10 @@ class HomeScreenState extends State<HomeScreen> {
           'completionRate': _progressProvider!.stats!.completionRate,
         };
 
-        coachProvider.loadInsights(weekData: weekData, habits: _habitProvider!.habits);
+        coachProvider.loadInsights(
+          weekData: weekData,
+          habits: _habitProvider!.habits,
+        );
       }
     }
   }
@@ -257,7 +265,8 @@ class _HomeTab extends StatelessWidget {
               children: [
                 // Header Section - uses Selector to only rebuild when firstName changes
                 Selector<SettingsProvider, String>(
-                  selector: (context, settings) => settings.userProfile.firstName,
+                  selector: (context, settings) =>
+                      settings.userProfile.firstName,
                   builder: (context, firstName, child) {
                     return HomeHeader(userName: firstName);
                   },
@@ -272,11 +281,40 @@ class _HomeTab extends StatelessWidget {
                 const SizedBox(height: 24),
 
                 // 3. Habit List (Core Action)
-                const HabitList(),
+                HabitList(
+                  onHabitTap: (habit) {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => HabitDetailScreen(habit: habit),
+                      ),
+                    );
+                  },
+                  onCreateHabit: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const HabitCreationScreen(),
+                      ),
+                    );
+                  },
+                ),
                 const SizedBox(height: 24),
 
                 // 4. AI Suggestion Card (Discovery - Least frequent)
-                const AISuggestionCard(),
+                AISuggestionCard(
+                  onCreateHabitFromSuggestion: (suggestion) {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            HabitCreationScreen(aiCoachSuggestion: suggestion),
+                      ),
+                    );
+                  },
+                  onViewAllSuggestions: () {
+                    final homeState = context
+                        .findAncestorStateOfType<HomeScreenState>();
+                    homeState?.switchToTab(2);
+                  },
+                ),
                 const SizedBox(height: 100),
               ],
             ),

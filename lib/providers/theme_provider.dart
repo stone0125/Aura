@@ -15,14 +15,20 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// Provider for managing app theme (light/dark mode)
 /// 管理应用主题（亮色/暗色模式）的 Provider
 class ThemeProvider with ChangeNotifier {
-  ThemeMode _themeMode = ThemeMode.light;
+  ThemeMode _themeMode;
   static const String _themeModeKey = 'theme_mode';
+  SharedPreferences? _prefs;
 
-  /// Constructor that loads the saved theme mode
-  /// 构造函数，加载已保存的主题模式
-  ThemeProvider() {
-    _loadThemeMode();
+  /// Cached SharedPreferences accessor
+  /// 缓存的 SharedPreferences 访问器
+  Future<SharedPreferences> _getPrefs() async {
+    return _prefs ??= await SharedPreferences.getInstance();
   }
+
+  /// Constructor with optional pre-loaded theme mode (avoids flash on startup)
+  /// 构造函数，支持预加载主题模式（避免启动时闪烁）
+  ThemeProvider({ThemeMode initialMode = ThemeMode.light})
+    : _themeMode = initialMode;
 
   /// Get current theme mode
   /// 获取当前主题模式
@@ -32,26 +38,12 @@ class ThemeProvider with ChangeNotifier {
   /// 检查暗色模式是否已启用
   bool get isDarkMode => _themeMode == ThemeMode.dark;
 
-  /// Load saved theme mode from shared preferences
-  /// 从 SharedPreferences 加载已保存的主题模式
-  Future<void> _loadThemeMode() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final savedMode = prefs.getString(_themeModeKey);
-      if (savedMode != null) {
-        _themeMode = savedMode == 'dark' ? ThemeMode.dark : ThemeMode.light;
-        notifyListeners();
-      }
-    } catch (e) {
-      // If loading fails, use default light mode
-      debugPrint('Error loading theme mode: $e');
-    }
-  }
-
   /// Toggle between light and dark mode
   /// 在亮色和暗色模式之间切换
   Future<void> toggleTheme() async {
-    _themeMode = _themeMode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
+    _themeMode = _themeMode == ThemeMode.light
+        ? ThemeMode.dark
+        : ThemeMode.light;
     notifyListeners();
     await _saveThemeMode();
   }
@@ -71,7 +63,7 @@ class ThemeProvider with ChangeNotifier {
   Future<void> clearUserData() async {
     _themeMode = ThemeMode.light;
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await _getPrefs();
       await prefs.remove(_themeModeKey);
     } catch (e) {
       debugPrint('Error clearing theme preference: $e');
@@ -83,7 +75,7 @@ class ThemeProvider with ChangeNotifier {
   /// 将主题模式保存到 SharedPreferences
   Future<void> _saveThemeMode() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await _getPrefs();
       await prefs.setString(
         _themeModeKey,
         _themeMode == ThemeMode.dark ? 'dark' : 'light',

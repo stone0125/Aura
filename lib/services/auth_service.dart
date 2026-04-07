@@ -54,7 +54,7 @@ class AuthService {
     try {
       if (kIsWeb) {
         // Web Google Sign In
-        GoogleAuthProvider authProvider = GoogleAuthProvider();
+        final GoogleAuthProvider authProvider = GoogleAuthProvider();
         return await _auth.signInWithPopup(authProvider);
       } else {
         // Mobile Google Sign In (v7 API)
@@ -62,7 +62,8 @@ class AuthService {
 
         if (!GoogleSignIn.instance.supportsAuthenticate()) {
           throw UnsupportedError(
-              'Google Sign-In not supported on this platform');
+            'Google Sign-In not supported on this platform',
+          );
         }
 
         // Credential Manager handles account selection — no disconnect() needed
@@ -132,7 +133,9 @@ class AuthService {
   /// Sign up with email and password, then send verification email
   /// 使用邮箱和密码注册，然后发送验证邮件
   Future<UserCredential> signUpWithEmailPassword(
-      String email, String password) async {
+    String email,
+    String password,
+  ) async {
     try {
       final credential = await _auth.createUserWithEmailAndPassword(
         email: email,
@@ -154,7 +157,9 @@ class AuthService {
   /// Sign in with email and password
   /// 使用邮箱和密码登录
   Future<UserCredential> signInWithEmailPassword(
-      String email, String password) async {
+    String email,
+    String password,
+  ) async {
     try {
       return await _auth.signInWithEmailAndPassword(
         email: email,

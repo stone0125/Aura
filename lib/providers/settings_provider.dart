@@ -27,6 +27,14 @@ import '../models/settings_models.dart';
 class SettingsProvider with ChangeNotifier {
   final FirestoreService _firestoreService = FirestoreService();
   StreamSubscription<User?>? _authSubscription;
+  SharedPreferences? _prefs;
+
+  /// Cached SharedPreferences accessor
+  /// 缓存的 SharedPreferences 访问器
+  Future<SharedPreferences> _getPrefs() async {
+    return _prefs ??= await SharedPreferences.getInstance();
+  }
+
   UserProfile _userProfile = UserProfile(
     id: '',
     firstName: '',
@@ -87,7 +95,7 @@ class SettingsProvider with ChangeNotifier {
   /// 登出时清除用户相关的 SharedPreferences 键
   Future<void> _clearUserPreferences() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await _getPrefs();
       await prefs.remove('notificationsEnabled');
       await prefs.remove('defaultReminderHour');
       await prefs.remove('defaultReminderMinute');
@@ -125,88 +133,86 @@ class SettingsProvider with ChangeNotifier {
     _isInitializing = true;
 
     try {
-    // Load saved settings from SharedPreferences
-    await _loadFromStorage();
+      // Load saved settings from SharedPreferences
+      await _loadFromStorage();
 
-    // Load real user data if logged in
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      try {
-        await user.reload(); // Ensure we have latest data
-        final freshUser = FirebaseAuth.instance.currentUser;
-        if (freshUser == null) {
-          debugPrint("DEBUG: User became null after reload");
-          notifyListeners();
-          return;
-        }
-        debugPrint("DEBUG: SettingsProvider init - Auth User loaded");
+      // Load real user data if logged in
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        try {
+          await user.reload(); // Ensure we have latest data
+          final freshUser = FirebaseAuth.instance.currentUser;
+          if (freshUser == null) {
+            notifyListeners();
+            return;
+          }
 
-        final userDoc = await _firestoreService.getUserProfile(freshUser.uid);
+          final userDoc = await _firestoreService.getUserProfile(freshUser.uid);
 
-        if (userDoc != null) {
-          debugPrint("DEBUG: Firestore Profile found");
-          _userProfile = userDoc;
+          if (userDoc != null) {
+            _userProfile = userDoc;
 
-          // Self-heal: If firestore name OR email is missing but auth has it, update it
-          bool needsUpdate = false;
-          UserProfile updatedProfile = _userProfile;
+            // Self-heal: If firestore name OR email is missing but auth has it, update it
+            bool needsUpdate = false;
+            UserProfile updatedProfile = _userProfile;
 
-          if ((updatedProfile.firstName.isEmpty ||
-                  updatedProfile.firstName == 'User') &&
-              freshUser.displayName != null &&
-              freshUser.displayName!.isNotEmpty) {
-            debugPrint("DEBUG: Fixing empty DB name with Auth data");
-            final names = freshUser.displayName!.split(' ');
-            updatedProfile = updatedProfile.copyWith(
-              firstName: names.first,
-              lastName: names.length > 1 ? names.sublist(1).join(' ') : '',
-              displayName: freshUser.displayName,
+            if ((updatedProfile.firstName.isEmpty ||
+                    updatedProfile.firstName == 'User') &&
+                freshUser.displayName != null &&
+                freshUser.displayName!.isNotEmpty) {
+              final names = freshUser.displayName!.split(' ');
+              updatedProfile = updatedProfile.copyWith(
+                firstName: names.first,
+                lastName: names.length > 1 ? names.sublist(1).join(' ') : '',
+                displayName: freshUser.displayName,
+              );
+              needsUpdate = true;
+            }
+
+            if (updatedProfile.email.isEmpty &&
+                freshUser.email != null &&
+                freshUser.email!.isNotEmpty) {
+              updatedProfile = updatedProfile.copyWith(email: freshUser.email);
+              needsUpdate = true;
+            }
+
+            if (needsUpdate) {
+              _userProfile = updatedProfile;
+              try {
+                await _firestoreService.updateUserProfile(updatedProfile);
+              } catch (e) {
+                debugPrint('Error self-healing profile: $e');
+              }
+            }
+          } else {
+            // Fallback if doc doesn't exist yet, create from Auth
+            final names = freshUser.displayName?.split(' ') ?? ['User'];
+            String firstName = names.first;
+            final String lastName = names.length > 1
+                ? names.sublist(1).join(' ')
+                : '';
+
+            if (firstName.isEmpty) firstName = 'User';
+
+            _userProfile = UserProfile(
+              id: freshUser.uid,
+              firstName: firstName,
+              lastName: lastName,
+              displayName: freshUser.displayName ?? 'User',
+              email: freshUser.email ?? '',
+              bio: 'Ready to build better habits!',
+              avatarUrl: freshUser.photoURL,
+              memberSince: freshUser.metadata.creationTime ?? DateTime.now(),
+              isPro: false,
             );
-            needsUpdate = true;
+            // Create in DB
+            await _firestoreService.updateUserProfile(_userProfile);
           }
-
-          if (updatedProfile.email.isEmpty &&
-              freshUser.email != null &&
-              freshUser.email!.isNotEmpty) {
-            debugPrint("DEBUG: Fixing empty DB email with Auth data");
-            updatedProfile = updatedProfile.copyWith(email: freshUser.email);
-            needsUpdate = true;
-          }
-
-          if (needsUpdate) {
-            _userProfile = updatedProfile;
-            await _firestoreService.updateUserProfile(updatedProfile);
-          }
-        } else {
-          debugPrint("DEBUG: No Firestore doc found, creating new.");
-          // Fallback if doc doesn't exist yet, create from Auth
-          final names = freshUser.displayName?.split(' ') ?? ['User'];
-          String firstName = names.first;
-          String lastName = names.length > 1 ? names.sublist(1).join(' ') : '';
-
-          if (firstName.isEmpty) firstName = 'User';
-
-          _userProfile = UserProfile(
-            id: freshUser.uid,
-            firstName: firstName,
-            lastName: lastName,
-            displayName: freshUser.displayName ?? 'User',
-            email: freshUser.email ?? '',
-            bio: 'Ready to build better habits!',
-            avatarUrl: freshUser.photoURL,
-            memberSince: freshUser.metadata.creationTime ?? DateTime.now(),
-            isPro: false,
-          );
-          // Create in DB
-          await _firestoreService.updateUserProfile(_userProfile);
+        } catch (e) {
+          debugPrint('Error loading user profile: $e');
         }
-      } catch (e) {
-        debugPrint('Error loading user profile: $e');
       }
-    } else {
-      debugPrint("DEBUG: SettingsProvider init - No user logged in");
-    }
-    notifyListeners();
+      notifyListeners();
     } finally {
       _isInitializing = false;
     }
@@ -475,17 +481,29 @@ class SettingsProvider with ChangeNotifier {
   Future<void> deleteAccount() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
+    final userId = user.uid;
 
     // 1. Delete the Firebase Auth account FIRST
+    //    先删除 Firebase Auth 账户
     //    This may throw requires-recent-login if the session is stale.
     //    By doing this first, we avoid deleting Firestore data only to have
     //    auth deletion fail (leaving the user with an account but no data).
     await user.delete();
 
-    // 2. Delete all Firestore user data (pass userId since auth user is gone)
-    await _firestoreService.deleteAllUserData(forUserId: user.uid);
+    // 2. Delete all Firestore user data (best-effort after auth deletion)
+    //    删除所有 Firestore 用户数据（认证删除后尽力而为）
+    try {
+      await _firestoreService.deleteAllUserData(forUserId: userId);
+    } catch (e) {
+      debugPrint(
+        'WARNING: Auth deleted but Firestore cleanup failed for $userId: $e',
+      );
+      // Data will need manual cleanup, but auth is already gone
+      // 数据需要手动清理，但认证已被删除
+    }
 
     // 3. Sign out (clears local state)
+    //    登出（清除本地状态）
     await AuthService().signOut();
     notifyListeners();
   }
@@ -566,7 +584,7 @@ class SettingsProvider with ChangeNotifier {
   /// 将设置保存到持久化存储
   Future<void> _saveToStorage() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await _getPrefs();
       await prefs.setBool(
         'notificationsEnabled',
         _settings.notificationsEnabled,
@@ -594,7 +612,6 @@ class SettingsProvider with ChangeNotifier {
       );
       await prefs.setBool('shareDataForAI', _settings.shareDataForAI);
       await prefs.setString('themePreference', _settings.themePreference.name);
-      debugPrint('Settings saved to storage');
     } catch (e) {
       debugPrint('Error saving settings: $e');
     }
@@ -604,12 +621,18 @@ class SettingsProvider with ChangeNotifier {
   /// 从持久化存储加载设置
   Future<void> _loadFromStorage() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await _getPrefs();
 
       final notificationsEnabled =
           prefs.getBool('notificationsEnabled') ?? true;
-      final reminderHour = (prefs.getInt('defaultReminderHour') ?? 9).clamp(0, 23);
-      final reminderMinute = (prefs.getInt('defaultReminderMinute') ?? 0).clamp(0, 59);
+      final reminderHour = (prefs.getInt('defaultReminderHour') ?? 9).clamp(
+        0,
+        23,
+      );
+      final reminderMinute = (prefs.getInt('defaultReminderMinute') ?? 0).clamp(
+        0,
+        59,
+      );
       final badgeEnabled = prefs.getBool('badgeEnabled') ?? true;
       final motivationalMessages =
           prefs.getBool('motivationalMessages') ?? true;
@@ -641,9 +664,6 @@ class SettingsProvider with ChangeNotifier {
         themePreference: themePreference,
       );
 
-      debugPrint(
-        'Settings loaded from storage: reminder time = $reminderHour:$reminderMinute',
-      );
       // Note: notifyListeners removed here - called once in initialize() after _loadFromStorage completes
     } catch (e) {
       debugPrint('Error loading settings: $e');

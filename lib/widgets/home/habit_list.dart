@@ -7,15 +7,25 @@ import '../../providers/habit_provider.dart';
 import '../../providers/ai_coach_provider.dart';
 import '../../config/theme/app_colors.dart';
 import '../../config/theme/ui_constants.dart';
-import '../../screens/habit_creation_screen.dart';
-import '../../screens/habit_detail_screen.dart';
 
 /// Habit List widget with completion toggles
 /// 带完成切换功能的习惯列表组件
 class HabitList extends StatelessWidget {
+  /// Callback when user taps a habit card to view details
+  /// 用户点击习惯卡片查看详情时的回调
+  final void Function(Habit habit) onHabitTap;
+
+  /// Callback when user taps the create habit button in empty state
+  /// 用户在空状态下点击创建习惯按钮时的回调
+  final VoidCallback onCreateHabit;
+
   /// Creates a habit list widget
   /// 创建习惯列表组件
-  const HabitList({super.key});
+  const HabitList({
+    super.key,
+    required this.onHabitTap,
+    required this.onCreateHabit,
+  });
 
   /// Builds the habit list with today's habits and an empty state fallback
   /// 构建今日习惯列表，无习惯时显示空状态
@@ -48,7 +58,7 @@ class HabitList extends StatelessWidget {
 
         // Habit Cards List
         if (habits.isEmpty)
-          _buildEmptyState(isDark)
+          _buildEmptyState(isDark, onCreateHabit)
         else
           ListView.builder(
             shrinkWrap: true,
@@ -62,11 +72,14 @@ class HabitList extends StatelessWidget {
               return HabitCard(
                 key: ValueKey(habit.id),
                 habit: habit,
+                onTap: () => onHabitTap(habit),
                 onToggle: () async {
                   HapticFeedback.lightImpact();
                   try {
                     // Use context.read for one-time access
-                    await context.read<HabitProvider>().toggleHabitCompletion(habit.id);
+                    await context.read<HabitProvider>().toggleHabitCompletion(
+                      habit.id,
+                    );
                   } catch (e, stackTrace) {
                     debugPrint('Error toggling habit: $e\n$stackTrace');
                     if (context.mounted) {
@@ -102,92 +115,84 @@ class HabitList extends StatelessWidget {
 
   /// Builds the empty state UI prompting the user to create their first habit
   /// 构建空状态界面，提示用户创建第一个习惯
-  Widget _buildEmptyState(bool isDark) {
-    return Builder(
-      builder: (context) => Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 60),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Illustration (using icon as placeholder)
-              Container(
-                width: 120,
-                height: 120,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: isDark
-                      ? AppColors.darkBorder.withValues(alpha: 0.3)
-                      : AppColors.lightBorder.withValues(alpha: 0.3),
-                ),
-                child: Icon(
-                  Icons.spa_rounded,
-                  size: 60,
-                  color: isDark ? AppColors.darkCoral : AppColors.lightCoral,
-                ),
+  Widget _buildEmptyState(bool isDark, VoidCallback onCreateHabit) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 60),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Illustration (using icon as placeholder)
+            Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isDark
+                    ? AppColors.darkBorder.withValues(alpha: 0.3)
+                    : AppColors.lightBorder.withValues(alpha: 0.3),
               ),
-              const SizedBox(height: 24),
-
-              // Title
-              Text(
-                'Start your habit journey',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: isDark
-                      ? AppColors.darkSecondaryText
-                      : AppColors.lightSecondaryText,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                ),
+              child: Icon(
+                Icons.spa_rounded,
+                size: 60,
+                color: isDark ? AppColors.darkCoral : AppColors.lightCoral,
               ),
-              const SizedBox(height: 8),
+            ),
+            const SizedBox(height: 24),
 
-              // Subtitle
-              Text(
-                'Create your first habit to begin tracking',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: isDark
-                      ? AppColors.darkSecondaryText
-                      : AppColors.lightSecondaryText,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w400,
-                ),
+            // Title
+            Text(
+              'Start your habit journey',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: isDark
+                    ? AppColors.darkSecondaryText
+                    : AppColors.lightSecondaryText,
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
               ),
-              const SizedBox(height: 24),
+            ),
+            const SizedBox(height: 8),
 
-              // CTA Button
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => const HabitCreationScreen(),
-                      ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: isDark
-                        ? AppColors.darkCoral
-                        : AppColors.lightCoral,
-                    foregroundColor: isDark
-                        ? AppColors.darkBackground
-                        : Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: UIConstants.borderRadiusMedium,
-                    ),
-                    elevation: 0,
+            // Subtitle
+            Text(
+              'Create your first habit to begin tracking',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: isDark
+                    ? AppColors.darkSecondaryText
+                    : AppColors.lightSecondaryText,
+                fontSize: 14,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // CTA Button
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                onPressed: onCreateHabit,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isDark
+                      ? AppColors.darkCoral
+                      : AppColors.lightCoral,
+                  foregroundColor: isDark
+                      ? AppColors.darkBackground
+                      : Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: UIConstants.borderRadiusMedium,
                   ),
-                  child: const Text(
-                    'Create Your First Habit',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                  ),
+                  elevation: 0,
+                ),
+                child: const Text(
+                  'Create Your First Habit',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -198,6 +203,7 @@ class HabitList extends StatelessWidget {
 /// 单个习惯卡片组件
 class HabitCard extends StatelessWidget {
   final Habit habit;
+  final VoidCallback onTap;
   final VoidCallback onToggle;
   final VoidCallback onDelete;
 
@@ -206,6 +212,7 @@ class HabitCard extends StatelessWidget {
   const HabitCard({
     super.key,
     required this.habit,
+    required this.onTap,
     required this.onToggle,
     required this.onDelete,
   });
@@ -266,13 +273,7 @@ class HabitCard extends StatelessWidget {
         onDelete();
       },
       child: GestureDetector(
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => HabitDetailScreen(habit: habit),
-            ),
-          );
-        },
+        onTap: onTap,
         child: Container(
           margin: const EdgeInsets.only(left: 20, right: 20, bottom: 12),
           padding: const EdgeInsets.symmetric(vertical: 12),
@@ -359,7 +360,8 @@ class HabitCard extends StatelessWidget {
                             ),
                           ),
                         ),
-                        if (habit.reminderEnabled && habit.reminderTime != null) ...[
+                        if (habit.reminderEnabled &&
+                            habit.reminderTime != null) ...[
                           const SizedBox(width: 8),
                           Icon(
                             Icons.alarm_rounded,
@@ -393,7 +395,9 @@ class HabitCard extends StatelessWidget {
                   color: Colors.transparent,
                   child: InkWell(
                     onTap: onToggle,
-                    borderRadius: BorderRadius.circular(UIConstants.radiusXLarge),
+                    borderRadius: BorderRadius.circular(
+                      UIConstants.radiusXLarge,
+                    ),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
                       width: 48,
