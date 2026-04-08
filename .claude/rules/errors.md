@@ -27,7 +27,11 @@ Format: Each entry has the error, root cause, and fix. Newest entries at the top
 
 ## Error Log
 
-<!-- Add new entries below this line, newest first -->
+### [2026-04-08] Pre-commit hook fails due to unformatted Dart files
+- **Error**: `ERROR: These files need formatting: lib/providers/ai_coach_provider.dart` etc. Commit rejected by pre-commit hook
+- **Root cause**: Edited Dart files without running `dart format` before committing. The project has a pre-commit hook that checks formatting
+- **Fix**: Ran `dart format` on the flagged files, re-staged, and committed again as a NEW commit (not amend)
+- **Prevention**: Always run `dart format` on modified Dart files before committing. After a formatting failure, re-stage and create a new commit — never amend, as the failed commit didn't actually happen
 
 ### [2026-04-07] Falsy zero converts health metrics to null in Cloud Functions
 - **Error**: `Number(healthData.avgSteps) || null` converts legitimate `0` values to `null` because `0` is falsy in JavaScript. Users with 0 steps/sleep see "N/A" instead of "0"
