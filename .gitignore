@@ -1,6 +1,6 @@
-# Claude Code (keep project-level config tracked, exclude local)
-.claude/settings.local.json
-.claude/todos/
+# Claude Code
+.claude/
+CLAUDE.md
 
 # Documentation & reports (not app code)
 doc/
