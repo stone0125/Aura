@@ -732,61 +732,67 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
 
     final screenWidth = MediaQuery.of(context).size.width;
     final cardWidth = (screenWidth - 32 - 16) / 2; // horizontal padding + gap
-    // Fixed content height: 48 icon + 32 padding + ~38 number + 4 gap + 16 label + 16 sublabel = ~154
-    final cardHeight = cardWidth.clamp(154.0, double.infinity);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: GridView.count(
-        crossAxisCount: 2,
-        shrinkWrap: true,
-        primary: false,
-        padding: EdgeInsets.zero,
-        physics: const NeverScrollableScrollPhysics(),
-        mainAxisSpacing: 16,
-        crossAxisSpacing: 16,
-        childAspectRatio: cardWidth / cardHeight,
+      child: Wrap(
+        spacing: 16,
+        runSpacing: 16,
         children: [
-          _buildStatCard(
-            isDark: isDark,
-            icon: Icons.local_fire_department_rounded,
-            gradientColors: isDark
-                ? [AppColors.darkOrange, const Color(0xFFFF6F00)]
-                : [AppColors.orange, const Color(0xFFE74C3C)],
-            number: '${stats.currentStreak}',
-            label: 'Day Streak',
-            sublabel: stats.currentStreak == 0 ? 'Start today!' : null,
+          SizedBox(
+            width: cardWidth,
+            child: _buildStatCard(
+              isDark: isDark,
+              icon: Icons.local_fire_department_rounded,
+              gradientColors: isDark
+                  ? [AppColors.darkOrange, const Color(0xFFFF6F00)]
+                  : [AppColors.orange, const Color(0xFFE74C3C)],
+              number: '${stats.currentStreak}',
+              label: 'Day Streak',
+              sublabel: stats.currentStreak == 0 ? 'Start today!' : null,
+            ),
           ),
-          _buildStatCard(
-            isDark: isDark,
-            icon: Icons.emoji_events_rounded,
-            gradientColors: const [Color(0xFFFFD54F), Color(0xFFFFC107)],
-            number: '${stats.longestStreak}',
-            label: 'Best Streak',
-            sublabel: stats.isRecord ? 'Record! ✨' : null,
-            sublabelColor: isDark ? AppColors.darkCoral : AppColors.lightCoral,
+          SizedBox(
+            width: cardWidth,
+            child: _buildStatCard(
+              isDark: isDark,
+              icon: Icons.emoji_events_rounded,
+              gradientColors: const [Color(0xFFFFD54F), Color(0xFFFFC107)],
+              number: '${stats.longestStreak}',
+              label: 'Best Streak',
+              sublabel: stats.isRecord ? 'Record! ✨' : null,
+              sublabelColor: isDark
+                  ? AppColors.darkCoral
+                  : AppColors.lightCoral,
+            ),
           ),
-          _buildStatCard(
-            isDark: isDark,
-            icon: Icons.check_circle_rounded,
-            gradientColors: isDark
-                ? [const Color(0xFF69F0AE), const Color(0xFF4CAF50)]
-                : [const Color(0xFFA8E6CF), const Color(0xFF27AE60)],
-            number: '${stats.totalCompletions}',
-            label: 'Completions',
-            sublabel: stats.totalCompletions < 100
-                ? '${100 - stats.totalCompletions} to Century'
-                : null,
+          SizedBox(
+            width: cardWidth,
+            child: _buildStatCard(
+              isDark: isDark,
+              icon: Icons.check_circle_rounded,
+              gradientColors: isDark
+                  ? [const Color(0xFF69F0AE), const Color(0xFF4CAF50)]
+                  : [const Color(0xFFA8E6CF), const Color(0xFF27AE60)],
+              number: '${stats.totalCompletions}',
+              label: 'Completions',
+              sublabel: stats.totalCompletions < 100
+                  ? '${100 - stats.totalCompletions} to Century'
+                  : null,
+            ),
           ),
-          _buildStatCard(
-            isDark: isDark,
-            icon: Icons.insert_chart_rounded,
-            gradientColors: isDark
-                ? [const Color(0xFF42A5F5), const Color(0xFFAB47BC)]
-                : [const Color(0xFF3498DB), const Color(0xFF9B59B6)],
-            number: stats.completionRateFormatted,
-            label: 'Success Rate',
-            sublabel: 'Last 30 days',
+          SizedBox(
+            width: cardWidth,
+            child: _buildStatCard(
+              isDark: isDark,
+              icon: Icons.insert_chart_rounded,
+              gradientColors: isDark
+                  ? [const Color(0xFF42A5F5), const Color(0xFFAB47BC)]
+                  : [const Color(0xFF3498DB), const Color(0xFF9B59B6)],
+              number: stats.completionRateFormatted,
+              label: 'Success Rate',
+              sublabel: 'Last 30 days',
+            ),
           ),
         ],
       ),
@@ -831,7 +837,7 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
             ),
             child: Icon(icon, color: Colors.white, size: 24),
           ),
-          const Spacer(),
+          const SizedBox(height: 12),
           Text(
             number,
             maxLines: 1,
