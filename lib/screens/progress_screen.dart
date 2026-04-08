@@ -550,21 +550,28 @@ class _ProgressScreenState extends State<ProgressScreen>
                     },
                   ),
 
-                // Stats row
-                Row(
-                  children: [
-                    _buildAIStat(
-                      isDark,
-                      '${(summary.completionRate * 100).toInt()}%',
-                      'Success Rate',
-                    ),
-                    const SizedBox(width: 24),
-                    _buildAIStat(
-                      isDark,
-                      '${summary.currentStreak}',
-                      'Day Streak',
-                    ),
-                  ],
+                // Stats row — use live data from ProgressProvider, not cached summary
+                Builder(
+                  builder: (context) {
+                    final progressProvider = context.watch<ProgressProvider>();
+                    final liveRate =
+                        progressProvider.stats?.completionRate ??
+                        summary.completionRate;
+                    final liveStreak =
+                        progressProvider.stats?.bestStreak ??
+                        summary.currentStreak;
+                    return Row(
+                      children: [
+                        _buildAIStat(
+                          isDark,
+                          '${(liveRate * 100).toInt()}%',
+                          'Success Rate',
+                        ),
+                        const SizedBox(width: 24),
+                        _buildAIStat(isDark, '$liveStreak', 'Day Streak'),
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(height: 16),
 

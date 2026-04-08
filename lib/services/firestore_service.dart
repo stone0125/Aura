@@ -429,16 +429,16 @@ class FirestoreService {
       }
     } else {
       // Undoing: find the most recent completion before today
+      // Use ascending order (default) and take the last doc to avoid needing a composite index
       final previousCompletions = await habitsRef
           .doc(habit.id)
           .collection('history')
           .where(FieldPath.documentId, isLessThan: dateStr)
-          .orderBy(FieldPath.documentId, descending: true)
-          .limit(1)
           .get();
 
       if (previousCompletions.docs.isNotEmpty) {
-        final data = previousCompletions.docs.first.data();
+        // Docs are in ascending order by ID (date string), so last = most recent
+        final data = previousCompletions.docs.last.data();
         final ts = data['completedAt'];
         if (ts is Timestamp) {
           newLastCompletedDate = ts.toDate();
@@ -453,7 +453,7 @@ class FirestoreService {
 
     // Atomic batch: update habit + history in one write
     final batch = _db.batch();
-    batch.update(habitsRef.doc(habit.id), {
+    final updateData = <String, dynamic>{
       'name': habit.name,
       'category': habit.category.name,
       'streak': newStreak,
@@ -462,9 +462,13 @@ class FirestoreService {
           ? Timestamp.fromDate(newLastCompletedDate)
           : null,
       'reminderEnabled': habit.reminderEnabled,
-      'reminderHour': habit.reminderTime?.hour,
-      'reminderMinute': habit.reminderTime?.minute,
-    });
+    };
+    // Only include reminder fields when they have values — null fails security rules
+    if (habit.reminderTime != null) {
+      updateData['reminderHour'] = habit.reminderTime!.hour;
+      updateData['reminderMinute'] = habit.reminderTime!.minute;
+    }
+    batch.update(habitsRef.doc(habit.id), updateData);
 
     if (willBeCompleted) {
       batch.set(habitsRef.doc(habit.id).collection('history').doc(dateStr), {

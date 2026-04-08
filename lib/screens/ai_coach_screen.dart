@@ -8,6 +8,7 @@ import '../models/daily_review_models.dart';
 import '../providers/ai_coach_provider.dart';
 import '../providers/ai_scoring_provider.dart';
 import '../providers/habit_provider.dart';
+import '../providers/progress_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/theme_provider.dart';
 
@@ -1348,31 +1349,46 @@ class _AICoachScreenState extends State<AICoachScreen>
           ),
           const SizedBox(height: 16),
 
-          // Stats Row
-          Row(
-            children: [
-              Expanded(
-                child: _buildWeeklyStat(
-                  isDark,
-                  '${summary.totalCompletions}/${summary.targetCompletions}',
-                  'Completions',
-                ),
-              ),
-              Expanded(
-                child: _buildWeeklyStat(
-                  isDark,
-                  '${(summary.completionRate * 100).toInt()}%',
-                  'Success Rate',
-                ),
-              ),
-              Expanded(
-                child: _buildWeeklyStat(
-                  isDark,
-                  '${summary.currentStreak}',
-                  'Day Streak',
-                ),
-              ),
-            ],
+          // Stats Row — use live data from providers, not cached summary
+          Builder(
+            builder: (context) {
+              final progressProvider = context.watch<ProgressProvider>();
+              final habitProvider = context.watch<HabitProvider>();
+              final liveRate =
+                  progressProvider.stats?.completionRate ??
+                  summary.completionRate;
+              final liveStreak =
+                  progressProvider.stats?.bestStreak ?? summary.currentStreak;
+              final liveCompleted = habitProvider.habits
+                  .where((h) => h.isCompleted)
+                  .length;
+              final liveTotal = habitProvider.habits.length;
+              return Row(
+                children: [
+                  Expanded(
+                    child: _buildWeeklyStat(
+                      isDark,
+                      '$liveCompleted/$liveTotal',
+                      'Today',
+                    ),
+                  ),
+                  Expanded(
+                    child: _buildWeeklyStat(
+                      isDark,
+                      '${(liveRate * 100).toInt()}%',
+                      'Success Rate',
+                    ),
+                  ),
+                  Expanded(
+                    child: _buildWeeklyStat(
+                      isDark,
+                      '$liveStreak',
+                      'Day Streak',
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 16),
 
@@ -1872,14 +1888,23 @@ class _AICoachScreenState extends State<AICoachScreen>
                         ],
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        '${review.completedCount}/${review.totalHabits} habits completed',
-                        style: TextStyle(
-                          color: isDark
-                              ? AppColors.darkSecondaryText
-                              : AppColors.lightSecondaryText,
-                          fontSize: 13,
-                        ),
+                      Builder(
+                        builder: (ctx) {
+                          final hp = ctx.watch<HabitProvider>();
+                          final done = hp.habits
+                              .where((h) => h.isCompleted)
+                              .length;
+                          final total = hp.habits.length;
+                          return Text(
+                            '$done/$total habits completed',
+                            style: TextStyle(
+                              color: isDark
+                                  ? AppColors.darkSecondaryText
+                                  : AppColors.lightSecondaryText,
+                              fontSize: 13,
+                            ),
+                          );
+                        },
                       ),
                     ],
                   ),

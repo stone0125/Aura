@@ -94,7 +94,15 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
         NotificationService().initialize(),
         SubscriptionService().initialize(),
         BadgeService().initialize(),
-      ]);
+      ]).timeout(
+        const Duration(seconds: 15),
+        onTimeout: () {
+          debugPrint(
+            'Splash: Service init timeout — continuing without full init',
+          );
+          return [];
+        },
+      );
     } catch (e) {
       debugPrint('Splash init error: $e');
       if (!mounted) return;

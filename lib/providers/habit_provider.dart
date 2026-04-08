@@ -179,8 +179,9 @@ class HabitProvider with ChangeNotifier {
       debugPrint('Error toggling habit: $e');
       rethrow;
     } finally {
-      // Always remove from toggling set
+      // Always remove from toggling set and re-enable the UI button
       _togglingHabits.remove(habitId);
+      notifyListeners();
     }
   }
 

@@ -188,6 +188,7 @@ class AICoachProvider with ChangeNotifier {
   /// 清除行动项的错误消息
   void clearActionsError() {
     _actionsError = null;
+    notifyListeners();
   }
 
   // Cache Keys
@@ -573,17 +574,22 @@ class AICoachProvider with ChangeNotifier {
       }
 
       final int totalCompletions = (weekData['totalCompletions'] as int?) ?? 0;
-      // Target = number of habits × 7 days in a week
-      final int targetCompletions = habits.length * 7;
-      final double completionRate = targetCompletions > 0
-          ? (totalCompletions / targetCompletions).clamp(0.0, 1.0)
+      // Use the completion rate from ProgressProvider if available, otherwise calculate
+      final double passedRate = (weekData['completionRate'] is double)
+          ? weekData['completionRate'] as double
+          : (weekData['completionRate'] is num)
+          ? (weekData['completionRate'] as num).toDouble()
           : 0.0;
+      // Target: days tracked so far this week × habits (not full 7 days)
+      final int targetCompletions = totalCompletions > 0 && passedRate > 0
+          ? (totalCompletions / passedRate).round()
+          : habits.length;
 
       _weeklySummary = WeeklyAISummary(
         weekRange: 'Current Week',
         totalCompletions: totalCompletions,
         targetCompletions: targetCompletions,
-        completionRate: completionRate,
+        completionRate: passedRate.clamp(0.0, 1.0),
         currentStreak: weekData['currentStreak'] ?? 0,
         topCategory: 'General',
         insight: data['summary'] ?? 'Keep going!',
